@@ -14,16 +14,169 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      kiosks: {
+        Row: {
+          configuration: Json | null
+          created_at: string
+          id: string
+          last_heartbeat: string | null
+          location: string
+          name: string
+          status: Database["public"]["Enums"]["kiosk_status"]
+          updated_at: string
+        }
+        Insert: {
+          configuration?: Json | null
+          created_at?: string
+          id?: string
+          last_heartbeat?: string | null
+          location: string
+          name: string
+          status?: Database["public"]["Enums"]["kiosk_status"]
+          updated_at?: string
+        }
+        Update: {
+          configuration?: Json | null
+          created_at?: string
+          id?: string
+          last_heartbeat?: string | null
+          location?: string
+          name?: string
+          status?: Database["public"]["Enums"]["kiosk_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount_baisas: number
+          card_last_four: string | null
+          category: Database["public"]["Enums"]["donation_category"]
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          kiosk_id: string | null
+          mobile_number: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          pos_response: Json | null
+          receipt_printed: boolean | null
+          receipt_sent: boolean | null
+          status: Database["public"]["Enums"]["transaction_status"]
+        }
+        Insert: {
+          amount_baisas: number
+          card_last_four?: string | null
+          category: Database["public"]["Enums"]["donation_category"]
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kiosk_id?: string | null
+          mobile_number?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          pos_response?: Json | null
+          receipt_printed?: boolean | null
+          receipt_sent?: boolean | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+        }
+        Update: {
+          amount_baisas?: number
+          card_last_four?: string | null
+          category?: Database["public"]["Enums"]["donation_category"]
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kiosk_id?: string | null
+          mobile_number?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          pos_response?: Json | null
+          receipt_printed?: boolean | null
+          receipt_sent?: boolean | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "operator" | "viewer"
+      donation_category: "donation" | "zakat" | "sadaqah" | "general"
+      kiosk_status: "active" | "inactive" | "maintenance"
+      transaction_status:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +303,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "operator", "viewer"],
+      donation_category: ["donation", "zakat", "sadaqah", "general"],
+      kiosk_status: ["active", "inactive", "maintenance"],
+      transaction_status: [
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+    },
   },
 } as const
