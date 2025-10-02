@@ -37,7 +37,7 @@ const Index = () => {
             <KioskButton
               variant="secondary"
               size="xl"
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/auth')}
               className="p-8 flex flex-col items-center space-y-2"
             >
               <span className="text-3xl mb-2">⚙️</span>

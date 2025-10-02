@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 const PaymentProcessingPage = () => {
   const navigate = useNavigate();
@@ -11,28 +12,50 @@ const PaymentProcessingPage = () => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Simulate payment processing with progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          // Simulate 90% success rate, 10% error rate
-          const isSuccess = Math.random() > 0.1;
-          setTimeout(() => {
-            if (isSuccess) {
-              navigate(`/kiosk/thank-you?category=${category}&amount=${amount}`);
-            } else {
-              navigate(`/kiosk/error?category=${category}&amount=${amount}`);
-            }
-          }, 500);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 100);
+    const processPayment = async () => {
+      try {
+        // Generate transaction ID
+        const transactionId = crypto.randomUUID();
+        const kioskId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"; // Default kiosk ID
 
-    return () => clearInterval(interval);
-  }, [navigate, category, amount]);
+        // Call edge function to process payment
+        const { data, error } = await supabase.functions.invoke('process-payment', {
+          body: {
+            transactionId,
+            kioskId,
+            amount,
+            category,
+            mobileNumber: searchParams.get('mobile') || null,
+          },
+        });
+
+        if (error) throw error;
+
+        // Animate progress while waiting
+        const interval = setInterval(() => {
+          setProgress(prev => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              setTimeout(() => {
+                if (data.success) {
+                  navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction.transaction_ref}`);
+                } else {
+                  navigate(`/kiosk/error?category=${category}&amount=${amount}`);
+                }
+              }, 500);
+              return 100;
+            }
+            return prev + 2;
+          });
+        }, 100);
+      } catch (error) {
+        console.error('Payment error:', error);
+        navigate(`/kiosk/error?category=${category}&amount=${amount}`);
+      }
+    };
+
+    processPayment();
+  }, [navigate, category, amount, searchParams]);
 
   const formatAmount = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
