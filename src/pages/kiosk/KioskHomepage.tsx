@@ -13,7 +13,7 @@ const KioskHomepage = () => {
     { id: 'zakat', title: 'زكاة', description: 'زكاة المال والذهب' },
     { id: 'sadaqah', title: 'صدقة', description: 'الصدقة العامة' },
     { id: 'charity', title: 'خيرية', description: 'الأعمال الخيرية' },
-    { id: 'mosque', title: 'مسجد', description: 'دعم المسجد' },
+    { id: 'mosque', title: 'تبرعات للمساجد', description: 'دعم المسجد' },
     { id: 'orphans', title: 'أيتام', description: 'كفالة الأيتام' },
     { id: 'education', title: 'نشاط التدريس', description: 'دعم التعليم' },
   ];
