@@ -10,6 +10,7 @@ const KioskHomepage = () => {
   // Mock donation categories - in real app, this would come from admin dashboard
   const donationCategories = [
     { id: 'ashura', title: 'تبرعات عاشوراء', description: 'التبرعات الخاصة بعاشوراء' },
+    { id: 'ramadan', title: 'إفطار شهر رمضان', description: 'إفطار الصائمين' },
     { id: 'zakat', title: 'زكاة', description: 'زكاة المال والذهب' },
     { id: 'sadaqah', title: 'صدقة', description: 'الصدقة العامة' },
     { id: 'charity', title: 'خيرية', description: 'الأعمال الخيرية' },
