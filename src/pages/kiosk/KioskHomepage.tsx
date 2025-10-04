@@ -15,7 +15,7 @@ const KioskHomepage = () => {
     { id: 'charity', title: 'خيرية', description: 'الأعمال الخيرية' },
     { id: 'mosque', title: 'مسجد', description: 'دعم المسجد' },
     { id: 'orphans', title: 'أيتام', description: 'كفالة الأيتام' },
-    { id: 'education', title: 'تعليم', description: 'دعم التعليم' },
+    { id: 'education', title: 'نشاط التدريس', description: 'دعم التعليم' },
   ];
 
   const handleCategorySelect = (categoryId: string) => {
