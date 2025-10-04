@@ -13,7 +13,7 @@ const AmountPage = () => {
   
   const [rials, setRials] = useState("");
   const [baisas, setBaisas] = useState("");
-  const [activeField, setActiveField] = useState<'rials' | 'baisas' | null>(null);
+  const [activeField, setActiveField] = useState<'rials' | 'baisas' | null>('rials');
 
   const keypadNumbers = [
     ['1', '2', '3'],
@@ -92,8 +92,8 @@ const AmountPage = () => {
                   value={rials}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gradient-card border-2 ${
-                    activeField === 'rials' ? 'border-primary shadow-elegant' : 'border-primary/30'
+                  className={`text-3xl text-center h-16 bg-gradient-card transition-all ${
+                    activeField === 'rials' ? 'border-[3px] border-blue-500 shadow-elegant' : 'border-2 border-primary/30'
                   }`}
                   onClick={() => setActiveField('rials')}
                 />
@@ -107,8 +107,8 @@ const AmountPage = () => {
                   value={baisas}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gradient-card border-2 ${
-                    activeField === 'baisas' ? 'border-primary shadow-elegant' : 'border-primary/30'
+                  className={`text-3xl text-center h-16 bg-gradient-card transition-all ${
+                    activeField === 'baisas' ? 'border-[3px] border-blue-500 shadow-elegant' : 'border-2 border-primary/30'
                   }`}
                   onClick={() => setActiveField('baisas')}
                 />

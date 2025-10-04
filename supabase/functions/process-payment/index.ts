@@ -41,19 +41,22 @@ serve(async (req) => {
       throw transactionError;
     }
 
-    // Simulate POS device communication
-    // In production, this would integrate with actual POS terminal API
-    // Examples: Ingenico, Verifone, PAX terminals via their SDKs
-    console.log('Communicating with POS terminal...');
+    // POS Device Integration: Ingenico AXIUM RX5000
+    // In production, integrate with Ingenico AXIUM RX5000 terminal API
+    // The terminal supports: VISA, MasterCard, Diners Club, Apple Pay, and Mal (Oman national payment system)
+    // Integration would use Ingenico's SDK/API to communicate with the terminal
+    // The amount (amount_baisas) will be charged to the donor's account when card is presented
+    console.log('Communicating with Ingenico AXIUM RX5000 terminal...');
     
     await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing time
 
     // Simulate payment result (90% success rate for demo)
     const isSuccess = Math.random() > 0.1;
+    const supportedPaymentMethods = ['Visa', 'MasterCard', 'Diners Club', 'Apple Pay', 'Mal'];
     const mockPOSResponse = {
-      terminal_id: 'POS-12345',
+      terminal_id: 'AXIUM-RX5000-001',
       transaction_ref: `TXN-${Date.now()}`,
-      card_type: ['Visa', 'MasterCard', 'Mada'][Math.floor(Math.random() * 3)],
+      card_type: supportedPaymentMethods[Math.floor(Math.random() * supportedPaymentMethods.length)],
       card_last_four: Math.floor(1000 + Math.random() * 9000).toString(),
       approval_code: isSuccess ? `APP${Math.floor(100000 + Math.random() * 900000)}` : null,
       response_code: isSuccess ? '00' : '51',
