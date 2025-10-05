@@ -3,28 +3,47 @@ import { useNavigate } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
-
 const KioskHomepage = () => {
   const navigate = useNavigate();
 
   // Mock donation categories - in real app, this would come from admin dashboard
-  const donationCategories = [
-    { id: 'ashura', title: 'تبرعات عاشوراء', description: 'التبرعات الخاصة بعاشوراء' },
-    { id: 'ramadan', title: 'إفطار شهر رمضان', description: 'إفطار الصائمين' },
-    { id: 'zakat', title: 'زكاة', description: 'زكاة المال والذهب' },
-    { id: 'sadaqah', title: 'صدقة', description: 'الصدقة العامة' },
-    { id: 'charity', title: 'خيرية', description: 'الأعمال الخيرية' },
-    { id: 'mosque', title: 'تبرعات للمساجد', description: 'دعم المسجد' },
-    { id: 'orphans', title: 'أيتام', description: 'كفالة الأيتام' },
-    { id: 'education', title: 'نشاط التدريس', description: 'دعم التعليم' },
-  ];
-
+  const donationCategories = [{
+    id: 'ashura',
+    title: 'تبرعات عاشوراء',
+    description: 'التبرعات الخاصة بعاشوراء'
+  }, {
+    id: 'ramadan',
+    title: 'إفطار شهر رمضان',
+    description: 'إفطار الصائمين'
+  }, {
+    id: 'zakat',
+    title: 'زكاة',
+    description: 'زكاة المال والذهب'
+  }, {
+    id: 'sadaqah',
+    title: 'صدقة',
+    description: 'الصدقة العامة'
+  }, {
+    id: 'charity',
+    title: 'خيرية',
+    description: 'الأعمال الخيرية'
+  }, {
+    id: 'mosque',
+    title: 'تبرعات للمساجد',
+    description: 'دعم المسجد'
+  }, {
+    id: 'orphans',
+    title: 'أيتام',
+    description: 'كفالة الأيتام'
+  }, {
+    id: 'education',
+    title: 'نشاط التدريس',
+    description: 'دعم التعليم'
+  }];
   const handleCategorySelect = (categoryId: string) => {
     navigate(`/kiosk/amount?category=${categoryId}`);
   };
-
-  return (
-    <KioskLayout showHomeButton={false}>
+  return <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
@@ -55,21 +74,18 @@ const KioskHomepage = () => {
 
         {/* Donation Categories Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-          {donationCategories.map((category, index) => (
-            <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group">
-              <KioskButton
-                variant="donation"
-                className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative"
-                onClick={() => handleCategorySelect(category.id)}
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="text-5xl mb-3 group-hover:scale-125 transition-transform duration-300" style={{ filter: 'drop-shadow(0 0 10px hsl(180 100% 50% / 0.5))' }}>📿</div>
+          {donationCategories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group">
+              <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative" onClick={() => handleCategorySelect(category.id)} style={{
+            animationDelay: `${index * 0.1}s`
+          }}>
+                <div className="text-5xl mb-3 group-hover:scale-125 transition-transform duration-300" style={{
+              filter: 'drop-shadow(0 0 10px hsl(180 100% 50% / 0.5))'
+            }}>📿</div>
                 <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">{category.title}</h3>
                 <p className="text-sm text-center text-muted-foreground group-hover:text-primary/80 transition-colors">{category.description}</p>
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-secondary/0 group-hover:from-primary/10 group-hover:to-secondary/10 transition-all duration-300 rounded-xl"></div>
+                
               </KioskButton>
-            </Card>
-          ))}
+            </Card>)}
         </div>
 
         {/* Footer */}
@@ -79,8 +95,6 @@ const KioskHomepage = () => {
           </p>
         </div>
       </div>
-    </KioskLayout>
-  );
+    </KioskLayout>;
 };
-
 export default KioskHomepage;
