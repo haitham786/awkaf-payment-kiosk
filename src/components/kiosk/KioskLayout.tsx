@@ -25,11 +25,11 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
       arabic ? "rtl" : "ltr",
       className
     )}>
-      {/* Futuristic glowing orbs */}
+      {/* Static glowing orbs - no animation */}
       <div className="absolute inset-0 bg-gradient-hero opacity-50" />
-      <div className="absolute top-10 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-slow" />
-      <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[140px] animate-pulse-slow" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-accent/15 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-10 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
+      <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[140px]" />
+      <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-accent/15 rounded-full blur-[100px]" />
       
       {/* Scanlines effect */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 

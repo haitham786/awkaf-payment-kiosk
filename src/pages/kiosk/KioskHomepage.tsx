@@ -28,16 +28,16 @@ const KioskHomepage = () => {
       <div className="w-full max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          {/* Futuristic Logo with glow */}
-          <div className="w-40 h-40 mx-auto mb-8 bg-gradient-primary rounded-full shadow-neon flex items-center justify-center relative animate-pulse-slow border-4 border-primary/30">
+          {/* Futuristic Logo with static glow */}
+          <div className="w-40 h-40 mx-auto mb-8 bg-gradient-primary rounded-full shadow-neon flex items-center justify-center relative border-4 border-primary/30">
             <div className="absolute inset-0 rounded-full bg-gradient-neon opacity-20 blur-xl"></div>
             <span className="text-5xl relative z-10">🕌</span>
           </div>
           
           {/* Quranic verse with neon border */}
-          <div className="bg-card/30 backdrop-blur-xl rounded-2xl p-8 shadow-neon border-2 border-primary/40 mb-8 relative overflow-hidden glare-effect">
+          <div className="bg-card/30 backdrop-blur-xl rounded-2xl p-8 shadow-neon border-2 border-primary/40 mb-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-secondary/5 to-accent/5"></div>
-            <p className="text-3xl font-bold text-foreground leading-relaxed relative z-10" style={{ textShadow: '0 0 20px hsl(180 100% 50% / 0.5)' }}>
+            <p className="text-3xl font-bold text-foreground leading-relaxed relative z-10">
               "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"
             </p>
             <p className="text-lg text-primary mt-3 relative z-10 font-semibold">
@@ -45,8 +45,7 @@ const KioskHomepage = () => {
             </p>
           </div>
 
-          <h1 className="text-5xl font-bold text-foreground mb-4 bg-gradient-neon bg-clip-text text-transparent animate-shimmer" 
-              style={{ backgroundImage: 'linear-gradient(90deg, hsl(180 100% 70%), hsl(280 100% 70%), hsl(330 100% 70%), hsl(180 100% 70%))' }}>
+          <h1 className="text-5xl font-bold text-foreground mb-4 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             مرحباً بكم في نظام التبرعات الذكي
           </h1>
           <p className="text-xl text-primary font-semibold">
@@ -73,9 +72,9 @@ const KioskHomepage = () => {
           ))}
         </div>
 
-        {/* Footer with glow */}
+        {/* Footer */}
         <div className="text-center mt-12">
-          <p className="text-primary text-lg font-semibold animate-pulse-slow">
+          <p className="text-primary text-lg font-semibold">
             المس الشاشة لاختيار نوع التبرع
           </p>
         </div>
