@@ -29,8 +29,8 @@ const KioskHomepage = () => {
     description: 'الأعمال الخيرية'
   }, {
     id: 'mosque',
-    title: 'تبرعات للمساجد',
-    description: 'دعم المسجد'
+    title: 'تبرعات للمآتم',
+    description: 'دعم المآتم'
   }, {
     id: 'orphans',
     title: 'أيتام',
