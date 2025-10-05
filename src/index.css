@@ -2,68 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Islamic Donation Kiosk Design System - Beautiful Arabic-themed colors and gradients */
+/* Futuristic Donation Kiosk - Cyberpunk Dark Theme with Neon Glows */
 
 @layer base {
   :root {
-    /* Islamic color palette */
-    --background: 120 20% 98%;
-    --foreground: 157 50% 15%;
+    /* Dark futuristic base */
+    --background: 240 10% 3%;
+    --foreground: 180 100% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 157 50% 15%;
+    --card: 240 10% 8%;
+    --card-foreground: 180 100% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 157 50% 15%;
+    --popover: 240 10% 8%;
+    --popover-foreground: 180 100% 95%;
 
-    /* Islamic green primary with gold accents */
-    --primary: 157 65% 25%;
-    --primary-foreground: 0 0% 98%;
-    --primary-light: 157 45% 35%;
-    --primary-glow: 157 60% 45%;
+    /* Neon cyan primary with electric glow */
+    --primary: 180 100% 50%;
+    --primary-foreground: 240 10% 3%;
+    --primary-light: 180 100% 65%;
+    --primary-glow: 180 100% 70%;
 
-    /* Gold/amber secondary colors */
-    --secondary: 45 85% 55%;
-    --secondary-foreground: 157 50% 15%;
-    --secondary-light: 45 75% 65%;
+    /* Electric purple secondary */
+    --secondary: 280 100% 60%;
+    --secondary-foreground: 240 10% 3%;
+    --secondary-light: 280 100% 70%;
 
-    /* Elegant muted tones */
-    --muted: 120 15% 95%;
-    --muted-foreground: 157 25% 45%;
+    /* Muted dark tones */
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 60%;
 
-    /* Accent colors for highlights */
-    --accent: 45 85% 55%;
-    --accent-foreground: 157 50% 15%;
+    /* Neon accent */
+    --accent: 330 100% 60%;
+    --accent-foreground: 240 10% 3%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 90% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 120 20% 90%;
-    --input: 120 20% 95%;
-    --ring: 157 65% 25%;
+    --border: 240 10% 20%;
+    --input: 240 10% 12%;
+    --ring: 180 100% 50%;
 
-    /* Kiosk-specific colors */
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 98%;
+    /* Status colors */
+    --success: 140 100% 45%;
+    --success-foreground: 240 10% 3%;
+    --warning: 45 100% 55%;
+    --warning-foreground: 240 10% 3%;
 
-    /* Islamic gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
-    --gradient-gold: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-glow)) 50%, hsl(var(--secondary)) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
+    /* Futuristic gradients with glow */
+    --gradient-primary: linear-gradient(135deg, hsl(180 100% 40%) 0%, hsl(180 100% 60%) 50%, hsl(280 100% 50%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(330 100% 60%) 100%);
+    --gradient-hero: radial-gradient(ellipse at top, hsl(180 100% 20%) 0%, hsl(240 10% 3%) 60%);
+    --gradient-card: linear-gradient(135deg, hsl(240 10% 8%) 0%, hsl(240 10% 12%) 100%);
+    --gradient-neon: linear-gradient(90deg, hsl(180 100% 50%) 0%, hsl(280 100% 60%) 50%, hsl(330 100% 60%) 100%);
 
-    /* Elegant shadows with Islamic theme */
-    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.2);
-    --shadow-gold: 0 8px 25px -8px hsl(var(--secondary) / 0.3);
-    --shadow-card: 0 4px 20px -4px hsl(var(--primary) / 0.1);
+    /* Glowing shadows */
+    --shadow-elegant: 0 0 40px hsl(180 100% 50% / 0.4), 0 20px 60px hsl(180 100% 50% / 0.2);
+    --shadow-gold: 0 0 30px hsl(280 100% 60% / 0.4), 0 15px 45px hsl(280 100% 60% / 0.2);
+    --shadow-card: 0 0 20px hsl(180 100% 50% / 0.2), 0 8px 32px hsl(240 10% 3% / 0.8);
+    --shadow-neon: 0 0 50px hsl(180 100% 50% / 0.6), 0 0 80px hsl(280 100% 60% / 0.4);
 
     /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --transition-glow: all 0.3s ease-in-out;
 
-    --radius: 1rem;
+    --radius: 1.2rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -83,45 +86,45 @@
   }
 
   .dark {
-    /* Dark mode with elegant Islamic theme */
-    --background: 157 25% 8%;
-    --foreground: 120 20% 95%;
+    /* Same futuristic theme - already dark by default */
+    --background: 240 10% 3%;
+    --foreground: 180 100% 95%;
 
-    --card: 157 20% 12%;
-    --card-foreground: 120 20% 95%;
+    --card: 240 10% 8%;
+    --card-foreground: 180 100% 95%;
 
-    --popover: 157 20% 12%;
-    --popover-foreground: 120 20% 95%;
+    --popover: 240 10% 8%;
+    --popover-foreground: 180 100% 95%;
 
-    --primary: 157 60% 55%;
-    --primary-foreground: 157 25% 8%;
-    --primary-light: 157 50% 45%;
-    --primary-glow: 157 65% 65%;
+    --primary: 180 100% 50%;
+    --primary-foreground: 240 10% 3%;
+    --primary-light: 180 100% 65%;
+    --primary-glow: 180 100% 70%;
 
-    --secondary: 45 80% 60%;
-    --secondary-foreground: 157 25% 8%;
-    --secondary-light: 45 70% 70%;
+    --secondary: 280 100% 60%;
+    --secondary-foreground: 240 10% 3%;
+    --secondary-light: 280 100% 70%;
 
-    --muted: 157 15% 15%;
-    --muted-foreground: 120 15% 65%;
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 60%;
 
-    --accent: 45 80% 60%;
-    --accent-foreground: 157 25% 8%;
+    --accent: 330 100% 60%;
+    --accent-foreground: 240 10% 3%;
 
-    --destructive: 0 75% 55%;
+    --destructive: 0 90% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 157 15% 20%;
-    --input: 157 15% 18%;
-    --ring: 157 60% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 240 10% 20%;
+    --input: 240 10% 12%;
+    --ring: 180 100% 50%;
+    --sidebar-background: 240 10% 5%;
+    --sidebar-foreground: 180 100% 95%;
+    --sidebar-primary: 180 100% 50%;
+    --sidebar-primary-foreground: 240 10% 3%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 180 100% 95%;
+    --sidebar-border: 240 10% 20%;
+    --sidebar-ring: 180 100% 50%;
   }
 }
 
@@ -145,40 +148,125 @@
     text-align: left;
   }
 
-  /* Islamic decorative elements */
+  /* Futuristic background pattern with grid */
   .islamic-pattern {
     background-image: 
-      radial-gradient(circle at 25% 25%, hsl(var(--primary) / 0.1) 0%, transparent 50%),
-      radial-gradient(circle at 75% 75%, hsl(var(--secondary) / 0.1) 0%, transparent 50%);
+      linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+      radial-gradient(circle at 20% 30%, hsl(180 100% 50% / 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, hsl(280 100% 60% / 0.15) 0%, transparent 40%);
+    background-size: 50px 50px, 50px 50px, 100% 100%, 100% 100%;
   }
 
-  /* Smooth animations */
+  /* Neon glow animations */
   .animate-glow {
-    animation: glow 2s ease-in-out infinite alternate;
+    animation: neon-glow 2s ease-in-out infinite;
   }
 
-  @keyframes glow {
-    from { box-shadow: 0 0 20px hsl(var(--primary) / 0.3); }
-    to { box-shadow: 0 0 30px hsl(var(--primary) / 0.6), 0 0 40px hsl(var(--secondary) / 0.3); }
+  @keyframes neon-glow {
+    0%, 100% { 
+      box-shadow: 
+        0 0 20px hsl(180 100% 50% / 0.5),
+        0 0 40px hsl(180 100% 50% / 0.3),
+        inset 0 0 20px hsl(180 100% 50% / 0.1);
+    }
+    50% { 
+      box-shadow: 
+        0 0 30px hsl(180 100% 50% / 0.8),
+        0 0 60px hsl(280 100% 60% / 0.5),
+        0 0 80px hsl(330 100% 60% / 0.3),
+        inset 0 0 30px hsl(180 100% 50% / 0.2);
+    }
   }
 
-  /* Processing animation */
+  /* Pulsing glow */
   .animate-pulse-slow {
-    animation: pulse-slow 3s ease-in-out infinite;
+    animation: pulse-glow 3s ease-in-out infinite;
   }
 
-  @keyframes pulse-slow {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+  @keyframes pulse-glow {
+    0%, 100% { 
+      opacity: 1;
+      box-shadow: 0 0 20px hsl(180 100% 50% / 0.3);
+    }
+    50% { 
+      opacity: 0.85;
+      box-shadow: 0 0 40px hsl(180 100% 50% / 0.6);
+    }
   }
 
-  /* Kiosk-specific styles */
+  /* Shimmer effect */
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+    background-size: 200% 100%;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* 3D Transform hover */
+  .transform-3d {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  /* Futuristic button styles */
   .kiosk-button {
     @apply transition-all duration-300 transform hover:scale-105 active:scale-95;
     box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kiosk-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
   }
 
   .kiosk-button:hover {
     box-shadow: var(--shadow-elegant);
+  }
+
+  .kiosk-button:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+
+  /* Glare effect */
+  .glare-effect {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glare-effect::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 70%
+    );
+    transform: rotate(45deg);
+    animation: glare 3s ease-in-out infinite;
+  }
+
+  @keyframes glare {
+    0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
   }
 }

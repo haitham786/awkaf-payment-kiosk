@@ -4,20 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const kioskButtonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 kiosk-button",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-bold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 kiosk-button glare-effect relative",
   {
     variants: {
       variant: {
-        default: "bg-gradient-primary text-primary-foreground shadow-elegant hover:shadow-gold",
-        secondary: "bg-gradient-gold text-secondary-foreground shadow-card hover:shadow-elegant",
-        success: "bg-success text-success-foreground shadow-card hover:shadow-elegant",
-        destructive: "bg-destructive text-destructive-foreground shadow-card hover:shadow-elegant",
-        outline: "border-2 border-primary bg-card/50 text-primary hover:bg-gradient-primary hover:text-primary-foreground",
-        ghost: "hover:bg-primary/10 hover:text-primary",
+        default: "bg-gradient-primary text-primary-foreground shadow-elegant hover:shadow-neon border border-primary/50",
+        secondary: "bg-gradient-gold text-secondary-foreground shadow-card hover:shadow-elegant border border-secondary/50",
+        success: "bg-success text-success-foreground shadow-card hover:shadow-elegant border border-success/50",
+        destructive: "bg-destructive text-destructive-foreground shadow-card hover:shadow-elegant border border-destructive/50",
+        outline: "border-2 border-primary/60 bg-card/20 backdrop-blur-sm text-foreground hover:bg-primary/10 hover:border-primary hover:shadow-elegant",
+        ghost: "hover:bg-primary/20 hover:text-primary hover:shadow-card",
         link: "text-primary underline-offset-4 hover:underline",
-        donation: "bg-gradient-card border-2 border-primary/20 text-foreground shadow-card hover:border-primary hover:shadow-elegant hover:bg-gradient-primary hover:text-primary-foreground min-h-[120px] p-6 text-lg font-semibold",
-        keypad: "bg-gradient-card border border-primary/30 text-foreground shadow-card hover:bg-gradient-primary hover:text-primary-foreground min-h-[80px] text-2xl font-bold",
-        confirm: "bg-gradient-primary text-primary-foreground shadow-elegant hover:shadow-gold min-h-[60px] text-xl font-bold animate-glow",
+        donation: "bg-gradient-card backdrop-blur-sm border-2 border-primary/40 text-foreground shadow-card hover:border-primary hover:shadow-elegant hover:scale-105 transform-3d min-h-[120px] p-6 text-lg font-bold",
+        keypad: "bg-card/40 backdrop-blur-md border-2 border-primary/40 text-foreground shadow-card hover:bg-primary/10 hover:border-primary hover:shadow-elegant hover:text-primary min-h-[80px] text-2xl font-bold",
+        confirm: "bg-gradient-neon text-primary-foreground shadow-neon hover:shadow-elegant min-h-[60px] text-xl font-bold animate-glow border-2 border-primary/70",
       },
       size: {
         default: "h-10 px-4 py-2",

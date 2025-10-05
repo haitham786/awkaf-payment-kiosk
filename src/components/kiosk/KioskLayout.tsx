@@ -21,14 +21,22 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-gradient-hero islamic-pattern relative overflow-hidden",
+      "min-h-screen w-full bg-background islamic-pattern relative overflow-hidden",
       arabic ? "rtl" : "ltr",
       className
     )}>
-      {/* Decorative elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-secondary/20 to-transparent rounded-full -translate-y-32 translate-x-32" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-radial from-primary/20 to-transparent rounded-full translate-y-48 -translate-x-48" />
+      {/* Futuristic glowing orbs */}
+      <div className="absolute inset-0 bg-gradient-hero opacity-50" />
+      <div className="absolute top-10 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-slow" />
+      <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[140px] animate-pulse-slow" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-accent/15 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '2s' }} />
+      
+      {/* Scanlines effect */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+           style={{ 
+             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(180 100% 50%) 2px, hsl(180 100% 50%) 4px)' 
+           }} 
+      />
       
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -36,7 +44,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
           {children}
         </main>
         
-        {/* Home button - bottom right for Arabic, bottom left for English */}
+        {/* Futuristic home button */}
         {showHomeButton && (
           <div className={cn(
             "absolute bottom-8 z-20",
@@ -46,7 +54,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
               variant="outline"
               size="kiosk"
               onClick={() => navigate("/kiosk")}
-              className="bg-card/80 backdrop-blur-sm border-primary/50 hover:bg-primary hover:text-primary-foreground"
+              className="bg-card/40 backdrop-blur-xl border-2 border-primary/70 hover:bg-primary/20 hover:border-primary hover:shadow-neon transition-all duration-300"
             >
               <Home className="w-6 h-6 ml-2" />
               {arabic ? "الرئيسية" : "Home"}

@@ -74,11 +74,16 @@ export default {
         'gradient-gold': 'var(--gradient-gold)',
         'gradient-hero': 'var(--gradient-hero)',
         'gradient-card': 'var(--gradient-card)',
+        'gradient-neon': 'var(--gradient-neon)',
       },
       boxShadow: {
         'elegant': 'var(--shadow-elegant)',
         'gold': 'var(--shadow-gold)',
         'card': 'var(--shadow-card)',
+        'neon': 'var(--shadow-neon)',
+      },
+      backdropBlur: {
+        'xl': '24px',
       },
       transitionTimingFunction: {
         'smooth': 'var(--transition-smooth)',

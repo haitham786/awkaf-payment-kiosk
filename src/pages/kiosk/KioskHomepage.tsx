@@ -28,49 +28,54 @@ const KioskHomepage = () => {
       <div className="w-full max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          {/* Logo placeholder */}
-          <div className="w-32 h-32 mx-auto mb-6 bg-gradient-primary rounded-full shadow-elegant flex items-center justify-center">
-            <span className="text-4xl text-primary-foreground">🕌</span>
+          {/* Futuristic Logo with glow */}
+          <div className="w-40 h-40 mx-auto mb-8 bg-gradient-primary rounded-full shadow-neon flex items-center justify-center relative animate-pulse-slow border-4 border-primary/30">
+            <div className="absolute inset-0 rounded-full bg-gradient-neon opacity-20 blur-xl"></div>
+            <span className="text-5xl relative z-10">🕌</span>
           </div>
           
-          {/* Quranic verse placeholder */}
-          <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 shadow-card border border-primary/20 mb-8">
-            <p className="text-2xl font-semibold text-foreground leading-relaxed">
+          {/* Quranic verse with neon border */}
+          <div className="bg-card/30 backdrop-blur-xl rounded-2xl p-8 shadow-neon border-2 border-primary/40 mb-8 relative overflow-hidden glare-effect">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-secondary/5 to-accent/5"></div>
+            <p className="text-3xl font-bold text-foreground leading-relaxed relative z-10" style={{ textShadow: '0 0 20px hsl(180 100% 50% / 0.5)' }}>
               "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"
             </p>
-            <p className="text-lg text-muted-foreground mt-2">
+            <p className="text-lg text-primary mt-3 relative z-10 font-semibold">
               القرآن الكريم - سورة البقرة
             </p>
           </div>
 
-          <h1 className="text-4xl font-bold text-foreground mb-4">
+          <h1 className="text-5xl font-bold text-foreground mb-4 bg-gradient-neon bg-clip-text text-transparent animate-shimmer" 
+              style={{ backgroundImage: 'linear-gradient(90deg, hsl(180 100% 70%), hsl(280 100% 70%), hsl(330 100% 70%), hsl(180 100% 70%))' }}>
             مرحباً بكم في نظام التبرعات الذكي
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xl text-primary font-semibold">
             اختر نوع التبرع الذي ترغب في المساهمة به
           </p>
         </div>
 
         {/* Donation Categories Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-          {donationCategories.map((category) => (
-            <Card key={category.id} className="p-0 overflow-hidden bg-gradient-card border border-primary/20 shadow-card hover:shadow-elegant transition-all duration-300">
+          {donationCategories.map((category, index) => (
+            <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group">
               <KioskButton
                 variant="donation"
-                className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-lg"
+                className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative"
                 onClick={() => handleCategorySelect(category.id)}
+                style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <div className="text-4xl mb-2">📿</div>
-                <h3 className="text-2xl font-bold">{category.title}</h3>
-                <p className="text-sm text-center opacity-80">{category.description}</p>
+                <div className="text-5xl mb-3 group-hover:scale-125 transition-transform duration-300" style={{ filter: 'drop-shadow(0 0 10px hsl(180 100% 50% / 0.5))' }}>📿</div>
+                <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">{category.title}</h3>
+                <p className="text-sm text-center text-muted-foreground group-hover:text-primary/80 transition-colors">{category.description}</p>
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-secondary/0 group-hover:from-primary/10 group-hover:to-secondary/10 transition-all duration-300 rounded-xl"></div>
               </KioskButton>
             </Card>
           ))}
         </div>
 
-        {/* Footer */}
+        {/* Footer with glow */}
         <div className="text-center mt-12">
-          <p className="text-muted-foreground">
+          <p className="text-primary text-lg font-semibold animate-pulse-slow">
             المس الشاشة لاختيار نوع التبرع
           </p>
         </div>
