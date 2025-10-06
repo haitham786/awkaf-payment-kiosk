@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -20,7 +21,7 @@ import {
 } from 'recharts';
 import { 
   DollarSign, CreditCard, TrendingUp, Activity, 
-  LogOut, Download, RefreshCw 
+  LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -30,6 +31,8 @@ const AdminDashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalTransactions: 0,
@@ -61,6 +64,22 @@ const AdminDashboard = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    // Filter transactions based on search query
+    if (searchQuery.trim() === '') {
+      setFilteredTransactions(transactions);
+    } else {
+      const filtered = transactions.filter(txn =>
+        txn.reference_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        txn.payment_reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        txn.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        txn.kiosks?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        txn.kiosks?.reference_number?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTransactions(filtered);
+    }
+  }, [searchQuery, transactions]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -210,15 +229,37 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Kiosk Management System</p>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground">Kiosk Management System</p>
+            </div>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/categories')}>
+              <Settings className="mr-2 h-4 w-4" />
+              Manage Categories
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/kiosks')}>
+              <Activity className="mr-2 h-4 w-4" />
+              Manage Kiosks
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/admins')}>
+              <Users className="mr-2 h-4 w-4" />
+              Manage Admins
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/statistics')}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Enhanced Statistics
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -316,38 +357,70 @@ const AdminDashboard = () => {
           <TabsContent value="transactions">
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
                   <h3 className="text-lg font-semibold">Recent Transactions</h3>
-                  <Button variant="outline" size="sm" onClick={loadTransactions}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by reference, category, kiosk..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8"
+                      />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={loadTransactions}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
+                {searchQuery && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Found {filteredTransactions.length} transaction(s)
+                  </p>
+                )}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Reference</TableHead>
                         <TableHead>Kiosk</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Payment Method</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Reference</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {transactions.map((txn) => (
-                        <TableRow key={txn.id}>
-                          <TableCell>{new Date(txn.created_at).toLocaleString()}</TableCell>
-                          <TableCell>{txn.kiosks?.name || 'N/A'}</TableCell>
-                          <TableCell className="capitalize">{txn.category}</TableCell>
-                          <TableCell>{formatAmount(txn.amount_baisas)}</TableCell>
-                          <TableCell>{txn.payment_method || '-'}</TableCell>
-                          <TableCell>{getStatusBadge(txn.status)}</TableCell>
-                          <TableCell className="font-mono text-xs">{txn.payment_reference || '-'}</TableCell>
+                      {filteredTransactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            No transactions found
+                          </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        filteredTransactions.map((txn) => (
+                          <TableRow key={txn.id}>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{new Date(txn.created_at).toLocaleDateString('en-GB')}</div>
+                                <div className="text-muted-foreground">{new Date(txn.created_at).toLocaleTimeString('en-GB')}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{txn.reference_number || txn.payment_reference || '-'}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{txn.kiosks?.name || 'N/A'}</div>
+                                <div className="text-muted-foreground text-xs">{txn.kiosks?.reference_number || ''}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="capitalize">{txn.category}</TableCell>
+                            <TableCell>{formatAmount(txn.amount_baisas)}</TableCell>
+                            <TableCell>{getStatusBadge(txn.status)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>

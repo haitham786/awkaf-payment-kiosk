@@ -5,6 +5,7 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const MobileNumberPage = () => {
   const navigate = useNavigate();
@@ -12,7 +13,10 @@ const MobileNumberPage = () => {
   const { toast } = useToast();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
+  const referenceNumber = searchParams.get('ref') || '';
+  const transactionId = searchParams.get('transactionId') || '';
   const [mobileNumber, setMobileNumber] = useState("");
+  const [sending, setSending] = useState(false);
 
   const keypadNumbers = [
     ['1', '2', '3'],
@@ -40,17 +44,44 @@ const MobileNumberPage = () => {
       return;
     }
 
-    // Simulate SMS sending
-    toast({
-      title: "تم الإرسال!",
-      description: "تم إرسال الإيصال إلى رقم الهاتف المحدد",
-      variant: "default",
-    });
+    setSending(true);
 
-    // Return to homepage after 2 seconds
-    setTimeout(() => {
-      navigate('/kiosk');
-    }, 2000);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-sms', {
+        body: {
+          mobile_number: `+968${mobileNumber}`,
+          category,
+          reference_number: referenceNumber || transactionId,
+          amount_baisas: amount,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "تم الإرسال!",
+        description: "تم إرسال الإيصال إلى رقم الهاتف المحدد",
+        variant: "default",
+      });
+
+      // Return to homepage after 2 seconds
+      setTimeout(() => {
+        navigate('/kiosk');
+      }, 2000);
+    } catch (error: any) {
+      console.error('SMS Error:', error);
+      toast({
+        title: "خطأ في الإرسال",
+        description: "حدث خطأ أثناء إرسال الرسالة. سيتم العودة للصفحة الرئيسية.",
+        variant: "destructive",
+      });
+
+      setTimeout(() => {
+        navigate('/kiosk');
+      }, 2000);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleCancel = () => {
@@ -147,10 +178,10 @@ const MobileNumberPage = () => {
                   variant="confirm"
                   size="xl"
                   onClick={handleSendSMS}
-                  disabled={mobileNumber.length !== 8}
+                  disabled={mobileNumber.length !== 8 || sending}
                   className="w-full"
                 >
-                  إرسال الإيصال
+                  {sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}
                 </KioskButton>
                 
                 <KioskButton

@@ -9,7 +9,9 @@ const ThankYouPage = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const [countdown, setCountdown] = useState(5);
+  const transactionId = searchParams.get('transactionId') || '';
+  const referenceNumber = searchParams.get('ref') || '';
+  const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -33,7 +35,7 @@ const ThankYouPage = () => {
   };
 
   const handleSMSReceipt = () => {
-    navigate(`/kiosk/mobile-number?category=${category}&amount=${amount}`);
+    navigate(`/kiosk/mobile-number?category=${category}&amount=${amount}&ref=${referenceNumber}&transactionId=${transactionId}`);
   };
 
   const handleReturnHome = () => {
@@ -102,11 +104,11 @@ const ThankYouPage = () => {
               </p>
             </div>
 
-            {/* Transaction ID */}
+            {/* Transaction Reference Number */}
             <div className="bg-muted/50 rounded-lg p-4 border border-muted">
-              <p className="text-sm text-muted-foreground">رقم العملية</p>
+              <p className="text-sm text-muted-foreground">رقم المعاملة</p>
               <p className="text-lg font-mono font-semibold text-foreground">
-                #{Math.random().toString(36).substr(2, 9).toUpperCase()}
+                {referenceNumber || transactionId}
               </p>
             </div>
           </div>
@@ -150,7 +152,7 @@ const ThankYouPage = () => {
             <div className="w-32 h-2 bg-muted rounded-full mx-auto mt-2">
               <div 
                 className="h-full bg-gradient-primary rounded-full transition-all duration-1000 ease-linear"
-                style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+                style={{ width: `${((10 - countdown) / 10) * 100}%` }}
               />
             </div>
           </div>

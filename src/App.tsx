@@ -15,6 +15,10 @@ import ThankYouPage from "./pages/kiosk/ThankYouPage";
 import MobileNumberPage from "./pages/kiosk/MobileNumberPage";
 import ErrorPage from "./pages/kiosk/ErrorPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import CategoriesManagement from "./pages/admin/CategoriesManagement";
+import KiosksManagement from "./pages/admin/KiosksManagement";
+import AdminsManagement from "./pages/admin/AdminsManagement";
+import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +44,10 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/categories" element={<CategoriesManagement />} />
+          <Route path="/admin/kiosks" element={<KiosksManagement />} />
+          <Route path="/admin/admins" element={<AdminsManagement />} />
+          <Route path="/admin/statistics" element={<EnhancedStatistics />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

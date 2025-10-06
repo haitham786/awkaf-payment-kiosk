@@ -1,45 +1,34 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 const KioskHomepage = () => {
   const navigate = useNavigate();
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock donation categories - in real app, this would come from admin dashboard
-  const donationCategories = [{
-    id: 'ashura',
-    title: 'تبرعات عاشوراء',
-    description: 'التبرعات الخاصة بعاشوراء'
-  }, {
-    id: 'ramadan',
-    title: 'إفطار شهر رمضان',
-    description: 'إفطار الصائمين'
-  }, {
-    id: 'zakat',
-    title: 'زكاة',
-    description: 'زكاة المال والذهب'
-  }, {
-    id: 'sadaqah',
-    title: 'صدقة',
-    description: 'الصدقة العامة'
-  }, {
-    id: 'charity',
-    title: 'خيرية',
-    description: 'الأعمال الخيرية'
-  }, {
-    id: 'mosque',
-    title: 'تبرعات للمآتم',
-    description: 'دعم المآتم'
-  }, {
-    id: 'orphans',
-    title: 'أيتام',
-    description: 'كفالة الأيتام'
-  }, {
-    id: 'education',
-    title: 'نشاط التدريس',
-    description: 'دعم التعليم'
-  }];
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('donation_categories')
+        .select('*')
+        .eq('is_visible', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleCategorySelect = (categoryId: string) => {
     navigate(`/kiosk/amount?category=${categoryId}`);
   };
@@ -74,8 +63,17 @@ const KioskHomepage = () => {
 
         {/* Donation Categories Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-          {donationCategories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group">
-              <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative" onClick={() => handleCategorySelect(category.id)} style={{
+          {loading ? (
+            <div className="col-span-2 md:col-span-3 text-center text-xl text-primary">
+              جاري التحميل...
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="col-span-2 md:col-span-3 text-center text-xl text-muted-foreground">
+              لا توجد فئات متاحة حالياً
+            </div>
+          ) : (
+            categories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group">
+              <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative" onClick={() => handleCategorySelect(category.category_id)} style={{
             animationDelay: `${index * 0.1}s`
           }}>
                 <div className="text-5xl mb-3 group-hover:scale-125 transition-transform duration-300" style={{
@@ -85,7 +83,8 @@ const KioskHomepage = () => {
                 <p className="text-sm text-center text-muted-foreground group-hover:text-primary/80 transition-colors">{category.description}</p>
                 
               </KioskButton>
-            </Card>)}
+            </Card>)
+          )}
         </div>
 
         {/* Footer */}

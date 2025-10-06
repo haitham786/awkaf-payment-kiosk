@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      donation_categories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          description: string
+          display_order: number
+          id: string
+          is_visible: boolean | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          description: string
+          display_order: number
+          id?: string
+          is_visible?: boolean | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          description?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       kiosks: {
         Row: {
           configuration: Json | null
@@ -22,6 +55,7 @@ export type Database = {
           last_heartbeat: string | null
           location: string
           name: string
+          reference_number: string | null
           status: Database["public"]["Enums"]["kiosk_status"]
           updated_at: string
         }
@@ -32,6 +66,7 @@ export type Database = {
           last_heartbeat?: string | null
           location: string
           name: string
+          reference_number?: string | null
           status?: Database["public"]["Enums"]["kiosk_status"]
           updated_at?: string
         }
@@ -42,6 +77,7 @@ export type Database = {
           last_heartbeat?: string | null
           location?: string
           name?: string
+          reference_number?: string | null
           status?: Database["public"]["Enums"]["kiosk_status"]
           updated_at?: string
         }
@@ -87,6 +123,7 @@ export type Database = {
           pos_response: Json | null
           receipt_printed: boolean | null
           receipt_sent: boolean | null
+          reference_number: string | null
           status: Database["public"]["Enums"]["transaction_status"]
         }
         Insert: {
@@ -104,6 +141,7 @@ export type Database = {
           pos_response?: Json | null
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
+          reference_number?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
         }
         Update: {
@@ -121,6 +159,7 @@ export type Database = {
           pos_response?: Json | null
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
+          reference_number?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
         }
         Relationships: [
@@ -159,6 +198,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_reference_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
