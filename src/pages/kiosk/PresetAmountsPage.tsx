@@ -12,8 +12,10 @@ const PresetAmountsPage = () => {
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200, 500];
 
   const handleAmountSelect = (amount: number) => {
+    // Convert Rials to Baisas (1 Rial = 1000 Baisas)
+    const amountInBaisas = amount * 1000;
     // Navigate directly to confirmation with the selected amount
-    navigate(`/kiosk/confirmation?category=${categoryId}&rials=${amount}&baisas=0`);
+    navigate(`/kiosk/confirmation?category=${categoryId}&amount=${amountInBaisas}`);
   };
 
   const handleCustomAmount = () => {
