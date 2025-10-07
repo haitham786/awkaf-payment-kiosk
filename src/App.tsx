@@ -7,8 +7,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import KioskHomepage from "./pages/kiosk/KioskHomepage";
+import PresetAmountsPage from "./pages/kiosk/PresetAmountsPage";
 import AmountPage from "./pages/kiosk/AmountPage";
 import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
+import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
 import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
 import PaymentProcessingPage from "./pages/kiosk/PaymentProcessingPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
@@ -34,6 +36,8 @@ const App = () => (
           
           {/* Kiosk Routes */}
           <Route path="/kiosk" element={<KioskHomepage />} />
+          <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
+          <Route path="/kiosk/preset-amounts" element={<PresetAmountsPage />} />
           <Route path="/kiosk/amount" element={<AmountPage />} />
           <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
           <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />

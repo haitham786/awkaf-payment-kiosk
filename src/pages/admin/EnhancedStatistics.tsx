@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, Mail, Printer } from "lucide-react";
@@ -18,11 +19,28 @@ const EnhancedStatistics = () => {
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('daily');
   const [selectedKiosk, setSelectedKiosk] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchType, setSearchType] = useState<"reference" | "mobile">("reference");
+  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
 
   useEffect(() => {
     checkAuth();
     loadData();
   }, [timeFilter, selectedKiosk]);
+
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = transactions.filter((t) => {
+        if (searchType === "mobile") {
+          return t.mobile_number?.includes(searchTerm);
+        }
+        return t.reference_number?.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+      setFilteredTransactions(filtered);
+    } else {
+      setFilteredTransactions(transactions);
+    }
+  }, [searchTerm, searchType, transactions]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -202,6 +220,61 @@ const EnhancedStatistics = () => {
             </Select>
           </div>
         </div>
+
+        {/* Search */}
+        <Card className="p-4 mb-8">
+          <div className="flex items-center gap-4">
+            <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reference">Reference Number</SelectItem>
+                <SelectItem value="mobile">Mobile Number</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder={searchType === "mobile" ? "Search by mobile number..." : "Search by reference number..."}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1"
+            />
+          </div>
+          {searchTerm && (
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground mb-2">
+                Found {filteredTransactions.length} transaction(s)
+              </p>
+              {filteredTransactions.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {filteredTransactions.map(t => (
+                    <div key={t.id} className="p-3 bg-muted/50 rounded-lg text-sm">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold">{t.reference_number}</p>
+                          <p className="text-muted-foreground">
+                            {t.category} • {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR
+                          </p>
+                          {t.mobile_number && (
+                            <p className="text-muted-foreground">Mobile: {t.mobile_number}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(t.created_at).toLocaleDateString('en-GB')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(t.created_at).toLocaleTimeString('en-GB')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 gap-6 mb-8">

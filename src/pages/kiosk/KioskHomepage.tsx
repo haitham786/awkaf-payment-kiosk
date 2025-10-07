@@ -4,6 +4,8 @@ import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
@@ -30,9 +32,19 @@ const KioskHomepage = () => {
     }
   };
   const handleCategorySelect = (categoryId: string) => {
-    navigate(`/kiosk/amount?category=${categoryId}`);
+    navigate(`/kiosk/preset-amounts?category=${categoryId}`);
   };
   return <KioskLayout showHomeButton={false}>
+      {/* Setup button in top-right corner */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 right-4 z-50 w-12 h-12 rounded-full bg-card/50 backdrop-blur-md border-2 border-primary/30 hover:bg-card/80"
+        onClick={() => navigate('/kiosk/setup')}
+      >
+        <Settings className="w-6 h-6 text-primary" />
+      </Button>
+      
       <div className="w-full max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
