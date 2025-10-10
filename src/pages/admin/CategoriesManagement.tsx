@@ -8,7 +8,8 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X } from "lucide-react";
+import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const CategoriesManagement = () => {
   const navigate = useNavigate();
@@ -21,8 +22,12 @@ const CategoriesManagement = () => {
     title: '',
     description: '',
     is_visible: true,
-    display_order: 0
+    display_order: 0,
+    icon_url: '',
+    info_text: ''
   });
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string>('');
 
   useEffect(() => {
     checkAuth();
@@ -57,6 +62,34 @@ const CategoriesManagement = () => {
     }
   };
 
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 100KB)
+    if (file.size > 100 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Icon must be less than 100KB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check file type
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Only JPG, JPEG, and PNG files are allowed",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIconFile(file);
+    setIconPreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -70,10 +103,30 @@ const CategoriesManagement = () => {
     }
 
     try {
+      let iconUrl = formData.icon_url;
+
+      // Upload icon if a new file is selected
+      if (iconFile) {
+        const fileName = `${formData.category_id}-${Date.now()}.${iconFile.name.split('.').pop()}`;
+        const { error: uploadError } = await supabase.storage
+          .from('category-icons')
+          .upload(fileName, iconFile, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('category-icons')
+          .getPublicUrl(fileName);
+
+        iconUrl = publicUrl;
+      }
+
+      const dataToSave = { ...formData, icon_url: iconUrl };
+
       if (editingId) {
         const { error } = await supabase
           .from('donation_categories')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingId);
 
         if (error) throw error;
@@ -81,7 +134,7 @@ const CategoriesManagement = () => {
       } else {
         const { error } = await supabase
           .from('donation_categories')
-          .insert([formData]);
+          .insert([dataToSave]);
 
         if (error) throw error;
         toast({ title: "Category added successfully" });
@@ -105,8 +158,12 @@ const CategoriesManagement = () => {
       title: category.title,
       description: category.description,
       is_visible: category.is_visible,
-      display_order: category.display_order
+      display_order: category.display_order,
+      icon_url: category.icon_url || '',
+      info_text: category.info_text || ''
     });
+    setIconPreview(category.icon_url || '');
+    setIconFile(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -156,8 +213,12 @@ const CategoriesManagement = () => {
       title: '',
       description: '',
       is_visible: true,
-      display_order: categories.length + 1
+      display_order: categories.length + 1,
+      icon_url: '',
+      info_text: ''
     });
+    setIconFile(null);
+    setIconPreview('');
   };
 
   return (
@@ -171,6 +232,7 @@ const CategoriesManagement = () => {
             </Button>
             <h1 className="text-3xl font-bold">Manage Categories</h1>
           </div>
+          <ThemeToggle />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -212,6 +274,58 @@ const CategoriesManagement = () => {
                   required
                   placeholder="وصف الفئة"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="info_text">Information Text (Arabic)</Label>
+                <Textarea
+                  id="info_text"
+                  value={formData.info_text}
+                  onChange={(e) => setFormData({ ...formData, info_text: e.target.value })}
+                  placeholder="معلومات إضافية عن الفئة"
+                  rows={3}
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  This information will be shown when users click the info icon on the kiosk
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="icon">Category Icon</Label>
+                <div className="mt-2">
+                  <Input
+                    id="icon"
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    onChange={handleIconChange}
+                    className="mb-2"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Only JPG, JPEG, and PNG files. Maximum size: 100 KB
+                  </p>
+                </div>
+                {iconPreview && (
+                  <div className="mt-2 relative w-24 h-24">
+                    <img 
+                      src={iconPreview} 
+                      alt="Icon preview" 
+                      className="w-full h-full object-cover rounded-lg border-2 border-border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                      onClick={() => {
+                        setIconFile(null);
+                        setIconPreview('');
+                        setFormData({ ...formData, icon_url: '' });
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div>

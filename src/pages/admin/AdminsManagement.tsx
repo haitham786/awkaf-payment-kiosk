@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Trash2, Shield, User } from "lucide-react";
+import { ArrowLeft, Trash2, Shield, User, UserPlus } from "lucide-react";
+import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const AdminsManagement = () => {
   const navigate = useNavigate();
@@ -106,7 +107,17 @@ const AdminsManagement = () => {
             </Button>
             <h1 className="text-3xl font-bold">Manage Admins</h1>
           </div>
+          <ThemeToggle />
         </div>
+
+        {isSuperAdmin && (
+          <div className="mb-6">
+            <Button onClick={() => navigate('/admin/add-admin')}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add New Admin
+            </Button>
+          </div>
+        )}
 
         <Card className="p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Super Admin Email</h2>

@@ -20,7 +20,9 @@ export type Database = {
           created_at: string | null
           description: string
           display_order: number
+          icon_url: string | null
           id: string
+          info_text: string | null
           is_visible: boolean | null
           title: string
           updated_at: string | null
@@ -30,7 +32,9 @@ export type Database = {
           created_at?: string | null
           description: string
           display_order: number
+          icon_url?: string | null
           id?: string
+          info_text?: string | null
           is_visible?: boolean | null
           title: string
           updated_at?: string | null
@@ -40,7 +44,9 @@ export type Database = {
           created_at?: string | null
           description?: string
           display_order?: number
+          icon_url?: string | null
           id?: string
+          info_text?: string | null
           is_visible?: boolean | null
           title?: string
           updated_at?: string | null
@@ -87,6 +93,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          first_login: boolean | null
           full_name: string | null
           id: string
           updated_at: string
@@ -94,6 +101,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          first_login?: boolean | null
           full_name?: string | null
           id: string
           updated_at?: string
@@ -101,9 +109,43 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          first_login?: boolean | null
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      sms_settings: {
+        Row: {
+          api_endpoint: string
+          api_key: string | null
+          api_password: string | null
+          api_username: string | null
+          created_at: string | null
+          id: string
+          sender_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_endpoint: string
+          api_key?: string | null
+          api_password?: string | null
+          api_username?: string | null
+          created_at?: string | null
+          id?: string
+          sender_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_endpoint?: string
+          api_key?: string | null
+          api_password?: string | null
+          api_username?: string | null
+          created_at?: string | null
+          id?: string
+          sender_id?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -124,6 +166,7 @@ export type Database = {
           receipt_printed: boolean | null
           receipt_sent: boolean | null
           reference_number: string | null
+          sms_status: string | null
           status: Database["public"]["Enums"]["transaction_status"]
         }
         Insert: {
@@ -142,6 +185,7 @@ export type Database = {
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
           reference_number?: string | null
+          sms_status?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
         }
         Update: {
@@ -160,6 +204,7 @@ export type Database = {
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
           reference_number?: string | null
+          sms_status?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
         }
         Relationships: [

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Trash2, Edit } from "lucide-react";
+import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -139,6 +140,7 @@ const KiosksManagement = () => {
             </Button>
             <h1 className="text-3xl font-bold">Manage Kiosks</h1>
           </div>
+          <ThemeToggle />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

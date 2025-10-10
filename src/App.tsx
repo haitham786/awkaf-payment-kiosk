@@ -20,44 +20,51 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
 import KiosksManagement from "./pages/admin/KiosksManagement";
 import AdminsManagement from "./pages/admin/AdminsManagement";
+import AddAdminPage from "./pages/admin/AddAdminPage";
+import SMSSettings from "./pages/admin/SMSSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          
-          {/* Kiosk Routes */}
-          <Route path="/kiosk" element={<KioskHomepage />} />
-          <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
-          <Route path="/kiosk/preset-amounts" element={<PresetAmountsPage />} />
-          <Route path="/kiosk/amount" element={<AmountPage />} />
-          <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
-          <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
-          <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
-          <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
-          <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
-          <Route path="/kiosk/error" element={<ErrorPage />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/categories" element={<CategoriesManagement />} />
-          <Route path="/admin/kiosks" element={<KiosksManagement />} />
-          <Route path="/admin/admins" element={<AdminsManagement />} />
-          <Route path="/admin/statistics" element={<EnhancedStatistics />} />
-          
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Kiosk Routes */}
+            <Route path="/kiosk" element={<KioskHomepage />} />
+            <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
+            <Route path="/kiosk/preset-amounts" element={<PresetAmountsPage />} />
+            <Route path="/kiosk/amount" element={<AmountPage />} />
+            <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
+            <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
+            <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
+            <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
+            <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
+            <Route path="/kiosk/error" element={<ErrorPage />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/categories" element={<CategoriesManagement />} />
+            <Route path="/admin/kiosks" element={<KiosksManagement />} />
+            <Route path="/admin/admins" element={<AdminsManagement />} />
+            <Route path="/admin/add-admin" element={<AddAdminPage />} />
+            <Route path="/admin/sms-settings" element={<SMSSettings />} />
+            <Route path="/admin/statistics" element={<EnhancedStatistics />} />
+            
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

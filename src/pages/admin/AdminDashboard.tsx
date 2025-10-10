@@ -23,6 +23,7 @@ import {
   DollarSign, CreditCard, TrendingUp, Activity, 
   LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users
 } from "lucide-react";
+import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -235,10 +236,13 @@ const AdminDashboard = () => {
               <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
               <p className="text-sm text-muted-foreground">Kiosk Management System</p>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
+            <div className="flex gap-2">
+              <ThemeToggle />
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
           
           {/* Quick Action Buttons */}
@@ -258,6 +262,10 @@ const AdminDashboard = () => {
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/statistics')}>
               <BarChart3 className="mr-2 h-4 w-4" />
               Enhanced Statistics
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/sms-settings')}>
+              <Settings className="mr-2 h-4 w-4" />
+              SMS Settings
             </Button>
           </div>
         </div>
