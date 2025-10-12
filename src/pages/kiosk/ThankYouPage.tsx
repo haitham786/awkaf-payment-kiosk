@@ -46,43 +46,43 @@ const ThankYouPage = () => {
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-3xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4">
           {/* Organization Logo Placeholder */}
-          <div className="w-32 h-32 mx-auto mb-6 bg-gradient-primary rounded-full shadow-elegant flex items-center justify-center animate-glow">
-            <span className="text-4xl text-primary-foreground">🕌</span>
+          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-lg flex items-center justify-center">
+            <span className="text-3xl">🕌</span>
           </div>
         </div>
 
         {/* Success Card */}
-        <Card className="p-12 bg-card/90 backdrop-blur-sm shadow-elegant border-2 border-success/30 text-center">
-          <div className="space-y-8">
+        <Card className="p-6 bg-white shadow-lg border-2 border-emerald-300 text-center">
+          <div className="space-y-4">
             {/* Success Icon */}
-            <div className="w-24 h-24 mx-auto bg-gradient-to-r from-success to-success/80 rounded-full shadow-elegant flex items-center justify-center animate-bounce">
-              <span className="text-4xl">✅</span>
+            <div className="w-16 h-16 mx-auto bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full shadow-md flex items-center justify-center">
+              <span className="text-3xl">✅</span>
             </div>
 
             {/* Thank You Message */}
-            <div className="space-y-4">
-              <h1 className="text-4xl font-bold text-success">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-emerald-700">
                 شكراً لكم!
               </h1>
-              <h2 className="text-2xl font-semibold text-foreground">
+              <h2 className="text-xl font-semibold text-gray-900">
                 تم قبول تبرعكم بنجاح
               </h2>
             </div>
 
             {/* Donation Summary */}
-            <div className="bg-gradient-card rounded-lg p-6 border border-primary/20">
-              <div className="grid grid-cols-2 gap-6 text-center">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
-                  <p className="text-muted-foreground mb-2">المبلغ المتبرع به</p>
-                  <p className="text-3xl font-bold text-primary">
+                  <p className="text-gray-600 mb-1 text-sm">المبلغ المتبرع به</p>
+                  <p className="text-2xl font-bold text-emerald-700">
                     {formatAmount(amount)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-2">نوع التبرع</p>
-                  <p className="text-2xl font-semibold text-secondary">
+                  <p className="text-gray-600 mb-1 text-sm">نوع التبرع</p>
+                  <p className="text-xl font-semibold text-gray-900">
                     {category === 'zakat' && 'زكاة'}
                     {category === 'sadaqah' && 'صدقة'}
                     {category === 'charity' && 'خيرية'}
@@ -95,19 +95,19 @@ const ThankYouPage = () => {
             </div>
 
             {/* Islamic Quote */}
-            <div className="bg-gradient-gold/10 rounded-lg p-6 border border-secondary/30">
-              <p className="text-xl font-medium text-foreground leading-relaxed">
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+              <p className="text-lg font-medium text-gray-800 leading-relaxed">
                 "جَزَاكُمُ اللهُ خَيْرًا"
               </p>
-              <p className="text-lg text-muted-foreground mt-2">
+              <p className="text-base text-gray-600 mt-1">
                 بارك الله فيكم وجعله في ميزان حسناتكم
               </p>
             </div>
 
             {/* Transaction Reference Number */}
-            <div className="bg-muted/50 rounded-lg p-4 border border-muted">
-              <p className="text-sm text-muted-foreground">رقم المعاملة</p>
-              <p className="text-lg font-mono font-semibold text-foreground">
+            <div className="bg-gray-100 rounded-lg p-3 border border-gray-300">
+              <p className="text-sm text-gray-600">رقم المعاملة</p>
+              <p className="text-base font-mono font-semibold text-gray-900">
                 {referenceNumber || transactionId}
               </p>
             </div>
@@ -115,19 +115,19 @@ const ThankYouPage = () => {
         </Card>
 
         {/* Receipt Options */}
-        <div className="mt-8 space-y-4">
-          <Card className="p-6 bg-card/80 backdrop-blur-sm shadow-card border border-primary/20">
-            <div className="text-center space-y-4">
-              <h3 className="text-xl font-semibold text-foreground">
+        <div className="mt-4 space-y-3">
+          <Card className="p-4 bg-white shadow-md border border-gray-300">
+            <div className="text-center space-y-3">
+              <h3 className="text-lg font-semibold text-gray-900">
                 هل تريد إيصال عبر الرسائل النصية؟
               </h3>
               
-              <div className="flex justify-center space-x-4">
+              <div className="flex justify-center space-x-3">
                 <KioskButton
                   variant="secondary"
                   size="xl"
                   onClick={handleSMSReceipt}
-                  className="min-w-[200px] ml-4"
+                  className="min-w-[160px] ml-3 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
                 >
                   نعم، أرسل الإيصال
                 </KioskButton>
@@ -136,7 +136,7 @@ const ThankYouPage = () => {
                   variant="outline"
                   size="xl"
                   onClick={handleReturnHome}
-                  className="min-w-[200px]"
+                  className="min-w-[160px] bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
                 >
                   لا، شكراً
                 </KioskButton>
@@ -146,12 +146,12 @@ const ThankYouPage = () => {
 
           {/* Auto Return Countdown */}
           <div className="text-center">
-            <p className="text-muted-foreground">
+            <p className="text-gray-600 text-sm">
               العودة التلقائية إلى الصفحة الرئيسية خلال {countdown} ثواني
             </p>
-            <div className="w-32 h-2 bg-muted rounded-full mx-auto mt-2">
+            <div className="w-32 h-2 bg-gray-200 rounded-full mx-auto mt-2">
               <div 
-                className="h-full bg-gradient-primary rounded-full transition-all duration-1000 ease-linear"
+                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000 ease-linear"
                 style={{ width: `${((10 - countdown) / 10) * 100}%` }}
               />
             </div>

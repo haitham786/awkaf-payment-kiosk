@@ -35,38 +35,35 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-6xl mx-auto space-y-8">
+      <div className="w-full max-w-6xl mx-auto space-y-4">
         {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="bg-card/30 backdrop-blur-xl rounded-2xl p-6 shadow-neon border-2 border-primary/40">
-            <h1 className="text-4xl font-bold text-foreground mb-2">
+        <div className="text-center">
+          <div className="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
               اختر مبلغ التبرع
             </h1>
-            <p className="text-xl text-primary font-semibold">
+            <p className="text-lg text-emerald-700 font-semibold">
               {getCategoryName(categoryId)}
             </p>
           </div>
         </div>
 
         {/* Preset Amount Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {presetAmounts.map((amount, index) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group"
+              className="p-0 overflow-hidden bg-white border-2 border-gray-300 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group"
             >
               <KioskButton
                 variant="donation"
-                className="w-full h-full flex flex-col items-center justify-center space-y-4 py-8 border-0 rounded-xl"
+                className="w-full h-full flex flex-col items-center justify-center space-y-2 py-4 border-0 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200"
                 onClick={() => handleAmountSelect(amount)}
-                style={{
-                  animationDelay: `${index * 0.05}s`,
-                }}
               >
-                <div className="text-6xl font-bold text-foreground group-hover:text-primary transition-colors">
+                <div className="text-4xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                   {amount}
                 </div>
-                <p className="text-xl text-muted-foreground group-hover:text-primary/80 transition-colors">
+                <p className="text-sm text-gray-600 group-hover:text-emerald-600 transition-colors">
                   ريال عماني
                 </p>
               </KioskButton>
@@ -75,12 +72,12 @@ const PresetAmountsPage = () => {
         </div>
 
         {/* Custom Amount Button */}
-        <div className="flex justify-center pt-8">
+        <div className="flex justify-center pt-2">
           <KioskButton
             variant="secondary"
             size="lg"
             onClick={handleCustomAmount}
-            className="px-16 py-8 text-2xl font-bold shadow-neon hover:shadow-glow"
+            className="px-12 py-4 text-xl font-bold bg-gray-200 hover:bg-gray-300 text-gray-900 border-2 border-gray-400"
           >
             إدخال مبلغ مختلف
           </KioskButton>

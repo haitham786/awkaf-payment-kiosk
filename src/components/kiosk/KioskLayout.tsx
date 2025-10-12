@@ -21,40 +21,28 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-background islamic-pattern relative overflow-hidden",
+      "min-h-screen w-full bg-white relative overflow-hidden",
       arabic ? "rtl" : "ltr",
       className
     )}>
-      {/* Static glowing orbs - no animation */}
-      <div className="absolute inset-0 bg-gradient-hero opacity-50" />
-      <div className="absolute top-10 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
-      <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[140px]" />
-      <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-accent/15 rounded-full blur-[100px]" />
-      
-      {/* Scanlines effect */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-           style={{ 
-             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(180 100% 50%) 2px, hsl(180 100% 50%) 4px)' 
-           }} 
-      />
       
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        <main className="flex-1 flex items-center justify-center p-8">
+        <main className="flex-1 flex items-center justify-center p-4">
           {children}
         </main>
         
-        {/* Futuristic home button */}
+        {/* Home button */}
         {showHomeButton && (
           <div className={cn(
-            "absolute bottom-8 z-20",
-            arabic ? "left-8" : "right-8"
+            "absolute bottom-4 z-20",
+            arabic ? "left-4" : "right-4"
           )}>
             <KioskButton
               variant="outline"
               size="kiosk"
               onClick={() => navigate("/kiosk")}
-              className="bg-card/40 backdrop-blur-xl border-2 border-primary/70 hover:bg-primary/20 hover:border-primary hover:shadow-neon transition-all duration-300"
+              className="bg-white border-2 border-gray-300 hover:bg-gray-100 text-black"
             >
               <Home className="w-6 h-6 ml-2" />
               {arabic ? "الرئيسية" : "Home"}

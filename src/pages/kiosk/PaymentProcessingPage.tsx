@@ -67,77 +67,74 @@ const PaymentProcessingPage = () => {
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-3xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             جاري معالجة الدفع
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-base text-gray-600">
             يرجى الانتظار، لا تقم بإزالة البطاقة
           </p>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Amount Display */}
-          <Card className="p-6 bg-gradient-primary/10 backdrop-blur-sm shadow-card border-2 border-primary/40 text-center">
-            <p className="text-lg text-muted-foreground mb-2">المبلغ</p>
-            <p className="text-4xl font-bold text-primary">
+          <Card className="p-4 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
+            <p className="text-base text-gray-600 mb-1">المبلغ</p>
+            <p className="text-3xl font-bold text-emerald-700">
               {formatAmount(amount)}
             </p>
           </Card>
 
           {/* Processing Animation */}
-          <Card className="p-12 bg-card/90 backdrop-blur-sm shadow-elegant border border-primary/20 text-center">
-            <div className="space-y-8">
+          <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
+            <div className="space-y-4">
               {/* Animated Circle */}
-              <div className="relative w-32 h-32 mx-auto">
-                <div className="absolute inset-0 rounded-full border-4 border-muted"></div>
+              <div className="relative w-24 h-24 mx-auto">
+                <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
                 <div 
-                  className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
-                  style={{ 
-                    background: `conic-gradient(from 0deg, hsl(var(--primary)) ${progress}%, transparent ${progress}%)`
-                  }}
+                  className="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"
                 ></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-3xl">💳</span>
+                  <span className="text-2xl">💳</span>
                 </div>
               </div>
 
               {/* Progress Text */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-foreground">
+              <div className="space-y-3">
+                <h2 className="text-xl font-bold text-gray-900">
                   معالجة العملية...
                 </h2>
                 
                 <div className="space-y-2">
-                  <div className="w-full bg-muted rounded-full h-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
-                      className="bg-gradient-primary h-3 rounded-full transition-all duration-300 ease-out"
+                      className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
-                  <p className="text-lg font-semibold text-primary">
+                  <p className="text-base font-semibold text-emerald-700">
                     {Math.round(progress)}%
                   </p>
                 </div>
 
                 {/* Processing Steps */}
-                <div className="space-y-3 text-lg">
-                  <div className={`flex items-center justify-center space-x-4 ${progress > 20 ? 'text-success' : 'text-muted-foreground'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ml-3 ${progress > 20 ? 'bg-success text-success-foreground' : 'bg-muted'}`}>
+                <div className="space-y-2 text-base">
+                  <div className={`flex items-center justify-center space-x-3 ${progress > 20 ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 20 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
                       {progress > 20 ? '✓' : '•'}
                     </span>
                     <p>التحقق من البطاقة</p>
                   </div>
                   
-                  <div className={`flex items-center justify-center space-x-4 ${progress > 50 ? 'text-success' : 'text-muted-foreground'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ml-3 ${progress > 50 ? 'bg-success text-success-foreground' : 'bg-muted'}`}>
+                  <div className={`flex items-center justify-center space-x-3 ${progress > 50 ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 50 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
                       {progress > 50 ? '✓' : '•'}
                     </span>
                     <p>الاتصال بالبنك</p>
                   </div>
                   
-                  <div className={`flex items-center justify-center space-x-4 ${progress > 80 ? 'text-success' : 'text-muted-foreground'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ml-3 ${progress > 80 ? 'bg-success text-success-foreground' : 'bg-muted'}`}>
+                  <div className={`flex items-center justify-center space-x-3 ${progress > 80 ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 80 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
                       {progress > 80 ? '✓' : '•'}
                     </span>
                     <p>تأكيد العملية</p>
@@ -146,8 +143,8 @@ const PaymentProcessingPage = () => {
               </div>
 
               {/* Security Message */}
-              <div className="bg-secondary/10 rounded-lg p-4 border border-secondary/30">
-                <p className="text-sm text-foreground">
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-sm text-gray-800">
                   🔒 جميع المعاملات مؤمنة ومشفرة
                 </p>
               </div>

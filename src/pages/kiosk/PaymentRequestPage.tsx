@@ -28,77 +28,77 @@ const PaymentRequestPage = () => {
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-3xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             طلب الدفع
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-base text-gray-600">
             يرجى استخدام البطاقة البنكية للدفع
           </p>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Amount Display */}
-          <Card className="p-6 bg-gradient-primary/10 backdrop-blur-sm shadow-card border-2 border-primary/40 text-center">
-            <p className="text-lg text-muted-foreground mb-2">المبلغ المطلوب</p>
-            <p className="text-4xl font-bold text-primary">
+          <Card className="p-4 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
+            <p className="text-base text-gray-600 mb-1">المبلغ المطلوب</p>
+            <p className="text-3xl font-bold text-emerald-700">
               {formatAmount(amount)}
             </p>
           </Card>
 
           {/* POS Terminal Instructions */}
-          <Card className="p-12 bg-card/90 backdrop-blur-sm shadow-elegant border border-primary/20 text-center">
-            <div className="space-y-8">
+          <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
+            <div className="space-y-4">
               {/* POS Terminal Image Placeholder */}
-              <div className="w-48 h-32 mx-auto bg-gradient-card rounded-lg shadow-card border-2 border-primary/20 flex items-center justify-center">
+              <div className="w-36 h-24 mx-auto bg-gray-100 rounded-lg shadow-md border-2 border-gray-300 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">💳</div>
-                  <p className="text-sm font-medium">جهاز نقاط البيع</p>
+                  <div className="text-3xl mb-1">💳</div>
+                  <p className="text-xs font-medium text-gray-700">جهاز نقاط البيع</p>
                 </div>
               </div>
 
               {/* Instructions */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-foreground">
+              <div className="space-y-3">
+                <h2 className="text-xl font-bold text-gray-900">
                   يرجى اتباع التعليمات التالية:
                 </h2>
                 
-                <div className="space-y-3 text-lg">
-                  <div className="flex items-center justify-center space-x-4">
-                    <span className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold ml-3">١</span>
-                    <p>أدخل البطاقة في الجهاز</p>
+                <div className="space-y-2 text-base">
+                  <div className="flex items-center justify-center space-x-3">
+                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">١</span>
+                    <p className="text-gray-800">أدخل البطاقة في الجهاز</p>
                   </div>
                   
-                  <div className="flex items-center justify-center space-x-4">
-                    <span className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold ml-3">٢</span>
-                    <p>أو مرر البطاقة على الجهاز</p>
+                  <div className="flex items-center justify-center space-x-3">
+                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">٢</span>
+                    <p className="text-gray-800">أو مرر البطاقة على الجهاز</p>
                   </div>
                   
-                  <div className="flex items-center justify-center space-x-4">
-                    <span className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center text-primary-foreground font-bold ml-3">٣</span>
-                    <p>أو قرب البطاقة من الجهاز (الدفع اللاتلامسي)</p>
+                  <div className="flex items-center justify-center space-x-3">
+                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">٣</span>
+                    <p className="text-gray-800">أو قرب البطاقة من الجهاز (الدفع اللاتلامسي)</p>
                   </div>
                 </div>
               </div>
 
               {/* Supported Cards */}
-              <div className="bg-gradient-card rounded-lg p-6 border border-primary/20">
-                <p className="text-lg font-semibold mb-4">البطاقات المدعومة:</p>
-                <div className="flex justify-center space-x-4 flex-wrap">
-                  <span className="bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium mx-1 mb-2">Visa</span>
-                  <span className="bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium mx-1 mb-2">MasterCard</span>
-                  <span className="bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium mx-1 mb-2">مدى</span>
-                  <span className="bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium mx-1 mb-2">Apple Pay</span>
-                  <span className="bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium mx-1 mb-2">Google Pay</span>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-base font-semibold mb-3 text-gray-900">البطاقات المدعومة:</p>
+                <div className="flex justify-center space-x-2 flex-wrap">
+                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Visa</span>
+                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">MasterCard</span>
+                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">مدى</span>
+                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Apple Pay</span>
+                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Google Pay</span>
                 </div>
               </div>
 
               {/* Waiting Animation */}
               <div className="flex items-center justify-center space-x-2">
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce ml-1"></div>
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce ml-1" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce ml-1" style={{ animationDelay: '0.2s' }}></div>
-                <p className="text-muted-foreground mr-4">في انتظار البطاقة...</p>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce ml-1"></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce ml-1" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce ml-1" style={{ animationDelay: '0.2s' }}></div>
+                <p className="text-gray-600 mr-3 text-sm">في انتظار البطاقة...</p>
               </div>
             </div>
           </Card>

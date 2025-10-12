@@ -98,52 +98,52 @@ const MobileNumberPage = () => {
     <KioskLayout>
       <div className="w-full max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             إدخال رقم الهاتف
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-base text-gray-600">
             أدخل رقم هاتفك لاستلام إيصال التبرع
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Mobile Number Input Section */}
-          <Card className="p-8 bg-card/80 backdrop-blur-sm shadow-card border border-primary/20">
-            <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-center mb-6">رقم الهاتف</h2>
+          <Card className="p-4 bg-white shadow-md border border-gray-300">
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-center mb-3 text-gray-900">رقم الهاتف</h2>
               
               {/* Transaction Summary */}
-              <div className="bg-gradient-card rounded-lg p-4 border border-primary/20 text-center">
-                <p className="text-muted-foreground mb-1">مبلغ التبرع</p>
-                <p className="text-2xl font-bold text-primary">
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-300 text-center">
+                <p className="text-gray-600 mb-1 text-sm">مبلغ التبرع</p>
+                <p className="text-xl font-bold text-emerald-700">
                   {formatAmount(amount)}
                 </p>
               </div>
 
               {/* Mobile Number Display */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-center space-x-2">
-                  <span className="text-2xl">🇴🇲</span>
-                  <span className="text-xl font-medium">+968</span>
+                  <span className="text-xl">🇴🇲</span>
+                  <span className="text-lg font-medium text-gray-900">+968</span>
                 </div>
                 
                 <Input
                   value={mobileNumber}
                   readOnly
                   placeholder="أدخل رقم الهاتف"
-                  className="text-3xl text-center h-16 bg-gradient-card border-2 border-primary/30 focus:border-primary shadow-card"
+                  className="text-2xl text-center h-12 bg-gray-50 border-2 border-gray-300 focus:border-emerald-500 text-gray-900"
                   maxLength={8}
                 />
                 
-                <p className="text-center text-muted-foreground">
+                <p className="text-center text-gray-600 text-sm">
                   8 أرقام (بدون +968)
                 </p>
               </div>
 
               {/* Example */}
-              <div className="bg-secondary/10 rounded-lg p-4 border border-secondary/30">
-                <p className="text-center text-sm">
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-center text-sm text-gray-700">
                   <span className="font-medium">مثال:</span> 91234567
                 </p>
               </div>
@@ -151,12 +151,12 @@ const MobileNumberPage = () => {
           </Card>
 
           {/* Keypad Section */}
-          <Card className="p-8 bg-card/80 backdrop-blur-sm shadow-card border border-primary/20">
-            <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-center mb-6">لوحة الأرقام</h2>
+          <Card className="p-4 bg-white shadow-md border border-gray-300">
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-center mb-3 text-gray-900">لوحة الأرقام</h2>
               
               {/* Keypad */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {keypadNumbers.map((row, rowIndex) => 
                   row.map((number, colIndex) => (
                     <KioskButton
@@ -164,7 +164,7 @@ const MobileNumberPage = () => {
                       variant="keypad"
                       onClick={() => handleKeypadPress(number)}
                       disabled={!number}
-                      className="aspect-square"
+                      className="aspect-square bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300"
                     >
                       {number}
                     </KioskButton>
@@ -173,13 +173,13 @@ const MobileNumberPage = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-4 pt-4">
+              <div className="space-y-2 pt-2">
                 <KioskButton
                   variant="confirm"
                   size="xl"
                   onClick={handleSendSMS}
                   disabled={mobileNumber.length !== 8 || sending}
-                  className="w-full"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   {sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}
                 </KioskButton>
@@ -188,7 +188,7 @@ const MobileNumberPage = () => {
                   variant="outline"
                   size="lg"
                   onClick={handleCancel}
-                  className="w-full"
+                  className="w-full bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
                 >
                   إلغاء والعودة للرئيسية
                 </KioskButton>
@@ -198,23 +198,23 @@ const MobileNumberPage = () => {
         </div>
 
         {/* SMS Info */}
-        <Card className="mt-8 p-6 bg-card/80 backdrop-blur-sm shadow-card border border-primary/20">
+        <Card className="mt-4 p-4 bg-white shadow-md border border-gray-300">
           <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-base font-semibold text-gray-900">
               📱 سيصلك إيصال يحتوي على:
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
               <div className="text-center">
-                <p className="font-medium">رقم العملية</p>
-                <p className="text-sm text-muted-foreground">للمراجعة والاستعلام</p>
+                <p className="font-medium text-gray-900 text-sm">رقم العملية</p>
+                <p className="text-xs text-gray-600">للمراجعة والاستعلام</p>
               </div>
               <div className="text-center">
-                <p className="font-medium">تفاصيل التبرع</p>
-                <p className="text-sm text-muted-foreground">النوع والمبلغ والتاريخ</p>
+                <p className="font-medium text-gray-900 text-sm">تفاصيل التبرع</p>
+                <p className="text-xs text-gray-600">النوع والمبلغ والتاريخ</p>
               </div>
               <div className="text-center">
-                <p className="font-medium">شكر وتقدير</p>
-                <p className="text-sm text-muted-foreground">رسالة شكر من المؤسسة</p>
+                <p className="font-medium text-gray-900 text-sm">شكر وتقدير</p>
+                <p className="text-xs text-gray-600">رسالة شكر من المؤسسة</p>
               </div>
             </div>
           </div>

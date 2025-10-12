@@ -41,46 +41,46 @@ const ConfirmationPage = () => {
     <KioskLayout>
       <div className="w-full max-w-3xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             تأكيد التبرع
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-base text-gray-600">
             يرجى مراجعة تفاصيل التبرع قبل المتابعة
           </p>
         </div>
 
         {/* Confirmation Card */}
-        <Card className="p-12 bg-card/90 backdrop-blur-sm shadow-elegant border-2 border-primary/30 text-center">
-          <div className="space-y-8">
+        <Card className="p-6 bg-white shadow-lg border-2 border-gray-300 text-center">
+          <div className="space-y-4">
             {/* Icon */}
-            <div className="w-24 h-24 mx-auto bg-gradient-primary rounded-full shadow-elegant flex items-center justify-center animate-glow">
-              <span className="text-4xl">📿</span>
+            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-md flex items-center justify-center">
+              <span className="text-3xl">📿</span>
             </div>
 
             {/* Donation Details */}
-            <div className="space-y-6">
-              <div className="bg-gradient-card rounded-lg p-6 border border-primary/20">
-                <p className="text-lg text-muted-foreground mb-2">نوع التبرع</p>
-                <p className="text-3xl font-bold text-secondary">
+            <div className="space-y-3">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-sm text-gray-600 mb-1">نوع التبرع</p>
+                <p className="text-2xl font-bold text-emerald-700">
                   {getCategoryName(category)}
                 </p>
               </div>
 
-              <div className="bg-gradient-primary/10 rounded-lg p-8 border-2 border-primary/40">
-                <p className="text-lg text-muted-foreground mb-2">مبلغ التبرع</p>
-                <p className="text-5xl font-bold text-primary">
+              <div className="bg-emerald-50 rounded-lg p-4 border-2 border-emerald-300">
+                <p className="text-sm text-gray-600 mb-1">مبلغ التبرع</p>
+                <p className="text-3xl font-bold text-emerald-700">
                   {formatAmount(amount)}
                 </p>
               </div>
             </div>
 
             {/* Islamic Quote */}
-            <div className="bg-secondary/10 rounded-lg p-6 border border-secondary/30">
-              <p className="text-lg font-medium text-foreground">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <p className="text-base font-medium text-gray-800">
                 "مَّن ذَا الَّذِي يُقْرِضُ اللَّهَ قَرْضًا حَسَنًا فَيُضَاعِفَهُ لَهُ أَضْعَافًا كَثِيرَةً"
               </p>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-xs text-gray-600 mt-2">
                 سورة البقرة - آية 245
               </p>
             </div>
@@ -88,12 +88,12 @@ const ConfirmationPage = () => {
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-6 mt-8">
+        <div className="flex justify-center space-x-4 mt-4">
           <KioskButton
             variant="outline"
             size="xl"
             onClick={handleBack}
-            className="min-w-[200px] ml-4"
+            className="min-w-[160px] ml-4 bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
           >
             <ArrowRight className="w-5 h-5 ml-2" />
             تعديل المبلغ
@@ -103,7 +103,7 @@ const ConfirmationPage = () => {
             variant="confirm"
             size="xl"
             onClick={handleConfirm}
-            className="min-w-[200px]"
+            className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white border-0"
           >
             تأكيد والدفع
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -111,8 +111,8 @@ const ConfirmationPage = () => {
         </div>
 
         {/* Additional Info */}
-        <div className="text-center mt-8">
-          <p className="text-muted-foreground">
+        <div className="text-center mt-4">
+          <p className="text-gray-600 text-sm">
             سيتم تحويل المبلغ بعد تأكيد الدفع بالبطاقة
           </p>
         </div>
