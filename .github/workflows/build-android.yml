@@ -59,12 +59,24 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Build Debug APK
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v -keystore android/app/release.keystore \
+            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=City, S=State, C=US"
+
+      - name: Build Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace --info
+        run: ./gradlew assembleRelease --stacktrace --info
+        env:
+          RELEASE_STORE_FILE: release.keystore
+          RELEASE_STORE_PASSWORD: android
+          RELEASE_KEY_ALIAS: release
+          RELEASE_KEY_PASSWORD: android
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
