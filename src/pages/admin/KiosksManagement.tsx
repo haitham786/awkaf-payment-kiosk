@@ -30,6 +30,26 @@ const KiosksManagement = () => {
     checkAuth();
     loadKiosks();
     loadBackgroundImage();
+
+    // Subscribe to real-time changes in kiosks table
+    const channel = supabase
+      .channel('kiosks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'kiosks'
+        },
+        () => {
+          loadKiosks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -418,15 +438,36 @@ const KiosksManagement = () => {
 
           {/* Kiosks List */}
           <div className="space-y-4">
-            <h2 className="text-xl font-bold">Existing Kiosks ({kiosks.length})</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">Existing Kiosks ({kiosks.length})</h2>
+              {kiosks.filter(k => k.status === 'inactive').length > 0 && (
+                <span className="px-3 py-1 bg-destructive/20 text-destructive rounded-full text-sm font-medium">
+                  {kiosks.filter(k => k.status === 'inactive').length} Pending Approval
+                </span>
+              )}
+            </div>
             {loading ? (
               <p>Loading...</p>
+            ) : kiosks.length === 0 ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No kiosks registered yet.</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Kiosks can register themselves from the Settings Panel on the kiosk app.
+                </p>
+              </Card>
             ) : (
               kiosks.map((kiosk) => (
-                <Card key={kiosk.id} className="p-4">
+                <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'inactive' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold">{kiosk.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold">{kiosk.name}</h3>
+                        {kiosk.status === 'inactive' && (
+                          <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">
+                            Needs Approval
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">{kiosk.location}</p>
                       <div className="flex gap-4 mt-2">
                         <p className="text-xs text-muted-foreground">
@@ -442,8 +483,45 @@ const KiosksManagement = () => {
                           </span>
                         </p>
                       </div>
+                      {kiosk.configuration?.pos && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          POS: {kiosk.configuration.pos.connectionType?.toUpperCase() || 'Not configured'}
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
+                      {kiosk.status === 'inactive' && (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          onClick={() => {
+                            setEditingId(kiosk.id);
+                            setFormData({
+                              ...formData,
+                              name: kiosk.name,
+                              location: kiosk.location,
+                              reference_number: kiosk.reference_number || '',
+                              status: 'active'
+                            });
+                            // Auto-submit to approve
+                            setTimeout(async () => {
+                              const { error } = await supabase
+                                .from('kiosks')
+                                .update({ status: 'active' })
+                                .eq('id', kiosk.id);
+                              
+                              if (!error) {
+                                toast({ title: "Kiosk approved and activated" });
+                                loadKiosks();
+                                resetForm();
+                              }
+                            }, 100);
+                          }}
+                          className="bg-success hover:bg-success/90"
+                        >
+                          Approve
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => handleEdit(kiosk)}>
                         <Edit className="w-4 h-4" />
                       </Button>
