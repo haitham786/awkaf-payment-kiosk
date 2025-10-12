@@ -136,7 +136,11 @@ const KioskHomepage = () => {
             </div>
           ) : (
             categories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group relative">
-              <CategoryInfoDialog title={category.title} infoText={category.info_text} />
+              <CategoryInfoDialog 
+                title={category.title} 
+                description={category.description}
+                infoText={category.info_text || ''}
+              />
               <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative" onClick={() => handleCategorySelect(category.category_id)} style={{
             animationDelay: `${index * 0.1}s`
           }}>
