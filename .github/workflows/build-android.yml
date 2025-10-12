@@ -78,8 +78,8 @@ jobs:
       - name: Zipalign APK
         run: |
           BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -f -v 4 \
-            android/app/build/outputs/apk/release/app-release.apk \
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -v 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
             android/app/build/outputs/apk/release/app-release-aligned.apk
 
       - name: Sign APK
