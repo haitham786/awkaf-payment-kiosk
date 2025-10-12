@@ -15,9 +15,9 @@ interface CategoryInfoDialogProps {
 }
 
 export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInfoDialogProps) => {
-  if (!description && !infoText) return null;
-  
   const content = infoText || description;
+  
+  if (!content) return null;
 
   return (
     <Dialog>
@@ -25,10 +25,10 @@ export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInf
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-primary/20 hover:bg-primary/30 border border-primary/50"
+          className="absolute top-2 right-2 w-10 h-10 rounded-full bg-primary/30 hover:bg-primary/50 border-2 border-primary z-10 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
-          <Info className="w-4 h-4 text-primary" />
+          <Info className="w-5 h-5 text-primary" />
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-card/95 backdrop-blur-xl border-2 border-primary/30 shadow-neon max-w-md">

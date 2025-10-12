@@ -115,9 +115,9 @@ const KioskHomepage = () => {
               جاري التحميل...
             </div> : categories.length === 0 ? <div className="col-span-2 md:col-span-3 text-center text-xl text-muted-foreground">
               لا توجد فئات متاحة حالياً
-            </div> : categories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group relative">
+            </div> : categories.map((category, index) => <Card key={category.id} className="p-0 overflow-hidden bg-card/20 backdrop-blur-md border-2 border-primary/30 shadow-card hover:shadow-neon transition-all duration-300 hover:scale-105 transform-3d group relative min-h-[200px]">
               <CategoryInfoDialog title={category.title} description={category.description} infoText={category.info_text || ''} />
-              <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl relative" onClick={() => handleCategorySelect(category.category_id)} style={{
+              <KioskButton variant="donation" className="w-full h-full flex flex-col items-center justify-center space-y-3 border-0 rounded-xl" onClick={() => handleCategorySelect(category.category_id)} style={{
             animationDelay: `${index * 0.1}s`
           }}>
                 {category.icon_url ? <div className="w-16 h-16 mb-3 group-hover:scale-125 transition-transform duration-300">
@@ -128,8 +128,6 @@ const KioskHomepage = () => {
               filter: 'drop-shadow(0 0 10px hsl(180 100% 50% / 0.5))'
             }}>📿</div>}
                 <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">{category.title}</h3>
-                <p className="text-sm text-center text-muted-foreground group-hover:text-primary/80 transition-colors">{category.description}</p>
-                
               </KioskButton>
             </Card>)}
         </div>
