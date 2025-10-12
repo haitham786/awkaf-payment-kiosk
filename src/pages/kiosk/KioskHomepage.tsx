@@ -163,7 +163,7 @@ const KioskHomepage = () => {
           </div>
           
           {/* Quranic verse */}
-          <div className="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200 mb-4">
+          <div className="bg-gray-50/60 rounded-xl p-4 shadow-sm border-0 mb-4">
             <p className="text-xl font-bold text-gray-800 leading-relaxed">
               "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"
             </p>
@@ -192,7 +192,7 @@ const KioskHomepage = () => {
             categories.map((category, index) => (
               <Card
                 key={category.id}
-                className="p-0 overflow-hidden bg-white border-2 border-gray-300 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
+                className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
               >
                 <CategoryInfoDialog
                   title={category.title}
@@ -201,15 +201,20 @@ const KioskHomepage = () => {
                 />
                 <KioskButton
                   variant="donation"
-                  className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200"
+                  className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-gradient-to-br from-emerald-50/60 to-emerald-100/60 hover:from-emerald-100/60 hover:to-emerald-200/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >
                   {category.icon_url ? (
                     <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform duration-300">
                       <img
-                        src={category.icon_url}
+                        src={`${category.icon_url}?t=${Date.now()}`}
                         alt={category.title}
                         className="w-full h-full object-contain"
+                        onError={(e) => {
+                          console.error('Error loading image:', category.icon_url);
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = '<div class="text-3xl">📿</div>';
+                        }}
                       />
                     </div>
                   ) : (

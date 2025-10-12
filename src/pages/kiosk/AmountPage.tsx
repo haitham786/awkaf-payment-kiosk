@@ -80,7 +80,7 @@ const AmountPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Amount Input Section */}
-          <Card className="p-4 bg-white shadow-md border border-gray-300">
+          <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-center mb-4 text-gray-900">أدخل المبلغ</h2>
               
@@ -92,8 +92,8 @@ const AmountPage = () => {
                   value={rials}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gray-50 transition-all text-gray-900 ${
-                    activeField === 'rials' ? 'border-2 border-emerald-500 shadow-md' : 'border border-gray-300'
+                  className={`text-3xl text-center h-16 bg-gray-50/60 transition-all text-gray-900 ${
+                    activeField === 'rials' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
                   }`}
                   onClick={() => setActiveField('rials')}
                 />
@@ -107,15 +107,15 @@ const AmountPage = () => {
                   value={baisas}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gray-50 transition-all text-gray-900 ${
-                    activeField === 'baisas' ? 'border-2 border-emerald-500 shadow-md' : 'border border-gray-300'
+                  className={`text-3xl text-center h-16 bg-gray-50/60 transition-all text-gray-900 ${
+                    activeField === 'baisas' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
                   }`}
                   onClick={() => setActiveField('baisas')}
                 />
               </div>
 
               {/* Total Display */}
-              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-300">
+              <div className="bg-emerald-50/60 rounded-lg p-4 border-0">
                 <p className="text-center text-base">
                   <span className="font-medium text-gray-700">المجموع: </span>
                   <span className="text-2xl font-bold text-emerald-700">
@@ -127,7 +127,7 @@ const AmountPage = () => {
           </Card>
 
           {/* Keypad Section */}
-          <Card className="p-4 bg-white shadow-md border border-gray-300">
+          <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-center mb-4 text-gray-900">لوحة الأرقام</h2>
               
@@ -136,14 +136,14 @@ const AmountPage = () => {
                 <KioskButton
                   variant={activeField === 'rials' ? 'default' : 'outline'}
                   onClick={() => setActiveField('rials')}
-                  className={`h-12 text-base ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white border-2 border-gray-300 text-gray-900'}`}
+                  className={`h-12 text-base ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
                   ريال
                 </KioskButton>
                 <KioskButton
                   variant={activeField === 'baisas' ? 'default' : 'outline'}
                   onClick={() => setActiveField('baisas')}
-                  className={`h-12 text-base ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white border-2 border-gray-300 text-gray-900'}`}
+                  className={`h-12 text-base ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
                   بيسة
                 </KioskButton>
@@ -157,7 +157,7 @@ const AmountPage = () => {
                     variant="keypad"
                     onClick={() => handleKeypadPress(number)}
                     disabled={!activeField}
-                    className="aspect-square text-2xl bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300"
+                    className="aspect-square text-2xl bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0"
                   >
                     {number}
                   </KioskButton>

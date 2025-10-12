@@ -38,7 +38,7 @@ const PresetAmountsPage = () => {
       <div className="w-full max-w-6xl mx-auto space-y-4">
         {/* Header */}
         <div className="text-center">
-          <div className="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
+          <div className="bg-gray-50/60 rounded-xl p-4 shadow-sm border-0">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">
               اختر مبلغ التبرع
             </h1>
@@ -53,11 +53,11 @@ const PresetAmountsPage = () => {
           {presetAmounts.map((amount, index) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white border-2 border-gray-300 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group"
+              className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group"
             >
               <KioskButton
                 variant="donation"
-                className="w-full h-full flex flex-col items-center justify-center space-y-2 py-4 border-0 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200"
+                className="w-full h-full flex flex-col items-center justify-center space-y-2 py-4 border-0 rounded-xl bg-gradient-to-br from-emerald-50/60 to-emerald-100/60 hover:from-emerald-100/60 hover:to-emerald-200/60"
                 onClick={() => handleAmountSelect(amount)}
               >
                 <div className="text-4xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">

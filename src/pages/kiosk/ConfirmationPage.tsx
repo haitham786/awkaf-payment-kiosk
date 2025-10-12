@@ -51,7 +51,7 @@ const ConfirmationPage = () => {
         </div>
 
         {/* Confirmation Card */}
-        <Card className="p-6 bg-white shadow-lg border-2 border-gray-300 text-center">
+        <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
             {/* Icon */}
             <div className="w-16 h-16 mx-auto bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-md flex items-center justify-center">
@@ -60,14 +60,14 @@ const ConfirmationPage = () => {
 
             {/* Donation Details */}
             <div className="space-y-3">
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="bg-gray-50/60 rounded-lg p-4 border-0">
                 <p className="text-sm text-gray-600 mb-1">نوع التبرع</p>
                 <p className="text-2xl font-bold text-emerald-700">
                   {getCategoryName(category)}
                 </p>
               </div>
 
-              <div className="bg-emerald-50 rounded-lg p-4 border-2 border-emerald-300">
+              <div className="bg-emerald-50/60 rounded-lg p-4 border-0">
                 <p className="text-sm text-gray-600 mb-1">مبلغ التبرع</p>
                 <p className="text-3xl font-bold text-emerald-700">
                   {formatAmount(amount)}
@@ -76,7 +76,7 @@ const ConfirmationPage = () => {
             </div>
 
             {/* Islamic Quote */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="bg-gray-50/60 rounded-lg p-4 border-0">
               <p className="text-base font-medium text-gray-800">
                 "مَّن ذَا الَّذِي يُقْرِضُ اللَّهَ قَرْضًا حَسَنًا فَيُضَاعِفَهُ لَهُ أَضْعَافًا كَثِيرَةً"
               </p>
@@ -93,7 +93,7 @@ const ConfirmationPage = () => {
             variant="outline"
             size="xl"
             onClick={handleBack}
-            className="min-w-[160px] ml-4 bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
+            className="min-w-[160px] ml-4 bg-white/60 backdrop-blur-sm border-0 hover:bg-gray-100/60 text-gray-900"
           >
             <ArrowRight className="w-5 h-5 ml-2" />
             تعديل المبلغ
