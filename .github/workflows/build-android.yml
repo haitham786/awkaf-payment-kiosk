@@ -25,22 +25,24 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build web assets
         run: npm run build
 
       - name: Add Android platform
-        run: npx cap add android
-
+        run: |
+          npx cap add android || echo "Android platform already exists"
+          
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Make Gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build APK
-        run: |
-          cd android
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
