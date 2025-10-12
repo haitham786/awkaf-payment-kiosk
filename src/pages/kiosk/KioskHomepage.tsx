@@ -13,12 +13,57 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance'>('active');
+  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'disconnected'>('active');
   const [kioskMessage, setKioskMessage] = useState('');
 
   useEffect(() => {
     checkKioskStatus();
     loadCategories();
+    
+    // Subscribe to kiosk deletion events
+    const kioskId = localStorage.getItem('kiosk_id');
+    if (kioskId) {
+      const channel = supabase
+        .channel('kiosk-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'kiosks',
+            filter: `id=eq.${kioskId}`
+          },
+          () => {
+            setKioskStatus('disconnected');
+            setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'kiosks',
+            filter: `id=eq.${kioskId}`
+          },
+          (payload) => {
+            const newStatus = payload.new.status;
+            setKioskStatus(newStatus);
+            if (newStatus === 'inactive') {
+              setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
+            } else if (newStatus === 'maintenance') {
+              setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
+            } else {
+              setKioskMessage('');
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, []);
 
   const checkKioskStatus = async () => {
@@ -33,17 +78,22 @@ const KioskHomepage = () => {
         .from('kiosks')
         .select('status')
         .eq('id', kioskId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data) {
-        setKioskStatus(data.status);
-        if (data.status === 'inactive') {
-          setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
-        } else if (data.status === 'maintenance') {
-          setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
-        }
+      if (!data) {
+        // Kiosk was deleted
+        setKioskStatus('disconnected');
+        setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
+        return;
+      }
+
+      setKioskStatus(data.status);
+      if (data.status === 'inactive') {
+        setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
+      } else if (data.status === 'maintenance') {
+        setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
       }
     } catch (error) {
       console.error('Error checking kiosk status:', error);
@@ -89,7 +139,7 @@ const KioskHomepage = () => {
       {/* Status Alert */}
       {kioskStatus !== 'active' && (
         <div className="w-full max-w-6xl mx-auto mb-4">
-          <Alert className="bg-red-50 border-red-300">
+          <Alert className={kioskStatus === 'disconnected' ? 'bg-red-100 border-red-500' : 'bg-red-50 border-red-300'}>
             <AlertTriangle className="h-5 w-5 text-red-600" />
             <AlertDescription className="text-base text-right font-semibold text-red-800">
               {kioskMessage}
