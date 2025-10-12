@@ -1,27 +1,33 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
+  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
 
-  const getCategoryName = (categoryId: string) => {
-    const categories: Record<string, string> = {
-      'zakat': 'زكاة',
-      'sadaqah': 'صدقة',
-      'charity': 'خيرية',
-      'mosque': 'مسجد',
-      'orphans': 'أيتام',
-      'education': 'تعليم'
+  useEffect(() => {
+    const loadCategory = async () => {
+      const { data, error } = await supabase
+        .from('donation_categories')
+        .select('title, icon_url')
+        .eq('category_id', category)
+        .maybeSingle();
+      
+      if (data) {
+        setCategoryData(data);
+      }
     };
-    return categories[categoryId] || 'تبرع';
-  };
+    
+    loadCategory();
+  }, [category]);
 
   const formatAmount = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
@@ -54,8 +60,12 @@ const ConfirmationPage = () => {
         <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
             {/* Icon */}
-            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-md flex items-center justify-center">
-              <span className="text-3xl">📿</span>
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-md flex items-center justify-center p-1">
+              {categoryData?.icon_url ? (
+                <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-3xl">📿</span>
+              )}
             </div>
 
             {/* Donation Details */}
@@ -63,7 +73,7 @@ const ConfirmationPage = () => {
               <div className="bg-gray-50/60 rounded-lg p-4 border-0">
                 <p className="text-sm text-gray-600 mb-1">نوع التبرع</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  {getCategoryName(category)}
+                  {categoryData?.title || 'تبرع'}
                 </p>
               </div>
 
@@ -73,16 +83,6 @@ const ConfirmationPage = () => {
                   {formatAmount(amount)}
                 </p>
               </div>
-            </div>
-
-            {/* Islamic Quote */}
-            <div className="bg-gray-50/60 rounded-lg p-4 border-0">
-              <p className="text-base font-medium text-gray-800">
-                "مَّن ذَا الَّذِي يُقْرِضُ اللَّهَ قَرْضًا حَسَنًا فَيُضَاعِفَهُ لَهُ أَضْعَافًا كَثِيرَةً"
-              </p>
-              <p className="text-xs text-gray-600 mt-2">
-                سورة البقرة - آية 245
-              </p>
             </div>
           </div>
         </Card>
