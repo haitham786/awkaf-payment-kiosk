@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Home } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface KioskLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,27 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
   arabic = true,
 }) => {
   const navigate = useNavigate();
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadBackgroundImage();
+  }, []);
+
+  const loadBackgroundImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('kiosk_settings')
+        .select('background_image_url')
+        .single();
+
+      if (error) throw error;
+      if (data?.background_image_url) {
+        setBackgroundImage(data.background_image_url);
+      }
+    } catch (error) {
+      console.error('Error loading background image:', error);
+    }
+  };
 
   return (
     <div className={cn(
@@ -25,6 +47,18 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
       arabic ? "rtl" : "ltr",
       className
     )}>
+      {/* Background Image */}
+      {backgroundImage && (
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url(${backgroundImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        />
+      )}
       
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">

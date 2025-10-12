@@ -53,6 +53,27 @@ export type Database = {
         }
         Relationships: []
       }
+      kiosk_settings: {
+        Row: {
+          background_image_url: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          background_image_url?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          background_image_url?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       kiosks: {
         Row: {
           configuration: Json | null

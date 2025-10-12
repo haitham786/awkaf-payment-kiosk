@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Upload, X } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -22,10 +23,13 @@ const KiosksManagement = () => {
     location: '',
     status: 'active' as 'active' | 'inactive' | 'maintenance'
   });
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     checkAuth();
     loadKiosks();
+    loadBackgroundImage();
   }, []);
 
   const checkAuth = async () => {
@@ -129,6 +133,144 @@ const KiosksManagement = () => {
     });
   };
 
+  const loadBackgroundImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('kiosk_settings')
+        .select('background_image_url')
+        .single();
+
+      if (error) throw error;
+      if (data?.background_image_url) {
+        setBackgroundImage(data.background_image_url);
+      }
+    } catch (error: any) {
+      console.error('Error loading background image:', error);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate aspect ratio would be 9:16 (vertical)
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    
+    await new Promise((resolve) => {
+      img.onload = resolve;
+    });
+
+    const aspectRatio = img.width / img.height;
+    const targetAspectRatio = 9 / 16;
+    const tolerance = 0.1;
+
+    if (Math.abs(aspectRatio - targetAspectRatio) > tolerance) {
+      toast({
+        title: "Incorrect aspect ratio",
+        description: `Please upload an image with a 9:16 aspect ratio (vertical). Current ratio: ${img.width}x${img.height}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // Delete old image if exists
+      if (backgroundImage) {
+        const oldPath = backgroundImage.split('/').pop();
+        if (oldPath) {
+          await supabase.storage
+            .from('kiosk-backgrounds')
+            .remove([oldPath]);
+        }
+      }
+
+      // Upload new image
+      const fileExt = file.name.split('.').pop();
+      const fileName = `background-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('kiosk-backgrounds')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('kiosk-backgrounds')
+        .getPublicUrl(fileName);
+
+      // Update database
+      const { error: updateError } = await supabase
+        .from('kiosk_settings')
+        .update({ background_image_url: publicUrl })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (updateError) throw updateError;
+
+      setBackgroundImage(publicUrl);
+      toast({
+        title: "Background image uploaded",
+        description: "The image will now appear on all kiosk screens",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error uploading image",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!backgroundImage) return;
+
+    try {
+      // Delete from storage
+      const oldPath = backgroundImage.split('/').pop();
+      if (oldPath) {
+        await supabase.storage
+          .from('kiosk-backgrounds')
+          .remove([oldPath]);
+      }
+
+      // Update database
+      const { error } = await supabase
+        .from('kiosk_settings')
+        .update({ background_image_url: null })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (error) throw error;
+
+      setBackgroundImage(null);
+      toast({
+        title: "Background image removed",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error removing image",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
@@ -141,6 +283,67 @@ const KiosksManagement = () => {
             <h1 className="text-3xl font-bold">Manage Kiosks</h1>
           </div>
           <ThemeToggle />
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 mb-8">
+          {/* Background Image Upload */}
+          <Card className="p-6">
+            <h2 className="text-xl font-bold mb-4">Kiosk Background Image</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Upload a background image that will appear on all kiosk screens. Recommended: 9:16 aspect ratio (e.g., 1080x1920 pixels)
+            </p>
+            
+            {backgroundImage ? (
+              <div className="space-y-4">
+                <div className="w-full max-w-xs mx-auto">
+                  <AspectRatio ratio={9 / 16} className="bg-muted rounded-lg overflow-hidden">
+                    <img
+                      src={backgroundImage}
+                      alt="Kiosk background"
+                      className="w-full h-full object-cover"
+                    />
+                  </AspectRatio>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={handleRemoveImage}
+                  className="w-full"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Remove Background Image
+                </Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <Label
+                  htmlFor="background-upload"
+                  className="cursor-pointer inline-block"
+                >
+                  <div className="text-sm text-muted-foreground mb-2">
+                    Click to upload or drag and drop
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    PNG, JPG up to 10MB (9:16 aspect ratio)
+                  </div>
+                </Label>
+                <Input
+                  id="background-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  className="hidden"
+                />
+              </div>
+            )}
+            
+            {uploadingImage && (
+              <p className="text-sm text-muted-foreground mt-2 text-center">
+                Uploading...
+              </p>
+            )}
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
