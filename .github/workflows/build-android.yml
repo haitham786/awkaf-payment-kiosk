@@ -75,26 +75,23 @@ jobs:
           echo "Listing APK files in release directory:"
           ls -la android/app/build/outputs/apk/release/
           
-      - name: Zipalign APK
+      - name: Sign APK with apksigner
         run: |
           BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -v 4 \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            android/app/build/outputs/apk/release/app-release-aligned.apk
-
-      - name: Sign APK
-        run: |
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore android/app/release.keystore \
-            -storepass android \
-            -keypass android \
-            android/app/build/outputs/apk/release/app-release-aligned.apk \
-            release
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner sign \
+            --ks android/app/release.keystore \
+            --ks-key-alias release \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out android/app/build/outputs/apk/release/app-release-signed.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
           
-      - name: Rename signed APK
+      - name: Verify APK signature
         run: |
-          mv android/app/build/outputs/apk/release/app-release-aligned.apk \
-             android/app/build/outputs/apk/release/app-release-signed.apk
+          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner verify \
+            --verbose \
+            android/app/build/outputs/apk/release/app-release-signed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
