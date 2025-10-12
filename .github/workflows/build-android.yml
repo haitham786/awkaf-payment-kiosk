@@ -70,20 +70,25 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace --info
 
+      - name: Zipalign APK
+        run: |
+          ${ANDROID_HOME}/build-tools/*/zipalign -f -v 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            android/app/build/outputs/apk/release/app-release-aligned.apk
+
       - name: Sign APK
         run: |
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
             -keystore android/app/release.keystore \
             -storepass android \
             -keypass android \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            android/app/build/outputs/apk/release/app-release-aligned.apk \
             release
-
-      - name: Zipalign APK
+          
+      - name: Rename signed APK
         run: |
-          ${ANDROID_HOME}/build-tools/*/zipalign -v 4 \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            android/app/build/outputs/apk/release/app-release-signed.apk
+          mv android/app/build/outputs/apk/release/app-release-aligned.apk \
+             android/app/build/outputs/apk/release/app-release-signed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
