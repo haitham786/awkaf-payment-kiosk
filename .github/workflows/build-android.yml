@@ -16,7 +16,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -24,25 +25,43 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install dependencies
         run: npm ci
 
+      - name: Create .env file
+        run: |
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+
       - name: Build web assets
         run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
 
       - name: Add Android platform
         run: |
-          npx cap add android || echo "Android platform already exists"
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
           
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Make Gradlew executable
+      - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Build APK
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --info
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
