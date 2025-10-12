@@ -6,6 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation schemas
+const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education'] as const;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OMAN_MOBILE_REGEX = /^\+968[0-9]{8}$/;
+
+// Validation helper
+function validatePaymentInput(data: any) {
+  const errors: string[] = [];
+
+  // Validate transaction ID
+  if (!data.transactionId || typeof data.transactionId !== 'string' || !UUID_REGEX.test(data.transactionId)) {
+    errors.push('Invalid transaction ID format');
+  }
+
+  // Validate kiosk ID
+  if (!data.kioskId || typeof data.kioskId !== 'string' || !UUID_REGEX.test(data.kioskId)) {
+    errors.push('Invalid kiosk ID format');
+  }
+
+  // Validate amount
+  if (typeof data.amount !== 'number' || !Number.isInteger(data.amount)) {
+    errors.push('Amount must be an integer');
+  } else if (data.amount < 100) {
+    errors.push('Amount must be at least 100 Baisa');
+  } else if (data.amount > 100000000) {
+    errors.push('Amount cannot exceed 100,000 OMR');
+  }
+
+  // Validate category
+  if (!data.category || !VALID_CATEGORIES.includes(data.category)) {
+    errors.push('Invalid category');
+  }
+
+  // Validate mobile number (optional but must be valid if provided)
+  if (data.mobileNumber && (typeof data.mobileNumber !== 'string' || !OMAN_MOBILE_REGEX.test(data.mobileNumber))) {
+    errors.push('Invalid Omani mobile number format (must be +968XXXXXXXX)');
+  }
+
+  return errors;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,8 +59,68 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     );
 
-    const { transactionId, kioskId, amount, category, mobileNumber } = await req.json();
+    const requestData = await req.json();
+    
+    // Validate input
+    const validationErrors = validatePaymentInput(requestData);
+    if (validationErrors.length > 0) {
+      console.error('Validation failed:', validationErrors);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid payment data'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
 
+    const { transactionId, kioskId, amount, category, mobileNumber } = requestData;
+    
+    // Verify kiosk exists and is active
+    const { data: kiosk, error: kioskError } = await supabaseClient
+      .from('kiosks')
+      .select('id, status')
+      .eq('id', kioskId)
+      .maybeSingle();
+
+    if (kioskError || !kiosk || kiosk.status !== 'active') {
+      console.error('Invalid kiosk:', kioskError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid kiosk configuration'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    // Check for duplicate transaction
+    const { data: existingTx } = await supabaseClient
+      .from('transactions')
+      .select('id')
+      .eq('id', transactionId)
+      .maybeSingle();
+
+    if (existingTx) {
+      console.error('Duplicate transaction ID');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Transaction already exists'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 409 
+        }
+      );
+    }
+    
     console.log('Processing payment:', { transactionId, kioskId, amount, category });
 
     // Create transaction record
@@ -41,12 +142,12 @@ serve(async (req) => {
       throw transactionError;
     }
 
-    // POS Device Integration: Ingenico AXIUM RX5000
-    // In production, integrate with Ingenico AXIUM RX5000 terminal API
+    // POS Device Integration: Generic POS Terminal
+    // In production, integrate with your POS terminal API
     // The terminal supports: VISA, MasterCard, Diners Club, Apple Pay, and Mal (Oman national payment system)
-    // Integration would use Ingenico's SDK/API to communicate with the terminal
+    // Integration would use the POS device's SDK/API to communicate with the terminal
     // The amount (amount_baisas) will be charged to the donor's account when card is presented
-    console.log('Communicating with Ingenico AXIUM RX5000 terminal...');
+    console.log('Communicating with POS terminal...');
     
     await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing time
 
@@ -54,7 +155,7 @@ serve(async (req) => {
     const isSuccess = Math.random() > 0.1;
     const supportedPaymentMethods = ['Visa', 'MasterCard', 'Diners Club', 'Apple Pay', 'Mal'];
     const mockPOSResponse = {
-      terminal_id: 'AXIUM-RX5000-001',
+      terminal_id: 'POS-TERM-001',
       transaction_ref: `TXN-${Date.now()}`,
       card_type: supportedPaymentMethods[Math.floor(Math.random() * supportedPaymentMethods.length)],
       card_last_four: Math.floor(1000 + Math.random() * 9000).toString(),
@@ -126,7 +227,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: 'Payment processing failed'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -27,8 +27,14 @@ const AddAdminPage = () => {
       return;
     }
 
-    // Check if super admin
-    const hasSuperAdminRole = session.user.email === 'haitham786@hotmail.com';
+    // Check if super admin using database role
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .eq('role', 'super_admin');
+    
+    const hasSuperAdminRole = roles && roles.length > 0;
     setIsSuperAdmin(hasSuperAdminRole);
 
     if (!hasSuperAdminRole) {

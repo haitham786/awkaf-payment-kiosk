@@ -32,14 +32,26 @@ const AdminsManagement = () => {
     
     setCurrentUserId(session.user.id);
 
-    // Check if super admin
+    // Check if user has admin or super_admin role
     const { data: roles } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id);
 
-    const hasSuperAdminRole = roles?.some(r => r.role === 'admin');
-    setIsSuperAdmin(hasSuperAdminRole || session.user.email === 'haitham786@hotmail.com');
+    if (!roles || roles.length === 0) {
+      navigate('/auth');
+      return;
+    }
+
+    const hasAdminRole = roles.some(r => r.role === 'admin' || r.role === 'super_admin');
+    if (!hasAdminRole) {
+      navigate('/auth');
+      return;
+    }
+
+    // Check if super admin (for delete privileges)
+    const hasSuperAdminRole = roles.some(r => r.role === 'super_admin');
+    setIsSuperAdmin(hasSuperAdminRole);
   };
 
   const loadAdmins = async () => {
@@ -76,6 +88,22 @@ const AdminsManagement = () => {
   };
 
   const handleDelete = async (userId: string) => {
+    // Check if target user is super admin
+    const { data: targetRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'super_admin');
+    
+    if (targetRoles && targetRoles.length > 0) {
+      toast({
+        title: "Cannot delete super admin",
+        description: "Super admin accounts cannot be deleted.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!confirm('Are you sure you want to remove this admin?')) return;
 
     try {
@@ -119,15 +147,17 @@ const AdminsManagement = () => {
           </div>
         )}
 
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Super Admin Email</h2>
-          <p className="text-muted-foreground">
-            Super Admin: <span className="font-semibold">haitham786@hotmail.com</span>
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            The super admin has full access to all features including managing other admins.
-          </p>
-        </Card>
+        {isSuperAdmin && (
+          <Card className="p-6 mb-6 bg-primary/10">
+            <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Super Admin Access
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              You have super admin privileges with full access to all features including managing other admins.
+            </p>
+          </Card>
+        )}
 
         <div className="space-y-4">
           <h2 className="text-xl font-bold">Current Admins ({admins.length})</h2>
@@ -142,8 +172,8 @@ const AdminsManagement = () => {
               <Card key={admin.id} className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-full ${admin.email === 'haitham786@hotmail.com' ? 'bg-primary/20' : 'bg-secondary/20'}`}>
-                      {admin.email === 'haitham786@hotmail.com' ? (
+                    <div className={`p-3 rounded-full ${admin.role === 'super_admin' ? 'bg-primary/20' : 'bg-secondary/20'}`}>
+                      {admin.role === 'super_admin' ? (
                         <Shield className="w-5 h-5 text-primary" />
                       ) : (
                         <User className="w-5 h-5 text-secondary" />
@@ -153,11 +183,11 @@ const AdminsManagement = () => {
                       <h3 className="text-lg font-bold">{admin.full_name || 'No name'}</h3>
                       <p className="text-sm text-muted-foreground">{admin.email}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {admin.email === 'haitham786@hotmail.com' ? '🔑 Super Admin' : '👤 Admin'}
+                        {admin.role === 'super_admin' ? '🔑 Super Admin' : '👤 Admin'}
                       </p>
                     </div>
                   </div>
-                  {isSuperAdmin && admin.id !== currentUserId && admin.email !== 'haitham786@hotmail.com' && (
+                  {isSuperAdmin && admin.id !== currentUserId && admin.role !== 'super_admin' && (
                     <Button size="sm" variant="ghost" onClick={() => handleDelete(admin.id)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
@@ -171,9 +201,7 @@ const AdminsManagement = () => {
         <Card className="p-6 mt-6 bg-muted/50">
           <h3 className="font-semibold mb-2">Note</h3>
           <p className="text-sm text-muted-foreground">
-            Only the super admin (haitham786@hotmail.com) can add or remove other admins.
-            To add a new admin, the super admin should create an account for them through the signup page,
-            then assign the admin role through the backend dashboard.
+            Only super admins can add or remove other admins. Super admin accounts cannot be deleted for security reasons.
           </p>
         </Card>
       </div>
