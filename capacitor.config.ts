@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/core';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.9d2171e7e0014fe8ada560809059a2f2',
+  appId: 'app.lovable.awkafpaymentkiosk',
   appName: 'awkaf-payment-kiosk',
   webDir: 'dist',
   server: {
