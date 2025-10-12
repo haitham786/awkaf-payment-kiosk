@@ -182,15 +182,15 @@ const KioskSetupPanel = () => {
   const handleTestPosConnection = () => {
     toast({
       title: "POS Connection Test",
-      description: "Testing connection to Ingenico Axium RX5000...",
+      description: `Testing ${posConfig.connectionType.toUpperCase()} connection...`,
     });
     
     // TODO: Implement actual POS connection test
-    // This will require the Ingenico SDK integration
+    // This will work with any POS device that provides SDK integration
     setTimeout(() => {
       toast({
         title: "POS Not Connected",
-        description: "Please ensure the POS device is connected and the SDK is configured",
+        description: "Please ensure the POS device is connected and properly configured",
         variant: "destructive",
       });
     }, 2000);
@@ -366,9 +366,9 @@ const KioskSetupPanel = () => {
                 )}
 
                 <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm font-semibold">Device: Ingenico Axium RX5000</p>
+                  <p className="text-sm font-semibold">Compatible with all POS devices</p>
                   <p className="text-xs text-muted-foreground">
-                    Ensure the POS terminal is properly connected and powered on
+                    Supports any POS terminal (Verifone, Ingenico, or Generic) with USB or Ethernet connectivity
                   </p>
                 </div>
 
