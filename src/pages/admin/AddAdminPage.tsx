@@ -52,13 +52,13 @@ const AddAdminPage = () => {
     setLoading(true);
 
     try {
-      // Generate a temporary password
-      const tempPassword = Math.random().toString(36).slice(-12) + 'Tmp!1';
+      // Use default password
+      const defaultPassword = 'awkaf12345';
 
       // Create the user account
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
-        password: tempPassword,
+        password: defaultPassword,
         options: {
           data: {
             full_name: email.split('@')[0],
@@ -79,7 +79,7 @@ const AddAdminPage = () => {
 
         toast({
           title: "Admin added successfully",
-          description: `An email has been sent to ${email} with instructions to set up their password.`,
+          description: `Admin account created for ${email}. Default password: awkaf12345 (must be changed on first login)`,
         });
 
         setEmail('');
@@ -125,7 +125,7 @@ const AddAdminPage = () => {
                 className="mt-2"
               />
               <p className="text-sm text-muted-foreground mt-2">
-                The admin will receive an email to set up their password on first login.
+                The admin will be assigned the default password: awkaf12345
               </p>
             </div>
 
@@ -139,8 +139,9 @@ const AddAdminPage = () => {
             <h3 className="font-semibold mb-2">Note</h3>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
               <li>Only super admin can add new admins</li>
-              <li>New admins will be prompted to set their password on first login</li>
-              <li>Admins can access both the admin panel and kiosk setup panel</li>
+              <li>Default password: awkaf12345</li>
+              <li>New admins must change their password on first login</li>
+              <li>Admins can access the admin panel and all its features</li>
             </ul>
           </div>
         </Card>

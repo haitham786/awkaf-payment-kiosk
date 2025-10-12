@@ -37,12 +37,22 @@ const Auth = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
+      // Check if this is first login
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_login')
+        .eq('id', data.user.id)
+        .single();
 
-      navigate("/admin");
+      if (profile?.first_login) {
+        navigate("/auth/first-login");
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        navigate("/admin");
+      }
     } catch (error: any) {
       toast({
         title: "Login failed",
@@ -103,14 +113,14 @@ const Auth = () => {
 
     setLoading(true);
     try {
-      // Check if the email exists in user_roles (only registered admins)
-      const { data: adminCheck } = await supabase
+      // Check if the email exists and has admin role
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', email)
         .single();
 
-      if (!adminCheck) {
+      if (!profileData) {
         toast({
           title: "Email not found",
           description: "This email is not registered as an admin.",
@@ -120,8 +130,26 @@ const Auth = () => {
         return;
       }
 
+      // Check if user has admin or super_admin role
+      const { data: roleCheck } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profileData.id);
+
+      const isAdmin = roleCheck?.some(r => r.role === 'admin' || r.role === 'super_admin');
+      
+      if (!isAdmin) {
+        toast({
+          title: "Access denied",
+          description: "This email is not registered as an admin.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
       if (error) throw error;

@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import FirstLoginPage from "./pages/auth/FirstLoginPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import KioskHomepage from "./pages/kiosk/KioskHomepage";
 import PresetAmountsPage from "./pages/kiosk/PresetAmountsPage";
 import AmountPage from "./pages/kiosk/AmountPage";
@@ -37,6 +39,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/first-login" element={<FirstLoginPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
             
             {/* Kiosk Routes */}
             <Route path="/kiosk" element={<KioskHomepage />} />
