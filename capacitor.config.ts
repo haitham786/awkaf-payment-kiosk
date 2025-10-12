@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.awkafpaymentkiosk',
   appName: 'awkaf-payment-kiosk',
   webDir: 'dist',
-  server: {
-    url: 'https://9d2171e7-e001-4fe8-ada5-60809059a2f2.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 0,
