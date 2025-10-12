@@ -70,10 +70,16 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace --info
 
+      - name: List APK files
+        run: |
+          echo "Listing APK files in release directory:"
+          ls -la android/app/build/outputs/apk/release/
+          
       - name: Zipalign APK
         run: |
-          ${ANDROID_HOME}/build-tools/*/zipalign -f -v 4 \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -f -v 4 \
+            android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release-aligned.apk
 
       - name: Sign APK
