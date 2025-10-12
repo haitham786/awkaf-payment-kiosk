@@ -69,14 +69,24 @@ jobs:
       - name: Build Release APK
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace --info
-        env:
-          RELEASE_STORE_FILE: release.keystore
-          RELEASE_STORE_PASSWORD: android
-          RELEASE_KEY_ALIAS: release
-          RELEASE_KEY_PASSWORD: android
+
+      - name: Sign APK
+        run: |
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore android/app/release.keystore \
+            -storepass android \
+            -keypass android \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            release
+
+      - name: Zipalign APK
+        run: |
+          ${ANDROID_HOME}/build-tools/*/zipalign -v 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            android/app/build/outputs/apk/release/app-release-signed.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: android/app/build/outputs/apk/release/app-release-signed.apk
