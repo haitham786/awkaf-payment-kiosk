@@ -66,25 +66,36 @@ jobs:
             -storepass android -keypass android \
             -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=City, S=State, C=US"
 
-      - name: Build Release APK
-        working-directory: android
-        run: ./gradlew assembleRelease --stacktrace --info
-
-      - name: List APK files
+      - name: Configure signing in Gradle
         run: |
-          echo "Listing APK files in release directory:"
-          ls -la android/app/build/outputs/apk/release/
+          cat >> android/app/build.gradle << 'EOF'
           
-      - name: Sign APK with apksigner
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file('release.keystore')
+                      storePassword 'android'
+                      keyAlias 'release'
+                      keyPassword 'android'
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+
+      - name: Build Signed Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: List and rename APK
         run: |
-          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner sign \
-            --ks android/app/release.keystore \
-            --ks-key-alias release \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out android/app/build/outputs/apk/release/app-release-signed.apk \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+          echo "Listing APK files:"
+          ls -la android/app/build/outputs/apk/release/
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-release-signed.apk
           
       - name: Verify APK signature
         run: |
