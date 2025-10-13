@@ -72,6 +72,8 @@ jobs:
       - name: Create gradle.properties for signing
         run: |
           cat > android/gradle.properties << EOF
+          android.useAndroidX=true
+          android.enableJetifier=true
           RELEASE_STORE_FILE=${{ github.workspace }}/release.keystore
           RELEASE_STORE_PASSWORD=android
           RELEASE_KEY_ALIAS=release
