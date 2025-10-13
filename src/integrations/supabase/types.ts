@@ -17,6 +17,7 @@ export type Database = {
       donation_categories: {
         Row: {
           category_id: string
+          category_reference: string
           created_at: string | null
           description: string
           display_order: number
@@ -29,6 +30,7 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          category_reference: string
           created_at?: string | null
           description: string
           display_order: number
@@ -41,6 +43,7 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          category_reference?: string
           created_at?: string | null
           description?: string
           display_order?: number
@@ -175,6 +178,7 @@ export type Database = {
           amount_baisas: number
           card_last_four: string | null
           category: Database["public"]["Enums"]["donation_category"]
+          category_reference: string | null
           completed_at: string | null
           created_at: string
           error_message: string | null
@@ -194,6 +198,7 @@ export type Database = {
           amount_baisas: number
           card_last_four?: string | null
           category: Database["public"]["Enums"]["donation_category"]
+          category_reference?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -213,6 +218,7 @@ export type Database = {
           amount_baisas?: number
           card_last_four?: string | null
           category?: Database["public"]["Enums"]["donation_category"]
+          category_reference?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -264,6 +270,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_category_reference: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_reference_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -279,7 +289,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "operator" | "viewer" | "super_admin"
       donation_category: "donation" | "zakat" | "sadaqah" | "general"
-      kiosk_status: "active" | "inactive" | "maintenance"
+      kiosk_status: "active" | "inactive" | "maintenance" | "pending_approval"
       transaction_status:
         | "pending"
         | "processing"
@@ -415,7 +425,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "operator", "viewer", "super_admin"],
       donation_category: ["donation", "zakat", "sadaqah", "general"],
-      kiosk_status: ["active", "inactive", "maintenance"],
+      kiosk_status: ["active", "inactive", "maintenance", "pending_approval"],
       transaction_status: [
         "pending",
         "processing",

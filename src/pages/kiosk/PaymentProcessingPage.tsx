@@ -31,6 +31,13 @@ const PaymentProcessingPage = () => {
 
         if (error) throw error;
 
+        // Fetch category reference
+        const { data: categoryData } = await supabase
+          .from('donation_categories')
+          .select('category_reference')
+          .eq('category_id', category)
+          .maybeSingle();
+
         // Animate progress while waiting
         const interval = setInterval(() => {
           setProgress(prev => {
@@ -38,7 +45,7 @@ const PaymentProcessingPage = () => {
               clearInterval(interval);
               setTimeout(() => {
                 if (data.success) {
-                  navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction.transaction_ref}`);
+                  navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction.reference_number}&catRef=${categoryData?.category_reference || ''}`);
                 } else {
                   navigate(`/kiosk/error?category=${category}&amount=${amount}`);
                 }

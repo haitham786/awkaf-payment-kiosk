@@ -21,7 +21,8 @@ const KiosksManagement = () => {
     name: '',
     reference_number: '',
     location: '',
-    status: 'active' as 'active' | 'inactive' | 'maintenance'
+    status: 'active' as 'active' | 'inactive' | 'maintenance' | 'pending_approval',
+    configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
   });
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -118,7 +119,8 @@ const KiosksManagement = () => {
       name: kiosk.name,
       reference_number: kiosk.reference_number || '',
       location: kiosk.location,
-      status: kiosk.status
+      status: kiosk.status,
+      configuration: kiosk.configuration || { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
     });
   };
 
@@ -149,7 +151,8 @@ const KiosksManagement = () => {
       name: '',
       reference_number: '',
       location: '',
-      status: 'active'
+      status: 'active',
+      configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
     });
   };
 
@@ -423,6 +426,67 @@ const KiosksManagement = () => {
                 </Select>
               </div>
 
+              {/* POS Configuration Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold text-sm">POS Configuration</h3>
+                <div>
+                  <Label>Connection Type</Label>
+                  <Select
+                    value={formData.configuration.pos.connectionType}
+                    onValueChange={(value) => setFormData({ 
+                      ...formData, 
+                      configuration: { 
+                        ...formData.configuration, 
+                        pos: { ...formData.configuration.pos, connectionType: value }
+                      }
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="usb">USB</SelectItem>
+                      <SelectItem value="ethernet">Ethernet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.configuration.pos.connectionType === 'ethernet' && (
+                  <>
+                    <div>
+                      <Label htmlFor="ip">IP Address</Label>
+                      <Input
+                        id="ip"
+                        value={formData.configuration.pos.ipAddress}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          configuration: { 
+                            ...formData.configuration, 
+                            pos: { ...formData.configuration.pos, ipAddress: e.target.value }
+                          }
+                        })}
+                        placeholder="192.168.1.100"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="port">Port</Label>
+                      <Input
+                        id="port"
+                        value={formData.configuration.pos.port}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          configuration: { 
+                            ...formData.configuration, 
+                            pos: { ...formData.configuration.pos, port: e.target.value }
+                          }
+                        })}
+                        placeholder="8080"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">
                   {editingId ? 'Update' : 'Add'} Kiosk
@@ -440,9 +504,9 @@ const KiosksManagement = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Existing Kiosks ({kiosks.length})</h2>
-              {kiosks.filter(k => k.status === 'inactive').length > 0 && (
+              {kiosks.filter(k => k.status === 'pending_approval').length > 0 && (
                 <span className="px-3 py-1 bg-destructive/20 text-destructive rounded-full text-sm font-medium">
-                  {kiosks.filter(k => k.status === 'inactive').length} Pending Approval
+                  {kiosks.filter(k => k.status === 'pending_approval').length} Pending Approval
                 </span>
               )}
             </div>
@@ -457,12 +521,12 @@ const KiosksManagement = () => {
               </Card>
             ) : (
               kiosks.map((kiosk) => (
-                <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'inactive' ? 'border-destructive' : ''}`}>
+                <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-bold">{kiosk.name}</h3>
-                        {kiosk.status === 'inactive' && (
+                        {kiosk.status === 'pending_approval' && (
                           <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">
                             Needs Approval
                           </span>
@@ -476,46 +540,38 @@ const KiosksManagement = () => {
                         <p className="text-xs">
                           <span className={`px-2 py-1 rounded ${
                             kiosk.status === 'active' ? 'bg-success/20 text-success' :
-                            kiosk.status === 'inactive' ? 'bg-destructive/20 text-destructive' :
+                            kiosk.status === 'pending_approval' ? 'bg-destructive/20 text-destructive' :
+                            kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
                             'bg-warning/20 text-warning'
                           }`}>
-                            {kiosk.status}
+                            {kiosk.status.replace('_', ' ')}
                           </span>
                         </p>
                       </div>
                       {kiosk.configuration?.pos && (
                         <p className="text-xs text-muted-foreground mt-2">
                           POS: {kiosk.configuration.pos.connectionType?.toUpperCase() || 'Not configured'}
+                          {kiosk.configuration.pos.connectionType === 'ethernet' && kiosk.configuration.pos.ipAddress && (
+                            <> ({kiosk.configuration.pos.ipAddress}:{kiosk.configuration.pos.port})</>
+                          )}
                         </p>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      {kiosk.status === 'inactive' && (
+                      {kiosk.status === 'pending_approval' && (
                         <Button 
                           size="sm" 
                           variant="default"
-                          onClick={() => {
-                            setEditingId(kiosk.id);
-                            setFormData({
-                              ...formData,
-                              name: kiosk.name,
-                              location: kiosk.location,
-                              reference_number: kiosk.reference_number || '',
-                              status: 'active'
-                            });
-                            // Auto-submit to approve
-                            setTimeout(async () => {
-                              const { error } = await supabase
-                                .from('kiosks')
-                                .update({ status: 'active' })
-                                .eq('id', kiosk.id);
-                              
-                              if (!error) {
-                                toast({ title: "Kiosk approved and activated" });
-                                loadKiosks();
-                                resetForm();
-                              }
-                            }, 100);
+                          onClick={async () => {
+                            const { error } = await supabase
+                              .from('kiosks')
+                              .update({ status: 'active' })
+                              .eq('id', kiosk.id);
+                            
+                            if (!error) {
+                              toast({ title: "Kiosk approved and activated" });
+                              loadKiosks();
+                            }
                           }}
                           className="bg-success hover:bg-success/90"
                         >

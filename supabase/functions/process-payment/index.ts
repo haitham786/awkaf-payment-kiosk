@@ -123,6 +123,24 @@ serve(async (req) => {
     
     console.log('Processing payment:', { transactionId, kioskId, amount, category });
 
+    // Fetch category reference
+    const { data: categoryData } = await supabaseClient
+      .from('donation_categories')
+      .select('category_reference')
+      .eq('category_id', category)
+      .maybeSingle();
+
+    const categoryReference = categoryData?.category_reference || null;
+
+    // Fetch kiosk reference
+    const { data: kioskData } = await supabaseClient
+      .from('kiosks')
+      .select('reference_number')
+      .eq('id', kioskId)
+      .maybeSingle();
+
+    const kioskReference = kioskData?.reference_number || null;
+
     // Create transaction record
     const { data: transaction, error: transactionError } = await supabaseClient
       .from('transactions')
@@ -130,6 +148,7 @@ serve(async (req) => {
         id: transactionId,
         kiosk_id: kioskId,
         category,
+        category_reference: categoryReference,
         amount_baisas: amount,
         mobile_number: mobileNumber,
         status: 'processing',
@@ -213,6 +232,9 @@ serve(async (req) => {
         success: isSuccess,
         transaction: {
           id: transactionId,
+          reference_number: transaction.reference_number,
+          category_reference: categoryReference,
+          kiosk_reference: kioskReference,
           status: isSuccess ? 'completed' : 'failed',
           ...mockPOSResponse,
         },

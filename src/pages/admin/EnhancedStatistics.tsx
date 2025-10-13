@@ -54,7 +54,7 @@ const EnhancedStatistics = () => {
     try {
       let query = supabase
         .from('transactions')
-        .select('*, kiosks(name, reference_number)')
+        .select('*, kiosks(name, reference_number), donation_categories(title, category_reference)')
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
@@ -135,14 +135,16 @@ const EnhancedStatistics = () => {
 
   const handleDownloadXLSX = () => {
     // Create CSV content
-    const headers = ['Date', 'Time', 'Reference', 'Category', 'Amount (OMR)', 'Kiosk'];
+    const headers = ['Date', 'Time', 'Reference', 'Category', 'Cat. Ref', 'Amount (OMR)', 'Kiosk', 'Kiosk Ref'];
     const rows = transactions.map(t => [
       new Date(t.created_at).toLocaleDateString('en-GB'),
       new Date(t.created_at).toLocaleTimeString('en-GB'),
       t.reference_number || 'N/A',
-      t.category,
+      (t.donation_categories as any)?.title || t.category,
+      t.category_reference || (t.donation_categories as any)?.category_reference || 'N/A',
       ((t.amount_baisas || 0) / 1000).toFixed(3),
-      t.kiosks?.name || 'N/A'
+      t.kiosks?.name || 'N/A',
+      t.kiosks?.reference_number || 'N/A'
     ]);
 
     const csvContent = [headers, ...rows]

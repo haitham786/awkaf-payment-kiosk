@@ -137,7 +137,7 @@ const KioskSetupPanel = () => {
           .insert([{
             name: kioskForm.name,
             location: kioskForm.location,
-            status: 'inactive', // Pending approval
+            status: 'pending_approval', // Pending approval
             configuration: { pos: posConfig }
           }])
           .select()

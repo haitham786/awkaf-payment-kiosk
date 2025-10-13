@@ -11,6 +11,7 @@ const ThankYouPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const transactionId = searchParams.get('transactionId') || '';
   const referenceNumber = searchParams.get('ref') || '';
+  const categoryReference = searchParams.get('catRef') || '';
   const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
@@ -104,12 +105,22 @@ const ThankYouPage = () => {
               </p>
             </div>
 
-            {/* Transaction Reference Number */}
-            <div className="bg-gray-100 rounded-lg p-3 border border-gray-300">
-              <p className="text-sm text-gray-600">رقم المعاملة</p>
-              <p className="text-base font-mono font-semibold text-gray-900">
-                {referenceNumber || transactionId}
-              </p>
+            {/* Transaction Details */}
+            <div className="space-y-2">
+              <div className="bg-gray-100 rounded-lg p-3 border border-gray-300">
+                <p className="text-sm text-gray-600">رقم المعاملة</p>
+                <p className="text-base font-mono font-semibold text-gray-900">
+                  {referenceNumber || transactionId}
+                </p>
+              </div>
+              {categoryReference && (
+                <div className="bg-emerald-100 rounded-lg p-3 border border-emerald-300">
+                  <p className="text-sm text-gray-600">رقم مرجع الفئة</p>
+                  <p className="text-base font-mono font-semibold text-emerald-700">
+                    {categoryReference}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </Card>

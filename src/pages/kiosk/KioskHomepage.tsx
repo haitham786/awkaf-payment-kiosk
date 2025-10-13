@@ -13,7 +13,7 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'disconnected'>('active');
+  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected'>('active');
   const [kioskMessage, setKioskMessage] = useState('');
 
   useEffect(() => {
@@ -136,15 +136,23 @@ const KioskHomepage = () => {
         <Settings className="w-5 h-5 text-gray-700" />
       </Button>
 
-      {/* Status Alert */}
+      {/* Out of Service Overlay */}
       {kioskStatus !== 'active' && (
-        <div className="w-full max-w-6xl mx-auto mb-4">
-          <Alert className={kioskStatus === 'disconnected' ? 'bg-red-100 border-red-500' : 'bg-red-50 border-red-300'}>
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-            <AlertDescription className="text-base text-right font-semibold text-red-800">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-8">
+          <Card className="max-w-2xl w-full p-12 text-center bg-white shadow-2xl">
+            <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
+              <AlertTriangle className="w-16 h-16 text-white" />
+            </div>
+            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+              {kioskStatus === 'disconnected' ? 'خارج الخدمة' : kioskStatus === 'maintenance' ? 'قيد الصيانة' : 'غير متاح حالياً'}
+            </h2>
+            <p className="text-2xl text-gray-700 leading-relaxed">
               {kioskMessage}
-            </AlertDescription>
-          </Alert>
+            </p>
+            <div className="mt-8 text-lg text-gray-600">
+              نشكر لكم تفهمكم
+            </div>
+          </Card>
         </div>
       )}
       
