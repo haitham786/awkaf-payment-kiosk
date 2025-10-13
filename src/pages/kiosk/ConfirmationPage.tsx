@@ -60,11 +60,13 @@ const ConfirmationPage = () => {
         <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
             {/* Icon */}
-            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-md flex items-center justify-center p-1">
+            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
               {categoryData?.icon_url ? (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
               ) : (
-                <span className="text-3xl">📿</span>
+                <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full w-full h-full flex items-center justify-center">
+                  <span className="text-3xl">📿</span>
+                </div>
               )}
             </div>
 

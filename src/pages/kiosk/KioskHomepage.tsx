@@ -13,7 +13,11 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>('unregistered');
+  // Initialize status based on localStorage to prevent flashing
+  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
+    const kioskId = localStorage.getItem('kiosk_id');
+    return kioskId ? 'active' : 'unregistered';
+  });
   const [kioskMessage, setKioskMessage] = useState('');
 
   useEffect(() => {
