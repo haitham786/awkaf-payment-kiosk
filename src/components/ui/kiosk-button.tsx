@@ -2,6 +2,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { soundManager } from "@/utils/soundEffects";
 
 const kioskButtonVariants = cva(
   "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-bold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 kiosk-button relative",
@@ -40,15 +41,47 @@ export interface KioskButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof kioskButtonVariants> {
   asChild?: boolean;
+  soundEffect?: 'keypad' | 'navigation' | 'category';
 }
 
 const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, soundEffect, onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
+    const [isGlowing, setIsGlowing] = React.useState(false);
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      // Play sound based on variant if not explicitly set
+      let sound: 'keypad' | 'navigation' | 'category' | undefined = soundEffect;
+      if (!sound) {
+        if (variant === 'keypad') {
+          sound = 'keypad';
+        } else if (variant === 'donation') {
+          sound = 'category';
+        } else {
+          sound = 'navigation';
+        }
+      }
+      
+      if (sound) {
+        soundManager.play(sound);
+      }
+
+      // Trigger glow effect
+      setIsGlowing(true);
+      setTimeout(() => setIsGlowing(false), 400);
+
+      // Call original onClick
+      onClick?.(e);
+    };
+
     return (
       <Comp
-        className={cn(kioskButtonVariants({ variant, size, className }))}
+        className={cn(
+          kioskButtonVariants({ variant, size, className }),
+          isGlowing && "button-glow-effect"
+        )}
         ref={ref}
+        onClick={handleClick}
         {...props}
       />
     );
