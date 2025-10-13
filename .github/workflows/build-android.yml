@@ -59,43 +59,61 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Create keystore directory
+        run: mkdir -p android/app
+
       - name: Generate keystore
         run: |
-          keytool -genkey -v -keystore android/app/release.keystore \
+          keytool -genkey -v -keystore ${{ github.workspace }}/release.keystore \
             -alias release -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=City, S=State, C=US"
 
-      - name: Configure signing in Gradle
+      - name: Create gradle.properties for signing
         run: |
-          cat >> android/app/build.gradle << 'EOF'
-          
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file('release.keystore')
-                      storePassword 'android'
-                      keyAlias 'release'
-                      keyPassword 'android'
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
+          cat > android/gradle.properties << EOF
+          RELEASE_STORE_FILE=${{ github.workspace }}/release.keystore
+          RELEASE_STORE_PASSWORD=android
+          RELEASE_KEY_ALIAS=release
+          RELEASE_KEY_PASSWORD=android
           EOF
 
-      - name: Build Signed Release APK
+      - name: Configure signing in build.gradle
+        run: |
+          sed -i '/android {/a\
+          \    signingConfigs {\
+          \        release {\
+          \            storeFile file(project.properties["RELEASE_STORE_FILE"])\
+          \            storePassword project.properties["RELEASE_STORE_PASSWORD"]\
+          \            keyAlias project.properties["RELEASE_KEY_ALIAS"]\
+          \            keyPassword project.properties["RELEASE_KEY_PASSWORD"]\
+          \        }\
+          \    }' android/app/build.gradle
+          
+          sed -i '/buildTypes {/,/release {/s/release {/release {\
+          \            signingConfig signingConfigs.release/' android/app/build.gradle
+
+      - name: Build Release APK
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: List and rename APK
+      - name: Zipalign APK
         run: |
-          echo "Listing APK files:"
-          ls -la android/app/build/outputs/apk/release/
-          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-release-signed.apk
+          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -v -p 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            android/app/build/outputs/apk/release/app-release-aligned.apk
+
+      - name: Sign APK
+        run: |
+          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
+          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner sign \
+            --ks ${{ github.workspace }}/release.keystore \
+            --ks-key-alias release \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out android/app/build/outputs/apk/release/app-release-signed.apk \
+            android/app/build/outputs/apk/release/app-release-aligned.apk
           
       - name: Verify APK signature
         run: |
