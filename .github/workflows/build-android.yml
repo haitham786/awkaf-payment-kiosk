@@ -99,23 +99,10 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Zipalign APK
+      - name: Rename APK
         run: |
-          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/zipalign -v -p 4 \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            android/app/build/outputs/apk/release/app-release-aligned.apk
-
-      - name: Sign APK
-        run: |
-          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner sign \
-            --ks ${{ github.workspace }}/release.keystore \
-            --ks-key-alias release \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out android/app/build/outputs/apk/release/app-release-signed.apk \
-            android/app/build/outputs/apk/release/app-release-aligned.apk
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            android/app/build/outputs/apk/release/app-release-signed.apk
           
       - name: Verify APK signature
         run: |
