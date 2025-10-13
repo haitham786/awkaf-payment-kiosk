@@ -237,6 +237,7 @@ const KioskHomepage = () => {
                 />
                 <KioskButton
                   variant="donation"
+                  soundEffect="category"
                   className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-gradient-to-br from-emerald-50/60 to-emerald-100/60 hover:from-emerald-100/60 hover:to-emerald-200/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >

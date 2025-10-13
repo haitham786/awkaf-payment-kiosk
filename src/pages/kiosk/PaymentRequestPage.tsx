@@ -84,12 +84,22 @@ const PaymentRequestPage = () => {
               {/* Supported Cards */}
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <p className="text-base font-semibold mb-3 text-gray-900">البطاقات المدعومة:</p>
-                <div className="flex justify-center space-x-2 flex-wrap">
-                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Visa</span>
-                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">MasterCard</span>
-                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">مدى</span>
-                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Apple Pay</span>
-                  <span className="bg-emerald-50 px-3 py-1 rounded-lg text-sm font-medium mx-1 mb-2 border border-emerald-300 text-gray-800">Google Pay</span>
+                <div className="flex justify-center items-center gap-3 flex-wrap">
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/gccnet.svg" alt="GCCNet" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-8" />
+                  </div>
                 </div>
               </div>
 

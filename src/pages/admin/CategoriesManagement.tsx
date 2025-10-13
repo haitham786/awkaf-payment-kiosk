@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const CategoriesManagement = () => {
@@ -207,6 +207,45 @@ const CategoriesManagement = () => {
     }
   };
 
+  const moveCategory = async (categoryId: string, direction: 'up' | 'down') => {
+    const currentIndex = categories.findIndex(c => c.id === categoryId);
+    if ((direction === 'up' && currentIndex === 0) || 
+        (direction === 'down' && currentIndex === categories.length - 1)) {
+      return;
+    }
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const updatedCategories = [...categories];
+    const [movedCategory] = updatedCategories.splice(currentIndex, 1);
+    updatedCategories.splice(newIndex, 0, movedCategory);
+
+    // Update display_order for all categories
+    try {
+      const updates = updatedCategories.map((cat, index) => ({
+        id: cat.id,
+        display_order: index + 1
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('donation_categories')
+          .update({ display_order: update.display_order })
+          .eq('id', update.id);
+
+        if (error) throw error;
+      }
+
+      toast({ title: "Category order updated" });
+      loadCategories();
+    } catch (error: any) {
+      toast({
+        title: "Error updating category order",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setFormData({
@@ -370,9 +409,43 @@ const CategoriesManagement = () => {
             {loading ? (
               <p>Loading...</p>
             ) : (
-              categories.map((category) => (
+              categories.map((category, index) => (
                 <Card key={category.id} className="p-4">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    {/* Reorder buttons */}
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => moveCategory(category.id, 'up')}
+                        disabled={index === 0}
+                        className="h-6 w-6 p-0"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => moveCategory(category.id, 'down')}
+                        disabled={index === categories.length - 1}
+                        className="h-6 w-6 p-0"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </Button>
+                    </div>
+
+                    {/* Category icon */}
+                    {category.icon_url && (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-border flex-shrink-0">
+                        <img 
+                          src={category.icon_url} 
+                          alt={category.title}
+                          className="w-full h-full object-contain bg-white"
+                        />
+                      </div>
+                    )}
+
+                    {/* Category details */}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-lg font-bold">{category.title}</h3>
@@ -383,10 +456,13 @@ const CategoriesManagement = () => {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{category.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ID: {category.category_id} | Order: {category.display_order}
-                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span>Ref: {category.category_reference || 'N/A'}</span>
+                        <span>Order: {category.display_order}</span>
+                      </div>
                     </div>
+
+                    {/* Action buttons */}
                     <div className="flex gap-2">
                       <Button
                         size="sm"

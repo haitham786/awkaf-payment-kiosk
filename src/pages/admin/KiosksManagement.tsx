@@ -556,6 +556,35 @@ const KiosksManagement = () => {
                           )}
                         </p>
                       )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-muted-foreground">Sound Effects:</span>
+                        <Button
+                          size="sm"
+                          variant={kiosk.configuration?.sound_enabled !== false ? "default" : "outline"}
+                          onClick={async () => {
+                            const currentSoundEnabled = kiosk.configuration?.sound_enabled !== false;
+                            const { error } = await supabase
+                              .from('kiosks')
+                              .update({
+                                configuration: {
+                                  ...kiosk.configuration,
+                                  sound_enabled: !currentSoundEnabled
+                                }
+                              })
+                              .eq('id', kiosk.id);
+                            
+                            if (!error) {
+                              toast({
+                                title: `Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`
+                              });
+                              loadKiosks();
+                            }
+                          }}
+                          className="h-6 text-xs px-2"
+                        >
+                          {kiosk.configuration?.sound_enabled !== false ? '🔊 Enabled' : '🔇 Muted'}
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       {kiosk.status === 'pending_approval' && (
