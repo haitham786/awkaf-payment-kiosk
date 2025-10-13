@@ -13,7 +13,7 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected'>('active');
+  const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>('unregistered');
   const [kioskMessage, setKioskMessage] = useState('');
 
   useEffect(() => {
@@ -49,7 +49,9 @@ const KioskHomepage = () => {
           (payload) => {
             const newStatus = payload.new.status;
             setKioskStatus(newStatus);
-            if (newStatus === 'inactive') {
+            if (newStatus === 'pending_approval') {
+              setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
+            } else if (newStatus === 'inactive') {
               setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
             } else if (newStatus === 'maintenance') {
               setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
@@ -70,7 +72,8 @@ const KioskHomepage = () => {
     try {
       const kioskId = localStorage.getItem('kiosk_id');
       if (!kioskId) {
-        setKioskStatus('active');
+        setKioskStatus('unregistered');
+        setKioskMessage('يرجى تسجيل هذا الكشك من خلال لوحة الإعدادات للبدء.');
         return;
       }
 
@@ -90,7 +93,9 @@ const KioskHomepage = () => {
       }
 
       setKioskStatus(data.status);
-      if (data.status === 'inactive') {
+      if (data.status === 'pending_approval') {
+        setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
+      } else if (data.status === 'inactive') {
         setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
       } else if (data.status === 'maintenance') {
         setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
@@ -141,17 +146,36 @@ const KioskHomepage = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-8">
           <Card className="max-w-2xl w-full p-12 text-center bg-white shadow-2xl">
             <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
-              <AlertTriangle className="w-16 h-16 text-white" />
+              {kioskStatus === 'unregistered' ? (
+                <Settings className="w-16 h-16 text-white" />
+              ) : (
+                <AlertTriangle className="w-16 h-16 text-white" />
+              )}
             </div>
             <h2 className="text-4xl font-bold text-gray-900 mb-6">
-              {kioskStatus === 'disconnected' ? 'خارج الخدمة' : kioskStatus === 'maintenance' ? 'قيد الصيانة' : 'غير متاح حالياً'}
+              {kioskStatus === 'unregistered' ? 'تسجيل مطلوب' : 
+               kioskStatus === 'pending_approval' ? 'في انتظار الموافقة' :
+               kioskStatus === 'disconnected' ? 'خارج الخدمة' : 
+               kioskStatus === 'maintenance' ? 'قيد الصيانة' : 'غير متاح حالياً'}
             </h2>
-            <p className="text-2xl text-gray-700 leading-relaxed">
+            <p className="text-2xl text-gray-700 leading-relaxed mb-8">
               {kioskMessage}
             </p>
-            <div className="mt-8 text-lg text-gray-600">
-              نشكر لكم تفهمكم
-            </div>
+            {kioskStatus === 'unregistered' && (
+              <Button
+                size="lg"
+                className="text-xl px-8 py-6 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => navigate('/kiosk/setup')}
+              >
+                <Settings className="w-6 h-6 ml-2" />
+                فتح لوحة الإعدادات
+              </Button>
+            )}
+            {kioskStatus !== 'unregistered' && (
+              <div className="mt-4 text-lg text-gray-600">
+                نشكر لكم تفهمكم
+              </div>
+            )}
           </Card>
         </div>
       )}
