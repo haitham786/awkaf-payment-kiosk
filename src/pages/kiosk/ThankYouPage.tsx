@@ -137,6 +137,7 @@ const ThankYouPage = () => {
                 <KioskButton
                   variant="secondary"
                   size="xl"
+                  soundEffect="navigation"
                   onClick={handleSMSReceipt}
                   className="min-w-[160px] ml-3 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
                 >
@@ -146,6 +147,7 @@ const ThankYouPage = () => {
                 <KioskButton
                   variant="outline"
                   size="xl"
+                  soundEffect="navigation"
                   onClick={handleReturnHome}
                   className="min-w-[160px] bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
                 >

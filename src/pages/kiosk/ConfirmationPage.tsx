@@ -94,6 +94,7 @@ const ConfirmationPage = () => {
           <KioskButton
             variant="outline"
             size="xl"
+            soundEffect="navigation"
             onClick={handleBack}
             className="min-w-[160px] ml-4 bg-white/60 backdrop-blur-sm border-0 hover:bg-gray-100/60 text-gray-900"
           >
@@ -104,6 +105,7 @@ const ConfirmationPage = () => {
           <KioskButton
             variant="confirm"
             size="xl"
+            soundEffect="navigation"
             onClick={handleConfirm}
             className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white border-0"
           >

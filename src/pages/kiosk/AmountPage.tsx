@@ -135,6 +135,7 @@ const AmountPage = () => {
               <div className="grid grid-cols-2 gap-3">
                 <KioskButton
                   variant={activeField === 'rials' ? 'default' : 'outline'}
+                  soundEffect="navigation"
                   onClick={() => setActiveField('rials')}
                   className={`h-12 text-base ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
@@ -142,6 +143,7 @@ const AmountPage = () => {
                 </KioskButton>
                 <KioskButton
                   variant={activeField === 'baisas' ? 'default' : 'outline'}
+                  soundEffect="navigation"
                   onClick={() => setActiveField('baisas')}
                   className={`h-12 text-base ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
@@ -155,6 +157,7 @@ const AmountPage = () => {
                   <KioskButton
                     key={index}
                     variant="keypad"
+                    soundEffect="keypad"
                     onClick={() => handleKeypadPress(number)}
                     disabled={!activeField}
                     className="aspect-square text-2xl bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0"
@@ -171,6 +174,7 @@ const AmountPage = () => {
         <div className="text-center mt-4">
           <KioskButton
             variant="confirm"
+            soundEffect="navigation"
             onClick={handleContinue}
             disabled={!rials && !baisas}
             className="min-w-[280px] h-14 text-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"

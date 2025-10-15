@@ -17,7 +17,7 @@ export type Database = {
       donation_categories: {
         Row: {
           category_id: string
-          category_reference: string
+          category_reference: string | null
           created_at: string | null
           description: string
           display_order: number
@@ -30,7 +30,7 @@ export type Database = {
         }
         Insert: {
           category_id: string
-          category_reference: string
+          category_reference?: string | null
           created_at?: string | null
           description: string
           display_order: number
@@ -43,7 +43,7 @@ export type Database = {
         }
         Update: {
           category_id?: string
-          category_reference?: string
+          category_reference?: string | null
           created_at?: string | null
           description?: string
           display_order?: number
@@ -270,10 +270,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_category_reference: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       generate_reference_number: {
         Args: Record<PropertyKey, never>
         Returns: string
