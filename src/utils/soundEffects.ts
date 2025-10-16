@@ -20,6 +20,7 @@ class SoundEffectManager {
       const audio = new Audio(path);
       audio.volume = this.volume;
       audio.preload = 'auto';
+      audio.load(); // Explicitly load the audio
       this.sounds.set(key, audio);
     });
   }
@@ -56,11 +57,18 @@ class SoundEffectManager {
     if (!audio) return;
 
     try {
-      // Reset and play
-      audio.currentTime = 0;
-      await audio.play();
+      // Clone the audio to allow overlapping plays
+      const audioClone = audio.cloneNode(true) as HTMLAudioElement;
+      audioClone.volume = this.volume;
+      await audioClone.play();
     } catch (error) {
-      console.error('Failed to play sound:', error);
+      // Fallback: try to play original audio
+      try {
+        audio.currentTime = 0;
+        await audio.play();
+      } catch (fallbackError) {
+        console.error('Failed to play sound:', error);
+      }
     }
   }
 

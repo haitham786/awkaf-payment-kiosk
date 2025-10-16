@@ -160,7 +160,7 @@ const AmountPage = () => {
                     soundEffect="keypad"
                     onClick={() => handleKeypadPress(number)}
                     disabled={!activeField}
-                    className="aspect-square text-2xl bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0"
+                    className="aspect-square text-xl bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0 min-h-[60px]"
                   >
                     {number}
                   </KioskButton>
@@ -171,13 +171,13 @@ const AmountPage = () => {
         </div>
 
         {/* Continue Button */}
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           <KioskButton
             variant="confirm"
             soundEffect="navigation"
             onClick={handleContinue}
             disabled={!rials && !baisas}
-            className="min-w-[280px] h-14 text-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"
+            className="min-w-[260px] h-12 text-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"
           >
             متابعة إلى التأكيد
           </KioskButton>

@@ -75,6 +75,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
             <KioskButton
               variant="outline"
               size="kiosk"
+              soundEffect="navigation"
               onClick={() => navigate("/kiosk")}
               className="bg-white border-2 border-gray-300 hover:bg-gray-100 text-black"
             >
