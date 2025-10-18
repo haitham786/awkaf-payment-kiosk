@@ -67,32 +67,32 @@ const AmountPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full max-w-6xl mx-auto pb-28">
         {/* Header */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-3">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
             تحديد مبلغ التبرع
           </h1>
-          <p className="text-lg text-gray-700">
+          <p className="text-base text-gray-700">
             نوع التبرع: <span className="font-semibold text-emerald-700">{getCategoryName(category)}</span>
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Amount Input Section */}
-          <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-center mb-4 text-gray-900">أدخل المبلغ</h2>
+          <Card className="p-3 bg-white/60 backdrop-blur-sm shadow-md border-0">
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-center mb-3 text-gray-900">أدخل المبلغ</h2>
               
               {/* Rials Input */}
-              <div className="space-y-2">
-                <Label htmlFor="rials" className="text-base font-medium text-gray-900">ريال عماني</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="rials" className="text-sm font-medium text-gray-900">ريال عماني</Label>
                 <Input
                   id="rials"
                   value={rials}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gray-50/60 transition-all text-gray-900 ${
+                  className={`text-3xl text-center h-14 bg-gray-50/60 transition-all text-gray-900 ${
                     activeField === 'rials' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
                   }`}
                   onClick={() => setActiveField('rials')}
@@ -100,14 +100,14 @@ const AmountPage = () => {
               </div>
 
               {/* Baisas Input */}
-              <div className="space-y-2">
-                <Label htmlFor="baisas" className="text-base font-medium text-gray-900">بيسة</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="baisas" className="text-sm font-medium text-gray-900">بيسة</Label>
                 <Input
                   id="baisas"
                   value={baisas}
                   readOnly
                   placeholder="0"
-                  className={`text-3xl text-center h-16 bg-gray-50/60 transition-all text-gray-900 ${
+                  className={`text-3xl text-center h-14 bg-gray-50/60 transition-all text-gray-900 ${
                     activeField === 'baisas' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
                   }`}
                   onClick={() => setActiveField('baisas')}
@@ -115,10 +115,10 @@ const AmountPage = () => {
               </div>
 
               {/* Total Display */}
-              <div className="bg-emerald-50/60 rounded-lg p-4 border-0">
-                <p className="text-center text-base">
+              <div className="bg-emerald-50/60 rounded-lg p-3 border-0">
+                <p className="text-center text-sm">
                   <span className="font-medium text-gray-700">المجموع: </span>
-                  <span className="text-2xl font-bold text-emerald-700">
+                  <span className="text-xl font-bold text-emerald-700">
                     {rials || '0'}.{(baisas || '0').padStart(3, '0')} ر.ع
                   </span>
                 </p>
@@ -127,17 +127,17 @@ const AmountPage = () => {
           </Card>
 
           {/* Keypad Section */}
-          <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-center mb-4 text-gray-900">لوحة الأرقام</h2>
+          <Card className="p-3 bg-white/60 backdrop-blur-sm shadow-md border-0">
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-center mb-3 text-gray-900">لوحة الأرقام</h2>
               
               {/* Field Selection */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <KioskButton
                   variant={activeField === 'rials' ? 'default' : 'outline'}
                   soundEffect="navigation"
                   onClick={() => setActiveField('rials')}
-                  className={`h-12 text-base ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
+                  className={`h-10 text-sm ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
                   ريال
                 </KioskButton>
@@ -145,14 +145,14 @@ const AmountPage = () => {
                   variant={activeField === 'baisas' ? 'default' : 'outline'}
                   soundEffect="navigation"
                   onClick={() => setActiveField('baisas')}
-                  className={`h-12 text-base ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
+                  className={`h-10 text-sm ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
                 >
                   بيسة
                 </KioskButton>
               </div>
 
               {/* Keypad */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {keypadNumbers.flat().map((number, index) => (
                   <KioskButton
                     key={index}
@@ -160,7 +160,7 @@ const AmountPage = () => {
                     soundEffect="keypad"
                     onClick={() => handleKeypadPress(number)}
                     disabled={!activeField}
-                    className="aspect-square text-xl bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0 min-h-[60px]"
+                    className="aspect-square text-lg bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0 min-h-[52px]"
                   >
                     {number}
                   </KioskButton>
@@ -171,13 +171,13 @@ const AmountPage = () => {
         </div>
 
         {/* Continue Button */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-8">
           <KioskButton
             variant="confirm"
             soundEffect="navigation"
             onClick={handleContinue}
             disabled={!rials && !baisas}
-            className="min-w-[260px] h-12 text-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"
+            className="min-w-[240px] h-11 text-base bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"
           >
             متابعة إلى التأكيد
           </KioskButton>

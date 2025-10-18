@@ -126,7 +126,7 @@ const ThankYouPage = () => {
         </Card>
 
         {/* Receipt Options */}
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3 pb-24">
           <Card className="p-4 bg-white shadow-md border border-gray-300">
             <div className="text-center space-y-3">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -158,7 +158,7 @@ const ThankYouPage = () => {
           </Card>
 
           {/* Auto Return Countdown */}
-          <div className="text-center">
+          <div className="text-center pb-4">
             <p className="text-gray-600 text-sm">
               العودة التلقائية إلى الصفحة الرئيسية خلال {countdown} ثواني
             </p>

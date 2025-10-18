@@ -48,6 +48,8 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
   ({ className, variant, size, asChild = false, soundEffect, onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     const [isGlowing, setIsGlowing] = React.useState(false);
+    const [ripples, setRipples] = React.useState<Array<{ id: number; x: number; y: number }>>([]);
+    const buttonRef = React.useRef<HTMLButtonElement>(null);
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       // Play sound based on variant if not explicitly set
@@ -62,28 +64,74 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
         }
       }
       
-      if (sound) {
+      if (sound && soundManager.isReady()) {
         soundManager.play(sound);
       }
 
-      // Trigger glow effect
+      // Haptic feedback for Android
+      if ('vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+
+      // Trigger glow effect (longer duration, more visible)
       setIsGlowing(true);
-      setTimeout(() => setIsGlowing(false), 400);
+      setTimeout(() => setIsGlowing(false), 600);
+
+      // Create ripple effect at click position
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const id = Date.now();
+        
+        setRipples(prev => [...prev, { id, x, y }]);
+        setTimeout(() => {
+          setRipples(prev => prev.filter(r => r.id !== id));
+        }, 600);
+      }
 
       // Call original onClick
       onClick?.(e);
+    };
+
+    // Merge refs
+    React.useImperativeHandle(ref, () => buttonRef.current as HTMLButtonElement);
+
+    // Get glow color based on variant
+    const getGlowColor = () => {
+      if (variant === 'donation' || variant === 'confirm') return 'button-glow-emerald';
+      if (variant === 'keypad') return 'button-glow-blue';
+      return 'button-glow-effect';
     };
 
     return (
       <Comp
         className={cn(
           kioskButtonVariants({ variant, size, className }),
-          isGlowing && "button-glow-effect"
+          isGlowing && getGlowColor(),
+          "relative overflow-hidden"
         )}
-        ref={ref}
+        ref={buttonRef}
         onClick={handleClick}
         {...props}
-      />
+      >
+        {props.children}
+        
+        {/* Ripple effects */}
+        {ripples.map(ripple => (
+          <span
+            key={ripple.id}
+            className="absolute rounded-full bg-white/40 pointer-events-none animate-ripple"
+            style={{
+              left: ripple.x,
+              top: ripple.y,
+              width: '10px',
+              height: '10px',
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        ))}
+      </Comp>
     );
   }
 );

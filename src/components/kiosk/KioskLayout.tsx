@@ -69,7 +69,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
         {/* Home button */}
         {showHomeButton && (
           <div className={cn(
-            "absolute bottom-4 z-20",
+            "fixed bottom-8 z-50 pb-safe",
             arabic ? "left-4" : "right-4"
           )}>
             <KioskButton
@@ -77,7 +77,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
               size="kiosk"
               soundEffect="navigation"
               onClick={() => navigate("/kiosk")}
-              className="bg-white border-2 border-gray-300 hover:bg-gray-100 text-black"
+              className="bg-white/90 backdrop-blur-md border-2 border-gray-300 hover:bg-gray-100 text-black shadow-lg hover:shadow-xl"
             >
               <Home className="w-6 h-6 ml-2" />
               {arabic ? "الرئيسية" : "Home"}

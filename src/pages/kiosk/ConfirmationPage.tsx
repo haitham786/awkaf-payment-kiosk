@@ -90,7 +90,7 @@ const ConfirmationPage = () => {
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-4 mt-4">
+        <div className="flex justify-center space-x-4 mt-4 pb-20">
           <KioskButton
             variant="outline"
             size="xl"
@@ -115,7 +115,7 @@ const ConfirmationPage = () => {
         </div>
 
         {/* Additional Info */}
-        <div className="text-center mt-4">
+        <div className="text-center mt-4 pb-4">
           <p className="text-gray-600 text-sm">
             سيتم تحويل المبلغ بعد تأكيد الدفع بالبطاقة
           </p>

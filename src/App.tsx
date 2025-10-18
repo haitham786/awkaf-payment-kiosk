@@ -26,16 +26,27 @@ import AddAdminPage from "./pages/admin/AddAdminPage";
 import SMSSettings from "./pages/admin/SMSSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { useAudioInitializer } from "./hooks/useAudioInitializer";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+const AppContent = () => {
+  const { isAudioReady, showInitPrompt } = useAudioInitializer();
+
+  return (
+    <>
+      {/* Audio initialization overlay - invisible but captures first touch */}
+      {showInitPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/5 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+          <div className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-lg pointer-events-auto">
+            <p className="text-gray-800 text-sm">اضغط في أي مكان للبدء</p>
+          </div>
+        </div>
+      )}
+      
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -67,6 +78,15 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+      </>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <TooltipProvider>
+        <AppContent />
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
