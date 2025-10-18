@@ -101,7 +101,9 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
     const getGlowColor = () => {
       if (variant === 'donation' || variant === 'confirm') return 'button-glow-emerald';
       if (variant === 'keypad') return 'button-glow-blue';
-      return 'button-glow-effect';
+      if (variant === 'secondary') return 'button-glow-gold';
+      if (variant === 'default') return 'button-glow-emerald';
+      return 'button-glow-blue'; // fallback for outline, ghost, etc.
     };
 
     return (

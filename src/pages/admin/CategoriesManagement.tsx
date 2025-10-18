@@ -8,8 +8,26 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X, GripVertical } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { SortableCategory } from "@/components/admin/SortableCategory";
 
 const CategoriesManagement = () => {
   const navigate = useNavigate();
@@ -208,19 +226,22 @@ const CategoriesManagement = () => {
     }
   };
 
-  const moveCategory = async (categoryId: string, direction: 'up' | 'down') => {
-    const currentIndex = categories.findIndex(c => c.id === categoryId);
-    if ((direction === 'up' && currentIndex === 0) || 
-        (direction === 'down' && currentIndex === categories.length - 1)) {
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
       return;
     }
 
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    const updatedCategories = [...categories];
-    const [movedCategory] = updatedCategories.splice(currentIndex, 1);
-    updatedCategories.splice(newIndex, 0, movedCategory);
+    const oldIndex = categories.findIndex((cat) => cat.id === active.id);
+    const newIndex = categories.findIndex((cat) => cat.id === over.id);
 
-    // Update display_order for all categories
+    const updatedCategories = arrayMove(categories, oldIndex, newIndex);
+
+    // Optimistically update UI
+    setCategories(updatedCategories);
+
+    // Update database with new order
     try {
       const updates = updatedCategories.map((cat, index) => ({
         id: cat.id,
@@ -236,16 +257,24 @@ const CategoriesManagement = () => {
         if (error) throw error;
       }
 
-      toast({ title: "Category order updated" });
-      loadCategories();
+      toast({ title: "Category order updated successfully" });
     } catch (error: any) {
       toast({
         title: "Error updating category order",
         description: error.message,
         variant: "destructive",
       });
+      // Reload categories on error to restore correct order
+      loadCategories();
     }
   };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const resetForm = () => {
     setEditingId(null);
@@ -424,78 +453,26 @@ const CategoriesManagement = () => {
             {loading ? (
               <p>Loading...</p>
             ) : (
-              categories.map((category, index) => (
-                <Card key={category.id} className="p-4">
-                  <div className="flex items-start gap-3">
-                    {/* Reorder buttons */}
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => moveCategory(category.id, 'up')}
-                        disabled={index === 0}
-                        className="h-6 w-6 p-0"
-                      >
-                        <ArrowUp className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => moveCategory(category.id, 'down')}
-                        disabled={index === categories.length - 1}
-                        className="h-6 w-6 p-0"
-                      >
-                        <ArrowDown className="w-3 h-3" />
-                      </Button>
-                    </div>
-
-                    {/* Category icon */}
-                    {category.icon_url && (
-                      <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-border flex-shrink-0">
-                        <img 
-                          src={category.icon_url} 
-                          alt={category.title}
-                          className="w-full h-full object-contain bg-white"
-                        />
-                      </div>
-                    )}
-
-                    {/* Category details */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-bold">{category.title}</h3>
-                        {category.is_visible ? (
-                          <Eye className="w-4 h-4 text-success" />
-                        ) : (
-                          <EyeOff className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{category.description}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        <span>Ref: {category.category_reference || 'N/A'}</span>
-                        <span>Order: {category.display_order}</span>
-                      </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => toggleVisibility(category.id, category.is_visible)}
-                      >
-                        {category.is_visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(category)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(category.id)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={categories.map(c => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {categories.map((category) => (
+                    <SortableCategory
+                      key={category.id}
+                      category={category}
+                      onToggleVisibility={toggleVisibility}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         </div>

@@ -24,52 +24,68 @@ const KioskHomepage = () => {
     checkKioskStatus();
     loadCategories();
     
-    // Subscribe to kiosk deletion events
+    // Subscribe to kiosk status changes and category changes
     const kioskId = localStorage.getItem('kiosk_id');
-    if (kioskId) {
-      const channel = supabase
-        .channel('kiosk-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'kiosks',
-            filter: `id=eq.${kioskId}`
-          },
-          () => {
-            setKioskStatus('disconnected');
-            setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
+    const kioskChannel = supabase
+      .channel('kiosk-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'kiosks',
+          filter: kioskId ? `id=eq.${kioskId}` : undefined
+        },
+        () => {
+          setKioskStatus('disconnected');
+          setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'kiosks',
+          filter: kioskId ? `id=eq.${kioskId}` : undefined
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          setKioskStatus(newStatus);
+          if (newStatus === 'pending_approval') {
+            setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
+          } else if (newStatus === 'inactive') {
+            setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
+          } else if (newStatus === 'maintenance') {
+            setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
+          } else {
+            setKioskMessage('');
           }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'kiosks',
-            filter: `id=eq.${kioskId}`
-          },
-          (payload) => {
-            const newStatus = payload.new.status;
-            setKioskStatus(newStatus);
-            if (newStatus === 'pending_approval') {
-              setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
-            } else if (newStatus === 'inactive') {
-              setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
-            } else if (newStatus === 'maintenance') {
-              setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
-            } else {
-              setKioskMessage('');
-            }
-          }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    // Real-time subscription for category changes
+    const categoryChannel = supabase
+      .channel('category-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'donation_categories'
+        },
+        () => {
+          // Reload categories on any change (INSERT, UPDATE, DELETE)
+          loadCategories();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(kioskChannel);
+      supabase.removeChannel(categoryChannel);
+    };
   }, []);
 
   const checkKioskStatus = async () => {

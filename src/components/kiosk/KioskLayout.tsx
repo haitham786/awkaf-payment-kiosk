@@ -4,6 +4,7 @@ import { Home } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useScreenSize } from "@/hooks/useScreenSize";
 
 interface KioskLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const { profile, scaleFactor, isKiosk } = useScreenSize();
 
   useEffect(() => {
     loadBackgroundImage();
@@ -42,11 +44,16 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
   };
 
   return (
-    <div className={cn(
-      "min-h-screen w-full bg-white relative overflow-hidden",
-      arabic ? "rtl" : "ltr",
-      className
-    )}>
+    <div 
+      className={cn(
+        "min-h-screen w-full bg-white relative overflow-hidden",
+        arabic ? "rtl" : "ltr",
+        className
+      )}
+      style={{
+        fontSize: `${scaleFactor}rem`
+      }}
+    >
       {/* Background Image */}
       {backgroundImage && (
         <div 
@@ -62,16 +69,26 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
       
       {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        <main className="flex-1 flex items-center justify-center p-4">
+        <main 
+          className="flex-1 flex items-center justify-center"
+          style={{
+            padding: `${profile === 'kiosk-fhd' ? '1.5rem' : '1rem'}`
+          }}
+        >
           {children}
         </main>
         
         {/* Home button */}
         {showHomeButton && (
-          <div className={cn(
-            "fixed bottom-8 z-50 pb-safe",
-            arabic ? "left-4" : "right-4"
-          )}>
+          <div 
+            className={cn(
+              "fixed z-50 pb-safe",
+              arabic ? "left-4" : "right-4"
+            )}
+            style={{
+              bottom: `${profile === 'kiosk-fhd' ? '2.5rem' : '2rem'}`
+            }}
+          >
             <KioskButton
               variant="outline"
               size="kiosk"
