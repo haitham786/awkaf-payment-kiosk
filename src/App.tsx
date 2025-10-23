@@ -25,6 +25,7 @@ import AdminsManagement from "./pages/admin/AdminsManagement";
 import AddAdminPage from "./pages/admin/AddAdminPage";
 import SMSSettings from "./pages/admin/SMSSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
+import ProfilePage from "./pages/admin/ProfilePage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
@@ -75,6 +76,7 @@ const AppContent = () => {
             <Route path="/admin/add-admin" element={<AddAdminPage />} />
             <Route path="/admin/sms-settings" element={<SMSSettings />} />
             <Route path="/admin/statistics" element={<EnhancedStatistics />} />
+            <Route path="/admin/profile" element={<ProfilePage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

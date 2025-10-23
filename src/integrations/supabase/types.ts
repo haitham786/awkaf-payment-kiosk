@@ -120,6 +120,7 @@ export type Database = {
           first_login: boolean | null
           full_name: string | null
           id: string
+          mobile_number: string | null
           updated_at: string
         }
         Insert: {
@@ -128,6 +129,7 @@ export type Database = {
           first_login?: boolean | null
           full_name?: string | null
           id: string
+          mobile_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -136,6 +138,7 @@ export type Database = {
           first_login?: boolean | null
           full_name?: string | null
           id?: string
+          mobile_number?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -270,10 +273,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_reference_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_reference_number: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

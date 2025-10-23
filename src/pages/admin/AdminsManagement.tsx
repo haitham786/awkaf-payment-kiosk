@@ -56,13 +56,21 @@ const AdminsManagement = () => {
 
   const loadAdmins = async () => {
     try {
+      // Get all users with admin or super_admin roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role');
+        .select('user_id, role')
+        .in('role', ['admin', 'super_admin']);
 
       if (rolesError) throw rolesError;
 
-      const userIds = rolesData?.map(r => r.user_id) || [];
+      if (!rolesData || rolesData.length === 0) {
+        setAdmins([]);
+        setLoading(false);
+        return;
+      }
+
+      const userIds = rolesData.map(r => r.user_id);
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -72,10 +80,17 @@ const AdminsManagement = () => {
 
       const combined = profilesData?.map(profile => ({
         ...profile,
-        role: rolesData?.find(r => r.user_id === profile.id)?.role || 'admin'
-      }));
+        role: rolesData.find(r => r.user_id === profile.id)?.role || 'admin'
+      })) || [];
 
-      setAdmins(combined || []);
+      // Sort: super_admins first, then by name
+      combined.sort((a, b) => {
+        if (a.role === 'super_admin' && b.role !== 'super_admin') return -1;
+        if (a.role !== 'super_admin' && b.role === 'super_admin') return 1;
+        return (a.full_name || a.email).localeCompare(b.full_name || b.email);
+      });
+
+      setAdmins(combined);
     } catch (error: any) {
       toast({
         title: "Error loading admins",

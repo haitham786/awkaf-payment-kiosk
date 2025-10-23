@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import { 
   DollarSign, CreditCard, TrendingUp, Activity, 
-  LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users
+  LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users, User
 } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
@@ -30,6 +30,8 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -119,6 +121,20 @@ const AdminDashboard = () => {
       }
 
       setUser(session.user);
+      
+      // Check if super admin
+      const hasSuperAdminRole = roles.some(r => r.role === 'super_admin');
+      setIsSuperAdmin(hasSuperAdminRole);
+      
+      // Load profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      setProfile(profileData);
+      
       return true;
     } catch (error) {
       console.error('Auth check error:', error);
@@ -249,10 +265,17 @@ const AdminDashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Kiosk Management System</p>
+              {profile?.full_name && (
+                <p className="text-sm text-muted-foreground">Welcome, {profile.full_name}</p>
+              )}
+              <p className="text-xs text-muted-foreground">Kiosk Management System</p>
             </div>
             <div className="flex gap-2">
               <ThemeToggle />
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/profile')}>
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
@@ -270,10 +293,12 @@ const AdminDashboard = () => {
               <Activity className="mr-2 h-4 w-4" />
               Manage Kiosks
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/admins')}>
-              <Users className="mr-2 h-4 w-4" />
-              Manage Admins
-            </Button>
+            {isSuperAdmin && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/admins')}>
+                <Users className="mr-2 h-4 w-4" />
+                Manage Admins
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/statistics')}>
               <BarChart3 className="mr-2 h-4 w-4" />
               Enhanced Statistics
