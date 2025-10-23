@@ -62,6 +62,21 @@ serve(async (req) => {
 
     if (createError) throw createError;
 
+    // Explicitly create profile (trigger might not fire for admin.createUser)
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert([{ 
+        id: newUser.user.id, 
+        email: email,
+        full_name: email.split('@')[0],
+        first_login: true
+      }]);
+
+    if (profileError) {
+      console.error('Profile creation error:', profileError);
+      // Don't throw, profile might already exist from trigger
+    }
+
     // Add admin role using service role (bypasses RLS)
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')

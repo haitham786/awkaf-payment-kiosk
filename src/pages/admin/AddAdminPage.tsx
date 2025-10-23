@@ -75,13 +75,15 @@ const AddAdminPage = () => {
 
       toast({
         title: "Admin added successfully",
-        description: `Admin account created for ${email}. Default password: awkaf12345 (must be changed on first login)`,
+        description: `Admin account created for ${email}. Default password: awkaf12345`,
       });
 
       setEmail('');
       
-      // Navigate back to admin management page to see the updated list
-      navigate('/admin/admins');
+      // Small delay to ensure data is committed before navigating
+      setTimeout(() => {
+        navigate('/admin/admins');
+      }, 500);
     } catch (error: any) {
       toast({
         title: "Error adding admin",
