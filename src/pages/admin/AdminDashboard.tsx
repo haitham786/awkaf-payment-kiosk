@@ -42,8 +42,16 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    checkAuth();
-    loadData();
+    let mounted = true;
+
+    const initializeAdmin = async () => {
+      const isAuthenticated = await checkAuth();
+      if (isAuthenticated && mounted) {
+        await loadData();
+      }
+    };
+
+    initializeAdmin();
 
     // Subscribe to realtime transactions
     const channel = supabase
@@ -62,6 +70,7 @@ const AdminDashboard = () => {
       .subscribe();
 
     return () => {
+      mounted = false;
       supabase.removeChannel(channel);
     };
   }, []);
@@ -82,34 +91,40 @@ const AdminDashboard = () => {
     }
   }, [searchQuery, transactions]);
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/auth");
-      return;
+  const checkAuth = async (): Promise<boolean> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate("/auth", { replace: true });
+        return false;
+      }
+
+      // Check if user has admin or super_admin role
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .in('role', ['admin', 'super_admin']);
+
+      if (error || !roles || roles.length === 0) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have admin privileges.",
+          variant: "destructive",
+        });
+        await supabase.auth.signOut();
+        navigate("/auth", { replace: true });
+        return false;
+      }
+
+      setUser(session.user);
+      return true;
+    } catch (error) {
+      console.error('Auth check error:', error);
+      navigate("/auth", { replace: true });
+      return false;
     }
-
-    // Check if user has admin role
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', session.user.id)
-      .eq('role', 'admin')
-      .single();
-
-    if (!roles) {
-      toast({
-        title: "Access Denied",
-        description: "You don't have admin privileges.",
-        variant: "destructive",
-      });
-      await supabase.auth.signOut();
-      navigate("/auth");
-      return;
-    }
-
-    setUser(session.user);
   };
 
   const loadData = async () => {

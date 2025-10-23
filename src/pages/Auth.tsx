@@ -17,12 +17,33 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
 
   useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/admin");
+    let mounted = true;
+
+    const checkExistingSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && mounted) {
+        // Verify user has admin role before redirecting
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .in('role', ['admin', 'super_admin']);
+        
+        if (roles && roles.length > 0) {
+          navigate("/admin", { replace: true });
+        } else {
+          // If no admin role, sign out
+          await supabase.auth.signOut();
+        }
       }
-    });
+    };
+
+    checkExistingSession();
+
+    return () => {
+      mounted = false;
+    };
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -45,13 +66,13 @@ const Auth = () => {
         .single();
 
       if (profile?.first_login) {
-        navigate("/auth/first-login");
+        navigate("/auth/first-login", { replace: true });
       } else {
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        navigate("/admin");
+        navigate("/admin", { replace: true });
       }
     } catch (error: any) {
       toast({
