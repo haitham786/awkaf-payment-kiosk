@@ -52,38 +52,36 @@ const AddAdminPage = () => {
     setLoading(true);
 
     try {
-      // Use default password
-      const defaultPassword = 'awkaf12345';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
+      }
 
-      // Create the user account
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password: defaultPassword,
-        options: {
-          data: {
-            full_name: email.split('@')[0],
-          },
-          emailRedirectTo: `${window.location.origin}/auth/first-login`,
+      // Call edge function to create admin (bypasses RLS)
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ email }),
       });
 
-      if (signUpError) throw signUpError;
+      const result = await response.json();
 
-      if (signUpData.user) {
-        // Add admin role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert([{ user_id: signUpData.user.id, role: 'admin' }]);
-
-        if (roleError) throw roleError;
-
-        toast({
-          title: "Admin added successfully",
-          description: `Admin account created for ${email}. Default password: awkaf12345 (must be changed on first login)`,
-        });
-
-        setEmail('');
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create admin');
       }
+
+      toast({
+        title: "Admin added successfully",
+        description: `Admin account created for ${email}. Default password: awkaf12345 (must be changed on first login)`,
+      });
+
+      setEmail('');
+      
+      // Navigate back to admin management page to see the updated list
+      navigate('/admin/admins');
     } catch (error: any) {
       toast({
         title: "Error adding admin",

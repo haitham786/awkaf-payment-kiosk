@@ -20,8 +20,13 @@ const AdminsManagement = () => {
 
   useEffect(() => {
     checkAuth();
-    loadAdmins();
   }, []);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadAdmins();
+    }
+  }, [currentUserId]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();

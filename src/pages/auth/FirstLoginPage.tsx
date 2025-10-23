@@ -81,17 +81,19 @@ const FirstLoginPage = () => {
 
       toast({
         title: "Password changed successfully",
-        description: "You can now access the admin panel.",
+        description: "Redirecting to admin panel...",
       });
 
-      navigate('/admin');
+      // Redirect immediately without re-login
+      setTimeout(() => {
+        navigate('/admin');
+      }, 1000);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
