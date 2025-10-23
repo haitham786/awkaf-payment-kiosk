@@ -97,9 +97,21 @@ const KiosksManagement = () => {
   };
 
   const loadLogoImage = async () => {
-    // Logo feature temporarily disabled until migration is approved
-    // Will be enabled after logo_url column is added to kiosk_settings table
-    console.log('Logo feature pending database migration approval');
+    try {
+      const { data, error } = await supabase
+        .from("kiosk_settings")
+        .select("logo_url")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data && (data as any).logo_url) {
+        setLogoImage((data as any).logo_url);
+      }
+    } catch (error) {
+      console.error("Error loading logo image:", error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -274,13 +286,98 @@ const KiosksManagement = () => {
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Logo upload temporarily disabled until migration is approved
-    toast.error("Logo upload feature pending database migration. Please approve the migration first.");
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.match(/^image\/(png|svg\+xml)$/)) {
+      toast.error("Please upload a PNG or SVG file");
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+
+      // Delete old logo if exists
+      if (logoImage) {
+        const urlParts = logoImage.split('/');
+        const oldFilePath = urlParts[urlParts.length - 1];
+        await supabase.storage
+          .from("organization-logos")
+          .remove([oldFilePath]);
+      }
+
+      // Upload new logo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("organization-logos")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("organization-logos")
+        .getPublicUrl(fileName);
+
+      // Update or insert kiosk_settings
+      const { data: existing } = await supabase
+        .from("kiosk_settings")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("kiosk_settings")
+          .update({ logo_url: urlData.publicUrl } as any)
+          .eq("id", existing.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from("kiosk_settings")
+          .insert({ logo_url: urlData.publicUrl } as any);
+
+        if (insertError) throw insertError;
+      }
+
+      setLogoImage(urlData.publicUrl);
+      toast.success("Logo uploaded successfully");
+    } catch (error: any) {
+      toast.error(`Error uploading logo: ${error.message}`);
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleRemoveLogo = async () => {
-    // Logo remove temporarily disabled until migration is approved
-    toast.error("Logo feature pending database migration. Please approve the migration first.");
+    if (!logoImage) return;
+
+    try {
+      const urlParts = logoImage.split('/');
+      const filePath = urlParts[urlParts.length - 1];
+      
+      const { error: deleteError } = await supabase.storage
+        .from("organization-logos")
+        .remove([filePath]);
+
+      if (deleteError) throw deleteError;
+
+      const { error: updateError } = await supabase
+        .from("kiosk_settings")
+        .update({ logo_url: null } as any)
+        .eq("id", "00000000-0000-0000-0000-000000000001");
+
+      if (updateError) throw updateError;
+
+      setLogoImage("");
+      toast.success("Logo removed successfully");
+    } catch (error: any) {
+      toast.error(`Error removing logo: ${error.message}`);
+    }
   };
 
   return (
