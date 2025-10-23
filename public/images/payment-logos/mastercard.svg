@@ -1,6 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 131.39 86.9">
-  <rect fill="#ff5f00" x="48.37" width="34.66" height="86.9" rx="4"/>
-  <path d="M51.94,43.45a55.14,55.14,0,0,1,21.07-43.45H69.45A55.14,55.14,0,1,0,69.45,86.9H73A55.14,55.14,0,0,1,51.94,43.45Z" fill="#eb001b"/>
-  <path d="M127.45,70.26V68.41h.77v-.36h-2v.36h.77v1.85Zm3.74,0V68.05h-.58l-.67,1.48-.67-1.48h-.58v2.21h.41V68.57l.63,1.45h.42l.63-1.45v1.69Z" fill="#f79e1b"/>
-  <path d="M79.45,43.45a55.14,55.14,0,0,1-89.09,43.3A55.14,55.14,0,0,0,69.45,0,55.14,55.14,0,0,1,79.45,43.45Z" fill="#f79e1b"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="svg3409" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" viewBox="0 0 1000.01 618.03">
+  <defs>
+    <style>
+      .st0 {
+        fill: #eb001b;
+      }
+
+      .st1 {
+        fill: #ff5f00;
+      }
+
+      .st2 {
+        fill: #f79e1b;
+      }
+    </style>
+  </defs>
+  <rect id="rect19" class="st1" x="364.81" y="66.1" width="270.39" height="485.84"/>
+  <path class="st0" d="M381.98,309.02c0-98.71,46.35-186.27,117.6-242.92C447.21,24.89,381.12,0,309.02,0,138.2,0,0,138.2,0,309.02s138.2,309.02,309.02,309.02c72.1,0,138.2-24.89,190.56-66.1-71.25-55.79-117.6-144.21-117.6-242.92Z" inkscape:connector-curvature="0"/>
+  <path id="path22" class="st2" d="M1000.01,309.02c0,170.82-138.2,309.02-309.02,309.02-72.1,0-138.2-24.89-190.56-66.1,72.1-56.65,117.6-144.21,117.6-242.92s-46.35-186.27-117.6-242.92C552.79,24.89,618.89,0,690.99,0,861.81,0,1000.01,139.06,1000.01,309.02Z" inkscape:connector-curvature="0"/>
 </svg>
