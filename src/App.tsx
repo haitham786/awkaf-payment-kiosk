@@ -27,6 +27,7 @@ import SMSSettings from "./pages/admin/SMSSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
+import { NetworkStatus } from "./components/shared/NetworkStatus";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const AppContent = () => {
       
       <Toaster />
       <Sonner />
+      <NetworkStatus />
       <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />

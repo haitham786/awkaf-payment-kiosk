@@ -78,28 +78,21 @@ export const KioskLayout: React.FC<KioskLayoutProps> = ({
           {children}
         </main>
         
-        {/* Home button */}
+        {/* Home button - Floating icon without frame */}
         {showHomeButton && (
-          <div 
+          <button
+            onClick={() => navigate("/kiosk")}
             className={cn(
-              "fixed z-50 pb-safe",
-              arabic ? "left-4" : "right-4"
+              "fixed z-50 pb-safe p-4 rounded-full bg-primary/90 hover:bg-primary shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95",
+              arabic ? "left-6" : "right-6"
             )}
             style={{
               bottom: `${profile === 'kiosk-fhd' ? '2.5rem' : '2rem'}`
             }}
+            aria-label={arabic ? "الرئيسية" : "Home"}
           >
-            <KioskButton
-              variant="outline"
-              size="kiosk"
-              soundEffect="navigation"
-              onClick={() => navigate("/kiosk")}
-              className="bg-white/90 backdrop-blur-md border-2 border-gray-300 hover:bg-gray-100 text-black shadow-lg hover:shadow-xl"
-            >
-              <Home className="w-6 h-6 ml-2" />
-              {arabic ? "الرئيسية" : "Home"}
-            </KioskButton>
-          </div>
+            <Home className="w-8 h-8 text-primary-foreground" />
+          </button>
         )}
       </div>
     </div>

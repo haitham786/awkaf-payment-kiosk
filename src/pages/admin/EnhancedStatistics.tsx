@@ -19,6 +19,8 @@ const EnhancedStatistics = () => {
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('daily');
   const [selectedKiosk, setSelectedKiosk] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [categories, setCategories] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchType, setSearchType] = useState<"reference" | "mobile">("reference");
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
@@ -26,7 +28,7 @@ const EnhancedStatistics = () => {
   useEffect(() => {
     checkAuth();
     loadData();
-  }, [timeFilter, selectedKiosk]);
+  }, [timeFilter, selectedKiosk, selectedCategory]);
 
   useEffect(() => {
     if (searchTerm) {
@@ -63,6 +65,11 @@ const EnhancedStatistics = () => {
       if (timeFilter === 'daily') {
         const startOfDay = new Date(now.setHours(0, 0, 0, 0));
         query = query.gte('created_at', startOfDay.toISOString());
+      } else if (timeFilter === 'weekly') {
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', startOfWeek.toISOString());
       } else if (timeFilter === 'monthly') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         query = query.gte('created_at', startOfMonth.toISOString());
@@ -76,6 +83,11 @@ const EnhancedStatistics = () => {
         query = query.eq('kiosk_id', selectedKiosk);
       }
 
+      // Apply category filter
+      if (selectedCategory !== 'all') {
+        query = query.eq('category_reference', selectedCategory);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
@@ -86,6 +98,13 @@ const EnhancedStatistics = () => {
         .from('kiosks')
         .select('*');
       setKiosks(kiosksData || []);
+
+      // Load categories
+      const { data: categoriesData } = await supabase
+        .from('donation_categories')
+        .select('category_reference, title')
+        .eq('is_visible', true);
+      setCategories(categoriesData || []);
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -190,7 +209,7 @@ const EnhancedStatistics = () => {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           <div>
             <label className="text-sm font-medium mb-2 block">Time Period</label>
             <Select value={timeFilter} onValueChange={setTimeFilter}>
@@ -199,9 +218,26 @@ const EnhancedStatistics = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
                 <SelectItem value="monthly">Monthly</SelectItem>
                 <SelectItem value="yearly">Yearly</SelectItem>
                 <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Category</label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(c => (
+                  <SelectItem key={c.category_reference} value={c.category_reference || ''}>
+                    {c.title}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

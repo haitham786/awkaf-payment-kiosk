@@ -8,10 +8,12 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Wifi, HardDrive, Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useScreenSize } from "@/hooks/useScreenSize";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { scaleFactor, profile } = useScreenSize();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kioskData, setKioskData] = useState<any>(null);
@@ -206,17 +208,20 @@ const KioskSetupPanel = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white p-8">
-        <Card className="w-full max-w-md p-8 space-y-6 bg-white border-gray-200">
+      <div 
+        className="min-h-screen flex items-center justify-center bg-white p-4"
+        style={{ fontSize: `${scaleFactor}rem` }}
+      >
+        <Card className="w-full max-w-md p-6 space-y-4 bg-white border-gray-200">
           <div className="text-center space-y-2">
-            <Settings className="w-16 h-16 mx-auto text-gray-700" />
-            <h1 className="text-3xl font-bold text-gray-900">Kiosk Setup Panel</h1>
-            <p className="text-gray-600">Administrator Access Required</p>
+            <Settings className="w-12 h-12 mx-auto text-gray-700" />
+            <h1 className="text-2xl font-bold text-gray-900">Kiosk Setup Panel</h1>
+            <p className="text-sm text-gray-600">Administrator Access Required</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3">
             <div>
-              <Label htmlFor="email" className="text-gray-900">Email</Label>
+              <Label htmlFor="email" className="text-gray-900 text-sm">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -224,12 +229,12 @@ const KioskSetupPanel = () => {
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                 required
                 placeholder="admin@example.com"
-                className="bg-white text-gray-900 border-gray-300"
+                className="bg-white text-gray-900 border-gray-300 h-10"
               />
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-gray-900">Password</Label>
+              <Label htmlFor="password" className="text-gray-900 text-sm">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -237,18 +242,18 @@ const KioskSetupPanel = () => {
                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                 required
                 placeholder="••••••••"
-                className="bg-white text-gray-900 border-gray-300"
+                className="bg-white text-gray-900 border-gray-300 h-10"
               />
             </div>
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full h-10">
               Login
             </Button>
             
             <Button 
               type="button" 
               variant="outline" 
-              className="w-full"
+              className="w-full h-10"
               onClick={() => navigate('/kiosk')}
             >
               Back to Kiosk
@@ -260,85 +265,98 @@ const KioskSetupPanel = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate('/kiosk')} className="text-gray-900 hover:bg-gray-100">
+    <div 
+      className="min-h-screen bg-white p-4"
+      style={{ fontSize: `${scaleFactor}rem` }}
+    >
+      <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/kiosk')} 
+            className="text-gray-900 hover:bg-gray-100 h-9"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Kiosk
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Kiosk Setup Panel</h1>
-          <Button variant="outline" onClick={() => {
-            supabase.auth.signOut();
-            setIsAuthenticated(false);
-          }}>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Kiosk Setup Panel</h1>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              supabase.auth.signOut();
+              setIsAuthenticated(false);
+            }}
+            className="h-9"
+          >
             Logout
           </Button>
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100">
-            <TabsTrigger value="general" className="text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">General Settings</TabsTrigger>
-            <TabsTrigger value="pos" className="text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">POS Configuration</TabsTrigger>
-            <TabsTrigger value="status" className="text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">Status</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-10">
+            <TabsTrigger value="general" className="text-sm text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">General</TabsTrigger>
+            <TabsTrigger value="pos" className="text-sm text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">POS Config</TabsTrigger>
+            <TabsTrigger value="status" className="text-sm text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900">Status</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" className="space-y-4">
-            <Card className="p-6 bg-white border-gray-200">
-              <h2 className="text-xl font-bold mb-4 text-gray-900">Kiosk Information</h2>
-              <div className="space-y-4">
+          <TabsContent value="general" className="space-y-3">
+            <Card className="p-4 bg-white border-gray-200">
+              <h2 className="text-lg font-bold mb-3 text-gray-900">Kiosk Information</h2>
+              <div className="space-y-3">
                 <div>
-                  <Label htmlFor="kiosk-name" className="text-gray-900">Kiosk Name</Label>
+                  <Label htmlFor="kiosk-name" className="text-gray-900 text-sm">Kiosk Name</Label>
                   <Input
                     id="kiosk-name"
                     value={kioskForm.name}
                     onChange={(e) => setKioskForm({ ...kioskForm, name: e.target.value })}
                     placeholder="e.g., Muscat Mall Kiosk"
-                    className="bg-white text-gray-900 border-gray-300"
+                    className="bg-white text-gray-900 border-gray-300 h-9"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="location" className="text-gray-900">Location</Label>
+                  <Label htmlFor="location" className="text-gray-900 text-sm">Location</Label>
                   <Input
                     id="location"
                     value={kioskForm.location}
                     onChange={(e) => setKioskForm({ ...kioskForm, location: e.target.value })}
                     placeholder="e.g., Muscat City Centre, Ground Floor"
-                    className="bg-white text-gray-900 border-gray-300"
+                    className="bg-white text-gray-900 border-gray-300 h-9"
                   />
                 </div>
 
                 {kioskData && (
-                  <div className="space-y-2 text-sm text-gray-600">
+                  <div className="space-y-1 text-xs text-gray-600 p-2 bg-gray-50 rounded">
                     <p><strong>Status:</strong> {kioskData.status}</p>
                     <p><strong>Reference Number:</strong> {kioskData.reference_number || 'Pending'}</p>
                   </div>
                 )}
 
-                <Button onClick={handleRegisterKiosk} className="w-full">
+                <Button onClick={handleRegisterKiosk} className="w-full h-10">
                   {kioskData ? 'Update Kiosk Information' : 'Register Kiosk'}
                 </Button>
               </div>
             </Card>
           </TabsContent>
 
-          <TabsContent value="pos" className="space-y-4">
-            <Card className="p-6 bg-white border-gray-200">
-              <h2 className="text-xl font-bold mb-4 text-gray-900">POS Configuration</h2>
-              <div className="space-y-4">
+          <TabsContent value="pos" className="space-y-3">
+            <Card className="p-4 bg-white border-gray-200">
+              <h2 className="text-lg font-bold mb-3 text-gray-900">POS Configuration</h2>
+              <div className="space-y-3">
                 <div>
-                  <Label className="text-gray-900">Connection Type</Label>
-                  <div className="flex gap-4 mt-2">
+                  <Label className="text-gray-900 text-sm">Connection Type</Label>
+                  <div className="flex gap-2 mt-2">
                     <Button
                       variant={posConfig.connectionType === 'usb' ? 'default' : 'outline'}
                       onClick={() => setPosConfig({ ...posConfig, connectionType: 'usb' })}
+                      className="flex-1 h-9 text-sm"
                     >
                       USB
                     </Button>
                     <Button
                       variant={posConfig.connectionType === 'ethernet' ? 'default' : 'outline'}
                       onClick={() => setPosConfig({ ...posConfig, connectionType: 'ethernet' })}
+                      className="flex-1 h-9 text-sm"
                     >
                       Ethernet
                     </Button>
@@ -348,82 +366,82 @@ const KioskSetupPanel = () => {
                 {posConfig.connectionType === 'ethernet' && (
                   <>
                     <div>
-                      <Label htmlFor="ip" className="text-gray-900">IP Address</Label>
+                      <Label htmlFor="ip" className="text-gray-900 text-sm">IP Address</Label>
                       <Input
                         id="ip"
                         value={posConfig.ipAddress}
                         onChange={(e) => setPosConfig({ ...posConfig, ipAddress: e.target.value })}
                         placeholder="192.168.1.100"
-                        className="bg-white text-gray-900 border-gray-300"
+                        className="bg-white text-gray-900 border-gray-300 h-9"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="port" className="text-gray-900">Port</Label>
+                      <Label htmlFor="port" className="text-gray-900 text-sm">Port</Label>
                       <Input
                         id="port"
                         value={posConfig.port}
                         onChange={(e) => setPosConfig({ ...posConfig, port: e.target.value })}
                         placeholder="8080"
-                        className="bg-white text-gray-900 border-gray-300"
+                        className="bg-white text-gray-900 border-gray-300 h-9"
                       />
                     </div>
                   </>
                 )}
 
-                <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-semibold text-gray-900">Compatible with all POS devices</p>
-                  <p className="text-xs text-gray-600">
+                <div className="space-y-1 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-900">Compatible with all POS devices</p>
+                  <p className="text-[10px] text-gray-600">
                     Supports any POS terminal (Verifone, Ingenico, or Generic) with USB or Ethernet connectivity
                   </p>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button onClick={handleTestPosConnection} className="flex-1">
-                    <HardDrive className="w-4 h-4 mr-2" />
-                    Test Connection
+                  <Button onClick={handleTestPosConnection} className="flex-1 h-9 text-sm">
+                    <HardDrive className="w-3 h-3 mr-1" />
+                    Test
                   </Button>
-                  <Button onClick={handleRegisterKiosk} variant="outline" className="flex-1">
-                    Save Configuration
+                  <Button onClick={handleRegisterKiosk} variant="outline" className="flex-1 h-9 text-sm">
+                    Save
                   </Button>
                 </div>
               </div>
             </Card>
           </TabsContent>
 
-          <TabsContent value="status" className="space-y-4">
-            <Card className="p-6 bg-white border-gray-200">
-              <h2 className="text-xl font-bold mb-4 text-gray-900">Connection Status</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Wifi className="w-5 h-5 text-gray-700" />
+          <TabsContent value="status" className="space-y-3">
+            <Card className="p-4 bg-white border-gray-200">
+              <h2 className="text-lg font-bold mb-3 text-gray-900">Connection Status</h2>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Wifi className="w-4 h-4 text-gray-700" />
                     <div>
-                      <p className="font-semibold text-gray-900">Admin Panel Connection</p>
-                      <p className="text-sm text-gray-600">
-                        {kioskData?.status === 'active' ? 'Connected' : 'Pending Approval'}
+                      <p className="font-semibold text-sm text-gray-900">Admin Panel</p>
+                      <p className="text-xs text-gray-600">
+                        {kioskData?.status === 'active' ? 'Connected' : 'Pending'}
                       </p>
                     </div>
                   </div>
-                  <div className={`w-3 h-3 rounded-full ${
+                  <div className={`w-2 h-2 rounded-full ${
                     kioskData?.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'
                   }`} />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <HardDrive className="w-5 h-5 text-gray-700" />
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-gray-700" />
                     <div>
-                      <p className="font-semibold text-gray-900">POS Terminal</p>
-                      <p className="text-sm text-gray-600">Not Connected</p>
+                      <p className="font-semibold text-sm text-gray-900">POS Terminal</p>
+                      <p className="text-xs text-gray-600">Not Connected</p>
                     </div>
                   </div>
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
                 </div>
 
                 {kioskData?.status !== 'active' && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-700">
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-700">
                       This kiosk is pending approval from the admin panel. Please contact an administrator.
                     </p>
                   </div>
