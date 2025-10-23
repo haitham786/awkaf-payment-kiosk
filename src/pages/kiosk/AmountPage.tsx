@@ -4,7 +4,7 @@ import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { KioskButton } from "@/components/ui/kiosk-button";
-import { Backspace } from "lucide-react";
+import { Delete } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const AmountPage = () => {
@@ -27,14 +27,14 @@ const AmountPage = () => {
       try {
         const { data, error } = await supabase
           .from("donation_categories")
-          .select("name_ar, icon_url")
+          .select("title, icon_url")
           .eq("id", categoryId)
           .single();
 
         if (error) throw error;
         
         if (data) {
-          setCategoryData({ name: data.name_ar, icon_url: data.icon_url });
+          setCategoryData({ name: data.title, icon_url: data.icon_url });
         }
       } catch (error) {
         console.error("Error loading category data:", error);
@@ -128,7 +128,7 @@ const AmountPage = () => {
               className="w-full h-16 text-gray-800 hover:bg-red-50/60 border-0 rounded-xl"
               onClick={handleBackspace}
             >
-              <Backspace className="w-6 h-6" />
+              <Delete className="w-6 h-6" />
             </KioskButton>
           </Card>
 

@@ -38,6 +38,9 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
   };
 
   const loadLogoImage = async () => {
+    // Logo feature will be available after migration is approved
+    // Temporarily disabled until logo_url column is added to kiosk_settings
+    /*
     try {
       const { data, error } = await supabase
         .from("kiosk_settings")
@@ -53,6 +56,7 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
     } catch (error) {
       console.error("Error loading logo image:", error);
     }
+    */
   };
 
   return (

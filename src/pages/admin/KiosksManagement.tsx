@@ -97,21 +97,9 @@ const KiosksManagement = () => {
   };
 
   const loadLogoImage = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("kiosk_settings")
-        .select("logo_url")
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (data?.logo_url) {
-        setLogoImage(data.logo_url);
-      }
-    } catch (error) {
-      console.error("Error loading logo image:", error);
-    }
+    // Logo feature temporarily disabled until migration is approved
+    // Will be enabled after logo_url column is added to kiosk_settings table
+    console.log('Logo feature pending database migration approval');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,11 +175,7 @@ const KiosksManagement = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image file",
-        variant: "destructive",
-      });
+      toast.error("Invalid file type. Please upload an image file");
       return;
     }
 
@@ -208,11 +192,7 @@ const KiosksManagement = () => {
     const tolerance = 0.1;
 
     if (Math.abs(aspectRatio - targetAspectRatio) > tolerance) {
-      toast({
-        title: "Incorrect aspect ratio",
-        description: `Please upload an image with a 9:16 aspect ratio (vertical). Current ratio: ${img.width}x${img.height}`,
-        variant: "destructive",
-      });
+      toast.error(`Incorrect aspect ratio. Please upload an image with a 9:16 aspect ratio (vertical). Current ratio: ${img.width}x${img.height}`);
       return;
     }
 
@@ -255,16 +235,9 @@ const KiosksManagement = () => {
       if (updateError) throw updateError;
 
       setBackgroundImage(publicUrl);
-      toast({
-        title: "Background image uploaded",
-        description: "The image will now appear on all kiosk screens",
-      });
+      toast.success("Background image uploaded! The image will now appear on all kiosk screens");
     } catch (error: any) {
-      toast({
-        title: "Error uploading image",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Error uploading image: ${error.message}`);
     } finally {
       setUploadingImage(false);
     }
@@ -289,7 +262,7 @@ const KiosksManagement = () => {
       const { error: updateError } = await supabase
         .from("kiosk_settings")
         .update({ background_image_url: null })
-        .eq("id", 1);
+        .eq("id", "00000000-0000-0000-0000-000000000001");
 
       if (updateError) throw updateError;
 
@@ -301,98 +274,13 @@ const KiosksManagement = () => {
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.match(/^image\/(png|svg\+xml)$/)) {
-      toast.error("Please upload a PNG or SVG file");
-      return;
-    }
-
-    try {
-      setUploadingLogo(true);
-
-      // Delete old logo if exists
-      if (logoImage) {
-        const urlParts = logoImage.split('/');
-        const oldFilePath = urlParts[urlParts.length - 1];
-        await supabase.storage
-          .from("organization-logos")
-          .remove([oldFilePath]);
-      }
-
-      // Upload new logo
-      const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from("organization-logos")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("organization-logos")
-        .getPublicUrl(fileName);
-
-      // Update or insert kiosk_settings
-      const { data: existing } = await supabase
-        .from("kiosk_settings")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("kiosk_settings")
-          .update({ logo_url: urlData.publicUrl } as any)
-          .eq("id", existing.id);
-
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from("kiosk_settings")
-          .insert({ logo_url: urlData.publicUrl } as any);
-
-        if (insertError) throw insertError;
-      }
-
-      setLogoImage(urlData.publicUrl);
-      toast.success("Logo uploaded successfully");
-    } catch (error: any) {
-      toast.error(`Error uploading logo: ${error.message}`);
-    } finally {
-      setUploadingLogo(false);
-    }
+    // Logo upload temporarily disabled until migration is approved
+    toast.error("Logo upload feature pending database migration. Please approve the migration first.");
   };
 
   const handleRemoveLogo = async () => {
-    if (!logoImage) return;
-
-    try {
-      const urlParts = logoImage.split('/');
-      const filePath = urlParts[urlParts.length - 1];
-      
-      const { error: deleteError } = await supabase.storage
-        .from("organization-logos")
-        .remove([filePath]);
-
-      if (deleteError) throw deleteError;
-
-      const { error: updateError } = await supabase
-        .from("kiosk_settings")
-        .update({ logo_url: null } as any)
-        .eq("id", "1");
-
-      if (updateError) throw updateError;
-
-      setLogoImage("");
-      toast.success("Logo removed successfully");
-    } catch (error: any) {
-      toast.error(`Error removing logo: ${error.message}`);
-    }
+    // Logo remove temporarily disabled until migration is approved
+    toast.error("Logo feature pending database migration. Please approve the migration first.");
   };
 
   return (
@@ -479,13 +367,13 @@ const KiosksManagement = () => {
             {backgroundImage ? (
               <div className="space-y-4">
                 <div className="w-full max-w-xs mx-auto">
-                  <AspectRatio ratio={9 / 16} className="bg-muted rounded-lg overflow-hidden">
+                  <div className="relative rounded-lg overflow-hidden" style={{aspectRatio: '9/16', maxHeight: '400px'}}>
                     <img
                       src={backgroundImage}
                       alt="Kiosk background"
                       className="w-full h-full object-cover"
                     />
-                  </AspectRatio>
+                  </div>
                 </div>
                 <Button
                   variant="destructive"
@@ -734,9 +622,7 @@ const KiosksManagement = () => {
                               .eq('id', kiosk.id);
                             
                             if (!error) {
-                              toast({
-                                title: `Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`
-                              });
+                              toast.success(`Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`);
                               loadKiosks();
                             }
                           }}
@@ -758,7 +644,7 @@ const KiosksManagement = () => {
                               .eq('id', kiosk.id);
                             
                             if (!error) {
-                              toast({ title: "Kiosk approved and activated" });
+                              toast.success("Kiosk approved and activated");
                               loadKiosks();
                             }
                           }}
