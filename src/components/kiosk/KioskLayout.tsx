@@ -1,100 +1,105 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Home } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
-import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { useScreenSize } from "@/hooks/useScreenSize";
 
 interface KioskLayoutProps {
   children: React.ReactNode;
   showHomeButton?: boolean;
-  className?: string;
-  arabic?: boolean;
 }
 
-export const KioskLayout: React.FC<KioskLayoutProps> = ({
-  children,
-  showHomeButton = true,
-  className,
-  arabic = true,
-}) => {
+export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProps) => {
   const navigate = useNavigate();
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const { profile, scaleFactor, isKiosk } = useScreenSize();
+  const [backgroundImage, setBackgroundImage] = useState<string>("");
+  const [logoImage, setLogoImage] = useState<string>("");
 
   useEffect(() => {
     loadBackgroundImage();
+    loadLogoImage();
   }, []);
 
   const loadBackgroundImage = async () => {
     try {
       const { data, error } = await supabase
-        .from('kiosk_settings')
-        .select('background_image_url')
-        .single();
+        .from("kiosk_settings")
+        .select("background_image_url")
+        .limit(1)
+        .maybeSingle();
 
       if (error) throw error;
+      
       if (data?.background_image_url) {
         setBackgroundImage(data.background_image_url);
       }
     } catch (error) {
-      console.error('Error loading background image:', error);
+      console.error("Error loading background image:", error);
+    }
+  };
+
+  const loadLogoImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("kiosk_settings")
+        .select("logo_url")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.logo_url) {
+        setLogoImage(data.logo_url);
+      }
+    } catch (error) {
+      console.error("Error loading logo image:", error);
     }
   };
 
   return (
     <div 
-      className={cn(
-        "min-h-screen w-full bg-white relative overflow-hidden",
-        arabic ? "rtl" : "ltr",
-        className
-      )}
+      className="min-h-screen flex flex-col items-center justify-start p-6 relative islamic-pattern"
       style={{
-        fontSize: `${scaleFactor}rem`
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Background Image */}
+      {/* Dark overlay for better content visibility */}
       {backgroundImage && (
-        <div 
-          className="absolute inset-0 z-0"
-          style={{
-            backgroundImage: `url(${backgroundImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
-          }}
-        />
+        <div className="absolute inset-0 bg-black/30" />
+      )}
+
+      {/* Logo at top center */}
+      {logoImage && (
+        <div className="relative z-10 w-full flex justify-center pt-4 pb-2">
+          <img 
+            src={logoImage} 
+            alt="Organization Logo" 
+            className="h-16 w-auto object-contain"
+          />
+        </div>
       )}
       
-      {/* Main content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
-        <main 
-          className="flex-1 flex items-center justify-center"
-          style={{
-            padding: `${profile === 'kiosk-fhd' ? '1.5rem' : '1rem'}`
-          }}
-        >
-          {children}
-        </main>
-        
-        {/* Home button - Floating icon without frame */}
-        {showHomeButton && (
-          <button
-            onClick={() => navigate("/kiosk")}
-            className={cn(
-              "fixed z-50 pb-safe p-4 rounded-full bg-primary/90 hover:bg-primary shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95",
-              arabic ? "left-6" : "right-6"
-            )}
-            style={{
-              bottom: `${profile === 'kiosk-fhd' ? '2.5rem' : '2rem'}`
-            }}
-            aria-label={arabic ? "الرئيسية" : "Home"}
-          >
-            <Home className="w-8 h-8 text-primary-foreground" />
-          </button>
-        )}
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-6xl flex-1 flex items-center justify-center">
+        {children}
       </div>
+
+      {/* Home Button */}
+      {showHomeButton && (
+        <div className="fixed bottom-6 left-6 z-20">
+          <KioskButton
+            variant="secondary"
+            size="lg"
+            soundEffect="navigation"
+            onClick={() => navigate("/kiosk")}
+            className="bg-white/80 hover:bg-white/90 backdrop-blur-sm shadow-lg border-0"
+          >
+            <Home className="w-6 h-6" />
+          </KioskButton>
+        </div>
+      )}
     </div>
   );
 };

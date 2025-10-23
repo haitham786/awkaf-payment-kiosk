@@ -1,185 +1,173 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
-import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { KioskButton } from "@/components/ui/kiosk-button";
+import { Backspace } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const AmountPage = () => {
-  const navigate = useNavigate();
+  const [amount, setAmount] = useState("");
   const [searchParams] = useSearchParams();
-  const category = searchParams.get('category') || 'donation';
-  
-  const [rials, setRials] = useState("");
-  const [baisas, setBaisas] = useState("");
-  const [activeField, setActiveField] = useState<'rials' | 'baisas' | null>('rials');
+  const navigate = useNavigate();
+  const categoryId = searchParams.get("category");
+  const [categoryData, setCategoryData] = useState<{ name: string; icon_url: string } | null>(null);
 
-  const keypadNumbers = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['0', '00', '⌫']
-  ];
-
-  const handleKeypadPress = (value: string) => {
-    if (!activeField) return;
-
-    if (value === '⌫') {
-      // Backspace
-      if (activeField === 'rials') {
-        setRials(prev => prev.slice(0, -1));
-      } else {
-        setBaisas(prev => prev.slice(0, -1));
-      }
-    } else {
-      // Add number
-      if (activeField === 'rials') {
-        setRials(prev => prev + value);
-      } else {
-        setBaisas(prev => {
-          const newValue = prev + value;
-          // Limit baisas to 3 digits (max 999)
-          return newValue.length <= 3 ? newValue : prev;
-        });
-      }
+  useEffect(() => {
+    if (amount) {
+      document.getElementById('amount-display')?.focus();
     }
-  };
+  }, [amount]);
 
-  const handleContinue = () => {
-    if (rials || baisas) {
-      const totalAmount = (parseFloat(rials || '0') * 1000) + parseFloat(baisas || '0');
-      navigate(`/kiosk/confirmation?category=${category}&amount=${totalAmount}`);
-    }
-  };
+  useEffect(() => {
+    const loadCategoryData = async () => {
+      if (!categoryId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("donation_categories")
+          .select("name_ar, icon_url")
+          .eq("id", categoryId)
+          .single();
 
-  const getCategoryName = (categoryId: string) => {
-    const categories: Record<string, string> = {
-      'zakat': 'زكاة',
-      'sadaqah': 'صدقة',
-      'charity': 'خيرية',
-      'mosque': 'مسجد',
-      'orphans': 'أيتام',
-      'education': 'تعليم'
+        if (error) throw error;
+        
+        if (data) {
+          setCategoryData({ name: data.name_ar, icon_url: data.icon_url });
+        }
+      } catch (error) {
+        console.error("Error loading category data:", error);
+      }
     };
-    return categories[categoryId] || 'تبرع';
+
+    loadCategoryData();
+  }, [categoryId]);
+
+  const handleNumberClick = (num: string) => {
+    if (num === "." && amount.includes(".")) return;
+    
+    if (amount === "" && num === ".") {
+      setAmount("0.");
+      return;
+    }
+
+    setAmount(prev => prev + num);
+  };
+
+  const handleBackspace = () => {
+    setAmount(prev => prev.slice(0, -1));
+  };
+
+  const handleConfirm = () => {
+    if (!amount || parseFloat(amount) <= 0) return;
+    
+    const amountInBaisas = Math.round(parseFloat(amount) * 1000);
+    navigate(`/kiosk/confirmation?category=${categoryId}&amount=${amountInBaisas}`);
   };
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-6xl mx-auto pb-28">
-        {/* Header */}
-        <div className="text-center mb-3">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">
-            تحديد مبلغ التبرع
-          </h1>
-          <p className="text-base text-gray-700">
-            نوع التبرع: <span className="font-semibold text-emerald-700">{getCategoryName(category)}</span>
-          </p>
+      <div className="w-full max-w-3xl mx-auto space-y-4">
+        {/* Header with Category */}
+        <div className="text-center">
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 shadow-md border-0">
+            {categoryData?.icon_url && (
+              <div className="flex justify-center mb-2">
+                <img 
+                  src={categoryData.icon_url} 
+                  alt={categoryData.name}
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+            )}
+            <h1 className="text-lg font-bold text-gray-900 mb-1">
+              {categoryData?.name || "أدخل مبلغ التبرع"}
+            </h1>
+            <p className="text-sm text-gray-600">الرجاء إدخال المبلغ بالريال العماني</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Amount Input Section */}
-          <Card className="p-3 bg-white/60 backdrop-blur-sm shadow-md border-0">
-            <div className="space-y-3">
-              <h2 className="text-lg font-semibold text-center mb-3 text-gray-900">أدخل المبلغ</h2>
-              
-              {/* Rials Input */}
-              <div className="space-y-1.5">
-                <Label htmlFor="rials" className="text-sm font-medium text-gray-900">ريال عماني</Label>
-                <Input
-                  id="rials"
-                  value={rials}
-                  readOnly
-                  placeholder="0"
-                  className={`text-3xl text-center h-14 bg-gray-50/60 transition-all text-gray-900 ${
-                    activeField === 'rials' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
-                  }`}
-                  onClick={() => setActiveField('rials')}
-                />
-              </div>
+        {/* Amount Display */}
+        <Card className="bg-white/60 backdrop-blur-sm shadow-md border-0">
+          <div className="p-4">
+            <Input
+              id="amount-display"
+              type="text"
+              value={amount || "0"}
+              readOnly
+              className="text-center text-4xl font-bold bg-transparent border-none focus:ring-0 text-emerald-600 h-16"
+            />
+            <p className="text-center text-base text-gray-500 mt-1">ریال عماني</p>
+          </div>
+        </Card>
 
-              {/* Baisas Input */}
-              <div className="space-y-1.5">
-                <Label htmlFor="baisas" className="text-sm font-medium text-gray-900">بيسة</Label>
-                <Input
-                  id="baisas"
-                  value={baisas}
-                  readOnly
-                  placeholder="0"
-                  className={`text-3xl text-center h-14 bg-gray-50/60 transition-all text-gray-900 ${
-                    activeField === 'baisas' ? 'border-2 border-emerald-500 shadow-md' : 'border-0'
-                  }`}
-                  onClick={() => setActiveField('baisas')}
-                />
-              </div>
+        {/* Number Pad */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+            <Card
+              key={num}
+              className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              <KioskButton
+                variant="keypad"
+                soundEffect="keypad"
+                className="w-full h-16 text-2xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
+                onClick={() => handleNumberClick(num.toString())}
+              >
+                {num}
+              </KioskButton>
+            </Card>
+          ))}
 
-              {/* Total Display */}
-              <div className="bg-emerald-50/60 rounded-lg p-3 border-0">
-                <p className="text-center text-sm">
-                  <span className="font-medium text-gray-700">المجموع: </span>
-                  <span className="text-xl font-bold text-emerald-700">
-                    {rials || '0'}.{(baisas || '0').padStart(3, '0')} ر.ع
-                  </span>
-                </p>
-              </div>
-            </div>
+          {/* Backspace */}
+          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <KioskButton
+              variant="keypad"
+              soundEffect="keypad"
+              className="w-full h-16 text-gray-800 hover:bg-red-50/60 border-0 rounded-xl"
+              onClick={handleBackspace}
+            >
+              <Backspace className="w-6 h-6" />
+            </KioskButton>
           </Card>
 
-          {/* Keypad Section */}
-          <Card className="p-3 bg-white/60 backdrop-blur-sm shadow-md border-0">
-            <div className="space-y-3">
-              <h2 className="text-lg font-semibold text-center mb-3 text-gray-900">لوحة الأرقام</h2>
-              
-              {/* Field Selection */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <KioskButton
-                  variant={activeField === 'rials' ? 'default' : 'outline'}
-                  soundEffect="navigation"
-                  onClick={() => setActiveField('rials')}
-                  className={`h-10 text-sm ${activeField === 'rials' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
-                >
-                  ريال
-                </KioskButton>
-                <KioskButton
-                  variant={activeField === 'baisas' ? 'default' : 'outline'}
-                  soundEffect="navigation"
-                  onClick={() => setActiveField('baisas')}
-                  className={`h-10 text-sm ${activeField === 'baisas' ? 'bg-emerald-600 text-white' : 'bg-white/60 backdrop-blur-sm border-0 text-gray-900'}`}
-                >
-                  بيسة
-                </KioskButton>
-              </div>
+          {/* Zero */}
+          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <KioskButton
+              variant="keypad"
+              soundEffect="keypad"
+              className="w-full h-16 text-2xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
+              onClick={() => handleNumberClick("0")}
+            >
+              0
+            </KioskButton>
+          </Card>
 
-              {/* Keypad */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {keypadNumbers.flat().map((number, index) => (
-                  <KioskButton
-                    key={index}
-                    variant="keypad"
-                    soundEffect="keypad"
-                    onClick={() => handleKeypadPress(number)}
-                    disabled={!activeField}
-                    className="aspect-square text-lg bg-gray-100/60 hover:bg-gray-200/60 text-gray-900 border-0 min-h-[52px]"
-                  >
-                    {number}
-                  </KioskButton>
-                ))}
-              </div>
-            </div>
+          {/* Decimal Point */}
+          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <KioskButton
+              variant="keypad"
+              soundEffect="keypad"
+              className="w-full h-16 text-2xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
+              onClick={() => handleNumberClick(".")}
+            >
+              .
+            </KioskButton>
           </Card>
         </div>
 
-        {/* Continue Button */}
-        <div className="text-center mt-8">
+        {/* Confirm Button */}
+        <div className="flex justify-center pt-2">
           <KioskButton
             variant="confirm"
+            size="lg"
             soundEffect="navigation"
-            onClick={handleContinue}
-            disabled={!rials && !baisas}
-            className="min-w-[240px] h-11 text-base bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:text-gray-500"
+            onClick={handleConfirm}
+            disabled={!amount || parseFloat(amount) <= 0}
+            className="px-12 py-3 text-lg font-bold bg-emerald-500/80 hover:bg-emerald-600/80 backdrop-blur-sm text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-md rounded-xl"
           >
-            متابعة إلى التأكيد
+            تأكيد
           </KioskButton>
         </div>
       </div>

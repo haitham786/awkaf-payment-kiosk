@@ -92,6 +92,9 @@ const PaymentRequestPage = () => {
                     <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-8" />
                   </div>
                   <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
                     <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-8" />
                   </div>
                   <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
@@ -99,6 +102,9 @@ const PaymentRequestPage = () => {
                   </div>
                   <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
                     <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-8" />
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-8" />
                   </div>
                 </div>
               </div>

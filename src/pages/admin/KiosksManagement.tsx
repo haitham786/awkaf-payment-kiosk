@@ -5,15 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Trash2, Edit, Upload, X } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -24,13 +22,16 @@ const KiosksManagement = () => {
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'pending_approval',
     configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
   });
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [logoImage, setLogoImage] = useState<string>("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     checkAuth();
     loadKiosks();
     loadBackgroundImage();
+    loadLogoImage();
 
     // Subscribe to real-time changes in kiosks table
     const channel = supabase
@@ -71,13 +72,45 @@ const KiosksManagement = () => {
       if (error) throw error;
       setKiosks(data || []);
     } catch (error: any) {
-      toast({
-        title: "Error loading kiosks",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Error loading kiosks: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBackgroundImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("kiosk_settings")
+        .select("background_image_url")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.background_image_url) {
+        setBackgroundImage(data.background_image_url);
+      }
+    } catch (error) {
+      console.error("Error loading background image:", error);
+    }
+  };
+
+  const loadLogoImage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("kiosk_settings")
+        .select("logo_url")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.logo_url) {
+        setLogoImage(data.logo_url);
+      }
+    } catch (error) {
+      console.error("Error loading logo image:", error);
     }
   };
 
@@ -92,24 +125,20 @@ const KiosksManagement = () => {
           .eq('id', editingId);
 
         if (error) throw error;
-        toast({ title: "Kiosk updated successfully" });
+        toast.success("Kiosk updated successfully");
       } else {
         const { error } = await supabase
           .from('kiosks')
           .insert([formData]);
 
         if (error) throw error;
-        toast({ title: "Kiosk added successfully" });
+        toast.success("Kiosk added successfully");
       }
 
       resetForm();
       loadKiosks();
     } catch (error: any) {
-      toast({
-        title: "Error saving kiosk",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Error saving kiosk: ${error.message}`);
     }
   };
 
@@ -134,14 +163,10 @@ const KiosksManagement = () => {
         .eq('id', id);
 
       if (error) throw error;
-      toast({ title: "Kiosk deleted successfully" });
+      toast.success("Kiosk deleted successfully");
       loadKiosks();
     } catch (error: any) {
-      toast({
-        title: "Error deleting kiosk",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Error deleting kiosk: ${error.message}`);
     }
   };
 
@@ -154,22 +179,6 @@ const KiosksManagement = () => {
       status: 'active',
       configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
     });
-  };
-
-  const loadBackgroundImage = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('kiosk_settings')
-        .select('background_image_url')
-        .single();
-
-      if (error) throw error;
-      if (data?.background_image_url) {
-        setBackgroundImage(data.background_image_url);
-      }
-    } catch (error: any) {
-      console.error('Error loading background image:', error);
-    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -265,48 +274,199 @@ const KiosksManagement = () => {
     if (!backgroundImage) return;
 
     try {
-      // Delete from storage
-      const oldPath = backgroundImage.split('/').pop();
-      if (oldPath) {
+      // Extract file path from the full URL
+      const urlParts = backgroundImage.split('/');
+      const filePath = urlParts[urlParts.length - 1];
+      
+      // Delete file from storage
+      const { error: deleteError } = await supabase.storage
+        .from("kiosk-backgrounds")
+        .remove([filePath]);
+
+      if (deleteError) throw deleteError;
+
+      // Update database to remove the URL
+      const { error: updateError } = await supabase
+        .from("kiosk_settings")
+        .update({ background_image_url: null })
+        .eq("id", 1);
+
+      if (updateError) throw updateError;
+
+      setBackgroundImage("");
+      toast.success("Background image removed successfully");
+    } catch (error: any) {
+      toast.error(`Error removing image: ${error.message}`);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.match(/^image\/(png|svg\+xml)$/)) {
+      toast.error("Please upload a PNG or SVG file");
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+
+      // Delete old logo if exists
+      if (logoImage) {
+        const urlParts = logoImage.split('/');
+        const oldFilePath = urlParts[urlParts.length - 1];
         await supabase.storage
-          .from('kiosk-backgrounds')
-          .remove([oldPath]);
+          .from("organization-logos")
+          .remove([oldFilePath]);
       }
 
-      // Update database
-      const { error } = await supabase
-        .from('kiosk_settings')
-        .update({ background_image_url: null })
-        .eq('id', '00000000-0000-0000-0000-000000000001');
+      // Upload new logo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("organization-logos")
+        .upload(fileName, file, { upsert: true });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
-      setBackgroundImage(null);
-      toast({
-        title: "Background image removed",
-      });
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("organization-logos")
+        .getPublicUrl(fileName);
+
+      // Update or insert kiosk_settings
+      const { data: existing } = await supabase
+        .from("kiosk_settings")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("kiosk_settings")
+          .update({ logo_url: urlData.publicUrl } as any)
+          .eq("id", existing.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from("kiosk_settings")
+          .insert({ logo_url: urlData.publicUrl } as any);
+
+        if (insertError) throw insertError;
+      }
+
+      setLogoImage(urlData.publicUrl);
+      toast.success("Logo uploaded successfully");
     } catch (error: any) {
-      toast({
-        title: "Error removing image",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Error uploading logo: ${error.message}`);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!logoImage) return;
+
+    try {
+      const urlParts = logoImage.split('/');
+      const filePath = urlParts[urlParts.length - 1];
+      
+      const { error: deleteError } = await supabase.storage
+        .from("organization-logos")
+        .remove([filePath]);
+
+      if (deleteError) throw deleteError;
+
+      const { error: updateError } = await supabase
+        .from("kiosk_settings")
+        .update({ logo_url: null } as any)
+        .eq("id", "1");
+
+      if (updateError) throw updateError;
+
+      setLogoImage("");
+      toast.success("Logo removed successfully");
+    } catch (error: any) {
+      toast.error(`Error removing logo: ${error.message}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate('/admin')}
+            >
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-3xl font-bold">Manage Kiosks</h1>
+            <h1 className="text-3xl font-bold">Kiosk Management</h1>
           </div>
           <ThemeToggle />
         </div>
+
+        {/* Logo Management */}
+        <Card className="mb-6">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Organization Logo</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Upload your organization's logo (PNG or SVG format only)
+            </p>
+            
+            {logoImage ? (
+              <div className="space-y-4">
+                <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                  <img 
+                    src={logoImage} 
+                    alt="Organization Logo" 
+                    className="max-w-full max-h-full object-contain p-2"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById('logo-upload')?.click()}
+                    disabled={uploadingLogo}
+                  >
+                    Change Logo
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleRemoveLogo}
+                    disabled={uploadingLogo}
+                  >
+                    Remove Logo
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Button
+                  onClick={() => document.getElementById('logo-upload')?.click()}
+                  disabled={uploadingLogo}
+                >
+                  {uploadingLogo ? "Uploading..." : "Upload Logo"}
+                </Button>
+              </div>
+            )}
+            
+            <input
+              id="logo-upload"
+              type="file"
+              accept=".png,.svg"
+              onChange={handleLogoUpload}
+              className="hidden"
+            />
+          </div>
+        </Card>
 
         <div className="grid grid-cols-1 gap-8 mb-8">
           {/* Background Image Upload */}

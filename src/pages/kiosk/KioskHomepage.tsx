@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, AlertTriangle } from "lucide-react";
+import { Settings, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const KioskHomepage = () => {
   const navigate = useNavigate();
@@ -209,13 +208,8 @@ const KioskHomepage = () => {
       >
         {/* Header */}
         <div className="text-center mb-6">
-          {/* Logo */}
-          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-lg flex items-center justify-center">
-            <span className="text-4xl">🕌</span>
-          </div>
-          
           {/* Quranic verse */}
-          <div className="bg-gray-50/60 rounded-xl p-4 shadow-sm border-0 mb-4">
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-md border-0 mb-4">
             <p className="text-xl font-bold text-gray-800 leading-relaxed">
               "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"
             </p>
@@ -224,8 +218,8 @@ const KioskHomepage = () => {
             </p>
           </div>
 
-          <h1 className="text-3xl font-bold mb-2 text-gray-900">نظام التبرعات الرقمي</h1>
-          <p className="text-lg text-emerald-700 font-semibold">
+          <h1 className="text-2xl font-bold mb-2 text-white drop-shadow-lg">نظام التبرعات الرقمي</h1>
+          <p className="text-lg text-white/90 font-semibold drop-shadow">
             اختر نوع التبرع الذي ترغب في المساهمة به
           </p>
         </div>
@@ -233,28 +227,32 @@ const KioskHomepage = () => {
         {/* Donation Categories Grid */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           {loading ? (
-            <div className="col-span-2 text-center text-lg text-gray-600">
+            <div className="col-span-2 text-center text-lg text-white/90">
               جاري التحميل...
             </div>
           ) : categories.length === 0 ? (
-            <div className="col-span-2 text-center text-lg text-gray-500">
+            <div className="col-span-2 text-center text-lg text-white/80">
               لا توجد فئات متاحة حالياً
             </div>
           ) : (
-            categories.map((category, index) => (
+            categories.map((category) => (
               <Card
                 key={category.id}
                 className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
               >
-                <CategoryInfoDialog
-                  title={category.title}
-                  description={category.description}
-                  infoText={category.info_text || ''}
-                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Add info dialog logic if needed
+                  }}
+                  className="absolute top-3 right-3 p-1.5 bg-white/70 rounded-full hover:bg-white/90 transition-colors shadow-sm z-10"
+                >
+                  <Info className="w-4 h-4 text-emerald-600" />
+                </button>
                 <KioskButton
                   variant="donation"
                   soundEffect="category"
-                  className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-gradient-to-br from-emerald-50/60 to-emerald-100/60 hover:from-emerald-100/60 hover:to-emerald-200/60"
+                  className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-transparent hover:bg-emerald-50/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >
                   {category.icon_url ? (
@@ -286,7 +284,7 @@ const KioskHomepage = () => {
 
         {/* Footer */}
         <div className="text-center">
-          <p className="text-emerald-700 text-base font-semibold">
+          <p className="text-white/90 text-base font-semibold drop-shadow">
             المس الشاشة لاختيار نوع التبرع
           </p>
         </div>
