@@ -14,7 +14,7 @@ const AmountPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const categoryId = searchParams.get("category");
-  const [categoryData, setCategoryData] = useState<{ name: string; icon_url: string } | null>(null);
+  const [categoryData, setCategoryData] = useState<{ title: string; icon_url: string | null } | null>(null);
 
   useEffect(() => {
     const loadCategoryData = async () => {
@@ -30,7 +30,7 @@ const AmountPage = () => {
         if (error) throw error;
         
         if (data) {
-          setCategoryData({ name: data.title, icon_url: data.icon_url });
+          setCategoryData(data);
         }
       } catch (error) {
         console.error("Error loading category data:", error);
@@ -78,19 +78,19 @@ const AmountPage = () => {
     <KioskLayout>
       <div className="w-full max-w-2xl mx-auto space-y-3">
         {/* Header with Category */}
-        <div className="text-center">
+        <div className="text-center mb-3">
           <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 shadow-md border-0">
             {categoryData?.icon_url && (
               <div className="flex justify-center mb-2">
                 <img 
                   src={categoryData.icon_url} 
-                  alt={categoryData.name}
-                  className="w-10 h-10 object-contain"
+                  alt={categoryData.title}
+                  className="w-12 h-12 object-contain"
                 />
               </div>
             )}
-            <h1 className="text-lg font-bold text-gray-900 mb-1">
-              {categoryData?.name || "أدخل مبلغ التبرع"}
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              {categoryData?.title || "أدخل مبلغ التبرع"}
             </h1>
             <p className="text-sm text-gray-600">الرجاء إدخال المبلغ بالريال والبيسة</p>
           </div>
@@ -137,59 +137,49 @@ const AmountPage = () => {
         </Card>
 
         {/* Number Pad */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 mt-3">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-            <Card
+            <KioskButton
               key={num}
-              className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+              variant="keypad"
+              soundEffect="keypad"
+              className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+              onClick={() => handleNumberClick(num.toString())}
             >
-              <KioskButton
-                variant="keypad"
-                soundEffect="keypad"
-                className="w-full h-14 text-xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
-                onClick={() => handleNumberClick(num.toString())}
-              >
-                {num}
-              </KioskButton>
-            </Card>
+              {num}
+            </KioskButton>
           ))}
 
           {/* Backspace */}
-          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
-            <KioskButton
-              variant="keypad"
-              soundEffect="keypad"
-              className="w-full h-14 text-gray-800 hover:bg-red-50/60 border-0 rounded-xl"
-              onClick={handleBackspace}
-            >
-              <Delete className="w-5 h-5" />
-            </KioskButton>
-          </Card>
+          <KioskButton
+            variant="keypad"
+            soundEffect="keypad"
+            className="w-full h-16 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+            onClick={handleBackspace}
+          >
+            <Delete className="w-6 h-6" />
+          </KioskButton>
 
           {/* Zero */}
-          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
-            <KioskButton
-              variant="keypad"
-              soundEffect="keypad"
-              className="w-full h-14 text-xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
-              onClick={() => handleNumberClick("0")}
-            >
-              0
-            </KioskButton>
-          </Card>
+          <KioskButton
+            variant="keypad"
+            soundEffect="keypad"
+            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+            onClick={() => handleNumberClick("0")}
+          >
+            0
+          </KioskButton>
 
           {/* Decimal Point (only for Rial) */}
-          <Card className="overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
-            <KioskButton
-              variant="keypad"
-              soundEffect="keypad"
-              className="w-full h-14 text-xl font-bold text-gray-800 hover:bg-emerald-50/60 border-0 rounded-xl"
-              onClick={() => activeField === "rial" && handleNumberClick(".")}
-              disabled={activeField === "baisa"}
-            >
-              .
-            </KioskButton>
-          </Card>
+          <KioskButton
+            variant="keypad"
+            soundEffect="keypad"
+            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => activeField === "rial" && handleNumberClick(".")}
+            disabled={activeField === "baisa"}
+          >
+            .
+          </KioskButton>
         </div>
 
         {/* Confirm Button */}

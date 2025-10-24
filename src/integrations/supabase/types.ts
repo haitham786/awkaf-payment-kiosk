@@ -61,18 +61,21 @@ export type Database = {
           background_image_url: string | null
           created_at: string | null
           id: string
+          logo_url: string | null
           updated_at: string | null
         }
         Insert: {
           background_image_url?: string | null
           created_at?: string | null
           id?: string
+          logo_url?: string | null
           updated_at?: string | null
         }
         Update: {
           background_image_url?: string | null
           created_at?: string | null
           id?: string
+          logo_url?: string | null
           updated_at?: string | null
         }
         Relationships: []

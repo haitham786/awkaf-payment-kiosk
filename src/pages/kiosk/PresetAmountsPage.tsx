@@ -1,15 +1,41 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
 import { KioskButton } from "@/components/ui/kiosk-button";
+import { supabase } from "@/integrations/supabase/client";
 
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get("category");
+  const [categoryData, setCategoryData] = useState<{ title: string; icon_url: string | null } | null>(null);
 
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200, 500];
+
+  useEffect(() => {
+    const loadCategoryData = async () => {
+      if (!categoryId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("donation_categories")
+          .select("title, icon_url")
+          .eq("id", categoryId)
+          .single();
+
+        if (error) throw error;
+        
+        if (data) {
+          setCategoryData(data);
+        }
+      } catch (error) {
+        console.error("Error loading category data:", error);
+      }
+    };
+
+    loadCategoryData();
+  }, [categoryId]);
 
   const handleAmountSelect = (amount: number) => {
     // Convert Rials to Baisas (1 Rial = 1000 Baisas)
@@ -23,27 +49,26 @@ const PresetAmountsPage = () => {
     navigate(`/kiosk/amount?category=${categoryId}`);
   };
 
-  const getCategoryName = (categoryId: string | null) => {
-    const categoryNames: { [key: string]: string } = {
-      sadaqah: "صدقة جارية",
-      zakat: "زكاة",
-      kaffarah: "كفارة",
-      aqeeqah: "عقيقة",
-    };
-    return categoryId ? categoryNames[categoryId] || "تبرع عام" : "تبرع عام";
-  };
-
   return (
     <KioskLayout>
       <div className="w-full max-w-6xl mx-auto space-y-4 pb-24">
-        {/* Header */}
+        {/* Header with Category */}
         <div className="text-center">
-          <div className="bg-gray-50/60 rounded-xl p-3 shadow-sm border-0">
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 shadow-md border-0">
+            {categoryData?.icon_url && (
+              <div className="flex justify-center mb-2">
+                <img 
+                  src={categoryData.icon_url} 
+                  alt={categoryData.title}
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+            )}
             <h1 className="text-xl font-bold text-gray-900 mb-1">
-              اختر مبلغ التبرع
+              {categoryData?.title || "اختر مبلغ التبرع"}
             </h1>
-            <p className="text-base text-emerald-700 font-semibold">
-              {getCategoryName(categoryId)}
+            <p className="text-sm text-gray-600">
+              اختر مبلغاً محدداً أو أدخل مبلغاً مختلفاً
             </p>
           </div>
         </div>

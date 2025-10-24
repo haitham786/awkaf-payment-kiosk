@@ -63,9 +63,9 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
       }}
     >
-      {/* Background overlay removed to show original image colors */}
 
       {/* Logo at top center */}
       {logoImage && (
