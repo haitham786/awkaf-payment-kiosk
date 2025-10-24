@@ -65,10 +65,7 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Dark overlay for better content visibility */}
-      {backgroundImage && (
-        <div className="absolute inset-0 bg-black/30" />
-      )}
+      {/* Background overlay removed to show original image colors */}
 
       {/* Logo at top center */}
       {logoImage && (

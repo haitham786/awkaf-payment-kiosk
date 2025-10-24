@@ -82,30 +82,16 @@ const PaymentRequestPage = () => {
               </div>
 
               {/* Supported Cards */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <p className="text-base font-semibold mb-3 text-gray-900">البطاقات المدعومة:</p>
-                <div className="flex justify-center items-center gap-3 flex-wrap">
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/gccnet.svg" alt="GCCNet" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-8" />
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded-lg border border-gray-200">
-                    <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-8" />
-                  </div>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-sm font-semibold mb-2 text-gray-900">البطاقات المدعومة:</p>
+                <div className="flex justify-center items-center gap-2 flex-wrap">
+                  <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5" />
+                  <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5" />
+                  <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-5" />
+                  <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-5" />
+                  <img src="/images/payment-logos/gccnet.svg" alt="GCCNet" className="h-5" />
+                  <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-5" />
+                  <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-5" />
                 </div>
               </div>
 

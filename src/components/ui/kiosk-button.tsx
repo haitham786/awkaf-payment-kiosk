@@ -73,9 +73,9 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
         navigator.vibrate(10);
       }
 
-      // Trigger glow effect (longer duration, more visible)
+      // Trigger glow effect (0.2s duration)
       setIsGlowing(true);
-      setTimeout(() => setIsGlowing(false), 600);
+      setTimeout(() => setIsGlowing(false), 200);
 
       // Create ripple effect at click position
       if (buttonRef.current) {
@@ -87,7 +87,7 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
         setRipples(prev => [...prev, { id, x, y }]);
         setTimeout(() => {
           setRipples(prev => prev.filter(r => r.id !== id));
-        }, 600);
+        }, 200);
       }
 
       // Call original onClick
