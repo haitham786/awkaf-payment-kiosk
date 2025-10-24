@@ -24,6 +24,7 @@ import {
   LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users, User
 } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -270,12 +271,9 @@ const AdminDashboard = () => {
               )}
               <p className="text-xs text-muted-foreground">Kiosk Management System</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <ThemeToggle />
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/profile')}>
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </Button>
+              <AdminHeader />
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout

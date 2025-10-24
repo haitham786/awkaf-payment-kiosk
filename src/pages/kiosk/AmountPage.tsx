@@ -143,7 +143,7 @@ const AmountPage = () => {
               key={num}
               variant="keypad"
               soundEffect="keypad"
-              className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+              className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
               onClick={() => handleNumberClick(num.toString())}
             >
               {num}
@@ -154,7 +154,7 @@ const AmountPage = () => {
           <KioskButton
             variant="keypad"
             soundEffect="keypad"
-            className="w-full h-16 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+            className="w-full h-16 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
             onClick={handleBackspace}
           >
             <Delete className="w-6 h-6" />
@@ -164,7 +164,7 @@ const AmountPage = () => {
           <KioskButton
             variant="keypad"
             soundEffect="keypad"
-            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100"
+            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
             onClick={() => handleNumberClick("0")}
           >
             0
@@ -174,7 +174,7 @@ const AmountPage = () => {
           <KioskButton
             variant="keypad"
             soundEffect="keypad"
-            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full h-16 text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
             onClick={() => activeField === "rial" && handleNumberClick(".")}
             disabled={activeField === "baisa"}
           >

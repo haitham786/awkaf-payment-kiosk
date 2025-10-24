@@ -11,47 +11,76 @@ interface KioskLayoutProps {
 
 export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProps) => {
   const navigate = useNavigate();
-  const [backgroundImage, setBackgroundImage] = useState<string>("");
-  const [logoImage, setLogoImage] = useState<string>("");
+  const [backgroundImage, setBackgroundImage] = useState<string>(() => {
+    // Initialize from localStorage to prevent flashing
+    return localStorage.getItem('kiosk_background_url') || "";
+  });
+  const [logoImage, setLogoImage] = useState<string>(() => {
+    // Initialize from localStorage to prevent flashing
+    return localStorage.getItem('kiosk_logo_url') || "";
+  });
+  const [imagesPreloaded, setImagesPreloaded] = useState(false);
 
   useEffect(() => {
-    loadBackgroundImage();
-    loadLogoImage();
+    preloadImages();
   }, []);
 
-  const loadBackgroundImage = async () => {
+  const preloadImages = async () => {
     try {
       const { data, error } = await supabase
         .from("kiosk_settings")
-        .select("background_image_url")
+        .select("background_image_url, logo_url")
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       
-      if (data?.background_image_url) {
-        setBackgroundImage(data.background_image_url);
+      if (data) {
+        const bgUrl = data.background_image_url || "";
+        const logoUrl = data.logo_url || "";
+        
+        // Preload images before setting them
+        const promises = [];
+        
+        if (bgUrl) {
+          const bgImg = new Image();
+          bgImg.src = bgUrl;
+          promises.push(
+            new Promise((resolve) => {
+              bgImg.onload = resolve;
+              bgImg.onerror = resolve;
+            })
+          );
+        }
+        
+        if (logoUrl) {
+          const logoImg = new Image();
+          logoImg.src = logoUrl;
+          promises.push(
+            new Promise((resolve) => {
+              logoImg.onload = resolve;
+              logoImg.onerror = resolve;
+            })
+          );
+        }
+        
+        await Promise.all(promises);
+        
+        // Store in localStorage for instant access on next load
+        if (bgUrl) {
+          localStorage.setItem('kiosk_background_url', bgUrl);
+          setBackgroundImage(bgUrl);
+        }
+        if (logoUrl) {
+          localStorage.setItem('kiosk_logo_url', logoUrl);
+          setLogoImage(logoUrl);
+        }
+        
+        setImagesPreloaded(true);
       }
     } catch (error) {
-      console.error("Error loading background image:", error);
-    }
-  };
-
-  const loadLogoImage = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("kiosk_settings")
-        .select("logo_url")
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (data && (data as any).logo_url) {
-        setLogoImage((data as any).logo_url);
-      }
-    } catch (error) {
-      console.error("Error loading logo image:", error);
+      console.error("Error preloading images:", error);
+      setImagesPreloaded(true);
     }
   };
 

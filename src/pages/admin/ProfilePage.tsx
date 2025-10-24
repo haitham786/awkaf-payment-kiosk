@@ -13,10 +13,12 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState({
     email: '',
     full_name: '',
-    mobile_number: ''
+    mobile_number: '',
+    profile_picture_url: ''
   });
 
   useEffect(() => {
@@ -49,7 +51,8 @@ const ProfilePage = () => {
       setProfile({
         email: data.email || '',
         full_name: data.full_name || '',
-        mobile_number: data.mobile_number || ''
+        mobile_number: data.mobile_number || '',
+        profile_picture_url: data.profile_picture_url || ''
       });
     }
   };
@@ -69,7 +72,8 @@ const ProfilePage = () => {
         .from('profiles')
         .update({
           full_name: profile.full_name,
-          mobile_number: profile.mobile_number
+          mobile_number: profile.mobile_number,
+          profile_picture_url: profile.profile_picture_url
         })
         .eq('id', session.user.id);
 
@@ -89,6 +93,66 @@ const ProfilePage = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const allowedTypes = ['jpg', 'jpeg', 'png', 'heic'];
+    
+    if (!allowedTypes.includes(fileExt?.toLowerCase() || '')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a JPEG, PNG, or HEIC image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Create bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'profile-pictures');
+      
+      if (!bucketExists) {
+        await supabase.storage.createBucket('profile-pictures', { public: true });
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-pictures')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-pictures')
+        .getPublicUrl(filePath);
+
+      setProfile({ ...profile, profile_picture_url: publicUrl });
+
+      toast({
+        title: "Profile picture uploaded",
+        description: "Don't forget to save your changes",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error uploading image",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -118,6 +182,42 @@ const ProfilePage = () => {
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
+            {/* Profile Picture */}
+            <div className="flex items-center gap-6 pb-6 border-b">
+              <div className="relative">
+                {profile.profile_picture_url ? (
+                  <img
+                    src={profile.profile_picture_url}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center border-4 border-primary/10">
+                    <User className="w-12 h-12 text-primary" />
+                  </div>
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="profile_picture" className="block mb-2">Profile Picture</Label>
+                <Input
+                  id="profile_picture"
+                  type="file"
+                  accept="image/jpeg,image/png,image/heic"
+                  onChange={handleProfilePictureUpload}
+                  disabled={uploading}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Supported formats: JPEG, PNG, HEIC
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="full_name">Full Name</Label>

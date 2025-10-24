@@ -240,15 +240,15 @@ const KioskHomepage = () => {
                 key={category.id}
                 className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
               >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Add info dialog logic if needed
-                  }}
-                  className="absolute top-3 right-3 p-1.5 bg-white/70 rounded-full hover:bg-white/90 transition-colors shadow-sm z-10"
-                >
-                  <Info className="w-4 h-4 text-emerald-600" />
-                </button>
+                {(category.info_text || category.description) && (
+                  <div className="absolute top-3 right-3 z-10">
+                    <CategoryInfoDialog
+                      title={category.title}
+                      description={category.description}
+                      infoText={category.info_text}
+                    />
+                  </div>
+                )}
                 <KioskButton
                   variant="donation"
                   soundEffect="category"
