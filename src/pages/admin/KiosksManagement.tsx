@@ -443,10 +443,10 @@ const KiosksManagement = () => {
               </div>
             )}
             
-            <input
+            <Input
               id="logo-upload"
               type="file"
-              accept=".png,.svg"
+              accept="image/png,image/svg+xml"
               onChange={handleLogoUpload}
               className="hidden"
             />
@@ -498,7 +498,7 @@ const KiosksManagement = () => {
                 <Input
                   id="background-upload"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleImageUpload}
                   disabled={uploadingImage}
                   className="hidden"

@@ -380,9 +380,9 @@ const CategoriesManagement = () => {
                   <Input
                     id="icon"
                     type="file"
-                    accept=".jpg,.jpeg,.png"
+                    accept="image/jpeg,image/jpg,image/png"
                     onChange={handleIconChange}
-                    className="mb-2"
+                    className="mb-2 cursor-pointer"
                   />
                   <p className="text-sm text-muted-foreground">
                     Only JPG, JPEG, and PNG files. Maximum size: 100 KB
