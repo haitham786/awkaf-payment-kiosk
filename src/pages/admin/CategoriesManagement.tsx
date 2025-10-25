@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import { SortableCategory } from "@/components/admin/SortableCategory";
 const CategoriesManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -377,12 +378,21 @@ const CategoriesManagement = () => {
               <div>
                 <Label htmlFor="icon">Category Icon</Label>
                 <div className="mt-2">
-                  <Input
-                    id="icon"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => iconInputRef.current?.click()}
+                    className="w-full mb-2"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose Icon
+                  </Button>
+                  <input
+                    ref={iconInputRef}
                     type="file"
                     accept="image/jpeg,image/jpg,image/png"
                     onChange={handleIconChange}
-                    className="mb-2 cursor-pointer"
+                    className="hidden"
                   />
                   <p className="text-sm text-muted-foreground">
                     Only JPG, JPEG, and PNG files. Maximum size: 100 KB

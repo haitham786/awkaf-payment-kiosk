@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -418,7 +420,7 @@ const KiosksManagement = () => {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => document.getElementById('logo-upload')?.click()}
+                    onClick={() => logoInputRef.current?.click()}
                     disabled={uploadingLogo}
                   >
                     Change Logo
@@ -435,7 +437,7 @@ const KiosksManagement = () => {
             ) : (
               <div>
                 <Button
-                  onClick={() => document.getElementById('logo-upload')?.click()}
+                  onClick={() => logoInputRef.current?.click()}
                   disabled={uploadingLogo}
                 >
                   {uploadingLogo ? "Uploading..." : "Upload Logo"}
@@ -443,8 +445,8 @@ const KiosksManagement = () => {
               </div>
             )}
             
-            <Input
-              id="logo-upload"
+            <input
+              ref={logoInputRef}
               type="file"
               accept="image/png,image/svg+xml"
               onChange={handleLogoUpload}
@@ -482,21 +484,18 @@ const KiosksManagement = () => {
                 </Button>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => backgroundInputRef.current?.click()}
+              >
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <Label
-                  htmlFor="background-upload"
-                  className="cursor-pointer inline-block"
-                >
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Click to upload or drag and drop
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    PNG, JPG up to 10MB (9:16 aspect ratio)
-                  </div>
-                </Label>
-                <Input
-                  id="background-upload"
+                <div className="text-sm text-muted-foreground mb-2">
+                  Click to upload or drag and drop
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  PNG, JPG up to 10MB (9:16 aspect ratio)
+                </div>
+                <input
+                  ref={backgroundInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/jpg"
                   onChange={handleImageUpload}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState({
@@ -204,13 +205,22 @@ const ProfilePage = () => {
               </div>
               <div className="flex-1">
                 <Label htmlFor="profile_picture" className="block mb-2">Profile Picture</Label>
-                <Input
-                  id="profile_picture"
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => profilePictureInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full"
+                >
+                  {uploading ? "Uploading..." : "Choose Image"}
+                </Button>
+                <input
+                  ref={profilePictureInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/heic"
                   onChange={handleProfilePictureUpload}
                   disabled={uploading}
-                  className="cursor-pointer"
+                  className="hidden"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Supported formats: JPEG, PNG, HEIC
