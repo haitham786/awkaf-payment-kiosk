@@ -122,14 +122,6 @@ const ProfilePage = () => {
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${session.user.id}/${fileName}`;
 
-      // Create bucket if it doesn't exist
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === 'profile-pictures');
-      
-      if (!bucketExists) {
-        await supabase.storage.createBucket('profile-pictures', { public: true });
-      }
-
       const { error: uploadError } = await supabase.storage
         .from('profile-pictures')
         .upload(filePath, file, { upsert: true });
