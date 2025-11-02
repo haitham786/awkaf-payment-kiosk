@@ -114,15 +114,15 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
 
       {/* Home Button */}
       {showHomeButton && (
-        <div className="fixed bottom-6 left-6 z-20">
+        <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 z-20">
           <KioskButton
-            variant="secondary"
+            variant="ghost"
             size="lg"
             soundEffect="navigation"
             onClick={() => navigate("/kiosk")}
-            className="bg-white/80 hover:bg-white/90 backdrop-blur-sm shadow-lg border-0"
+            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
           >
-            <Home className="w-6 h-6" />
+            <Home className="w-8 h-8 text-white drop-shadow-lg" />
           </KioskButton>
         </div>
       )}

@@ -44,7 +44,8 @@ const CategoriesManagement = () => {
     display_order: 0,
     icon_url: '',
     info_text: '',
-    category_reference: ''
+    category_reference: '',
+    quranic_verse: ''
   });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string>('');
@@ -181,7 +182,8 @@ const CategoriesManagement = () => {
       display_order: category.display_order,
       icon_url: category.icon_url || '',
       info_text: category.info_text || '',
-      category_reference: category.category_reference || ''
+      category_reference: category.category_reference || '',
+      quranic_verse: category.quranic_verse || ''
     });
     setIconPreview(category.icon_url || '');
     setIconFile(null);
@@ -287,7 +289,8 @@ const CategoriesManagement = () => {
       display_order: categories.length + 1,
       icon_url: '',
       info_text: '',
-      category_reference: ''
+      category_reference: '',
+      quranic_verse: ''
     });
     setIconFile(null);
     setIconPreview('');
@@ -372,6 +375,20 @@ const CategoriesManagement = () => {
                 />
                 <p className="text-sm text-muted-foreground mt-1">
                   This information will be shown when users click the info icon on the kiosk
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="quranic_verse">Quranic Verse (Arabic)</Label>
+                <Textarea
+                  id="quranic_verse"
+                  value={formData.quranic_verse || ''}
+                  onChange={(e) => setFormData({ ...formData, quranic_verse: e.target.value })}
+                  placeholder="الآية القرآنية التي تظهر في الصفحة الرئيسية"
+                  rows={2}
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  The Quranic verse shown on the kiosk homepage (leave empty to use default)
                 </p>
               </div>
 

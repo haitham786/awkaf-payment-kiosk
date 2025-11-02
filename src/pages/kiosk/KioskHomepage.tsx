@@ -241,7 +241,7 @@ const KioskHomepage = () => {
                 className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
               >
                 {(category.info_text || category.description) && (
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-2 right-12 z-10">
                     <CategoryInfoDialog
                       title={category.title}
                       description={category.description}
@@ -255,22 +255,14 @@ const KioskHomepage = () => {
                   className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-transparent hover:bg-emerald-50/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >
-                  {category.icon_url ? (
+                  {category.icon_url && (
                     <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform duration-300">
                       <img
-                        src={`${category.icon_url}?t=${Date.now()}`}
+                        src={category.icon_url}
                         alt={category.title}
                         className="w-full h-full object-contain"
-                        onError={(e) => {
-                          console.error('Error loading image:', category.icon_url);
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.parentElement!.innerHTML = '<div class="text-3xl">📿</div>';
-                        }}
+                        loading="eager"
                       />
-                    </div>
-                  ) : (
-                    <div className="text-3xl mb-1 group-hover:scale-110 transition-transform duration-300">
-                      📿
                     </div>
                   )}
                   <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
