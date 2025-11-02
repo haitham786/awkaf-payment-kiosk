@@ -119,8 +119,8 @@ const ProfilePage = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
 
       // Create bucket if it doesn't exist
       const { data: buckets } = await supabase.storage.listBuckets();
