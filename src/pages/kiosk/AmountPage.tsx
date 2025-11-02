@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Delete } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";

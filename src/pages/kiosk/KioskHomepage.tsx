@@ -12,6 +12,7 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quranicVerse, setQuranicVerse] = useState<string>("");
   // Initialize status based on localStorage to prevent flashing
   const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
     const kioskId = localStorage.getItem('kiosk_id');
@@ -134,6 +135,14 @@ const KioskHomepage = () => {
 
       if (error) throw error;
       setCategories(data || []);
+      
+      // Load Quranic verse from first category with a verse set, or use default
+      const categoryWithVerse = data?.find(cat => cat.quranic_verse);
+      if (categoryWithVerse?.quranic_verse) {
+        setQuranicVerse(categoryWithVerse.quranic_verse);
+      } else {
+        setQuranicVerse("وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -211,7 +220,7 @@ const KioskHomepage = () => {
           {/* Quranic verse */}
           <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-md border-0 mb-4">
             <p className="text-xl font-bold text-gray-800 leading-relaxed">
-              "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"
+              "{quranicVerse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"}"
             </p>
             <p className="text-sm text-emerald-700 mt-2 font-semibold">
               القرآن الكريم - سورة البقرة

@@ -25,6 +25,7 @@ export type Database = {
           id: string
           info_text: string | null
           is_visible: boolean | null
+          quranic_verse: string | null
           title: string
           updated_at: string | null
         }
@@ -38,6 +39,7 @@ export type Database = {
           id?: string
           info_text?: string | null
           is_visible?: boolean | null
+          quranic_verse?: string | null
           title: string
           updated_at?: string | null
         }
@@ -51,6 +53,7 @@ export type Database = {
           id?: string
           info_text?: string | null
           is_visible?: boolean | null
+          quranic_verse?: string | null
           title?: string
           updated_at?: string | null
         }
