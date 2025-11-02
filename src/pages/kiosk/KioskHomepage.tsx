@@ -136,10 +136,15 @@ const KioskHomepage = () => {
       if (error) throw error;
       setCategories(data || []);
       
-      // Load Quranic verse from first category with a verse set, or use default
-      const categoryWithVerse = data?.find(cat => cat.quranic_verse);
-      if (categoryWithVerse?.quranic_verse) {
-        setQuranicVerse(categoryWithVerse.quranic_verse);
+      // Load Quranic verse from kiosk_settings
+      const { data: settings } = await supabase
+        .from('kiosk_settings')
+        .select('quranic_verse')
+        .limit(1)
+        .maybeSingle();
+      
+      if (settings?.quranic_verse) {
+        setQuranicVerse(settings.quranic_verse);
       } else {
         setQuranicVerse("وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
       }

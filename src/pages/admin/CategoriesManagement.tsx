@@ -44,15 +44,17 @@ const CategoriesManagement = () => {
     display_order: 0,
     icon_url: '',
     info_text: '',
-    category_reference: '',
-    quranic_verse: ''
+    category_reference: ''
   });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string>('');
+  const [quranicVerse, setQuranicVerse] = useState<string>('');
+  const [savingVerse, setSavingVerse] = useState(false);
 
   useEffect(() => {
     checkAuth();
     loadCategories();
+    loadQuranicVerse();
   }, []);
 
   const checkAuth = async () => {
@@ -80,6 +82,46 @@ const CategoriesManagement = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadQuranicVerse = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('kiosk_settings')
+        .select('quranic_verse')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      setQuranicVerse(data?.quranic_verse || 'وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ');
+    } catch (error: any) {
+      toast({
+        title: "Error loading Quranic verse",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const saveQuranicVerse = async () => {
+    setSavingVerse(true);
+    try {
+      const { error } = await supabase
+        .from('kiosk_settings')
+        .update({ quranic_verse: quranicVerse })
+        .eq('id', (await supabase.from('kiosk_settings').select('id').limit(1).single()).data?.id);
+
+      if (error) throw error;
+      toast({ title: "Quranic verse updated successfully" });
+    } catch (error: any) {
+      toast({
+        title: "Error saving Quranic verse",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingVerse(false);
     }
   };
 
@@ -182,8 +224,7 @@ const CategoriesManagement = () => {
       display_order: category.display_order,
       icon_url: category.icon_url || '',
       info_text: category.info_text || '',
-      category_reference: category.category_reference || '',
-      quranic_verse: category.quranic_verse || ''
+      category_reference: category.category_reference || ''
     });
     setIconPreview(category.icon_url || '');
     setIconFile(null);
@@ -289,8 +330,7 @@ const CategoriesManagement = () => {
       display_order: categories.length + 1,
       icon_url: '',
       info_text: '',
-      category_reference: '',
-      quranic_verse: ''
+      category_reference: ''
     });
     setIconFile(null);
     setIconPreview('');
@@ -311,6 +351,33 @@ const CategoriesManagement = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Quranic Verse Settings */}
+          <Card className="p-6 md:col-span-2">
+            <h2 className="text-xl font-bold mb-4">Quranic Verse Settings</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              This verse appears at the top of the kiosk homepage
+            </p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="quranic_verse">Quranic Verse (Arabic)</Label>
+                <Textarea
+                  id="quranic_verse"
+                  value={quranicVerse}
+                  onChange={(e) => setQuranicVerse(e.target.value)}
+                  placeholder="الآية القرآنية التي تظهر في الصفحة الرئيسية"
+                  rows={3}
+                  className="text-right"
+                />
+              </div>
+              <Button 
+                onClick={saveQuranicVerse}
+                disabled={savingVerse}
+              >
+                {savingVerse ? 'Saving...' : 'Save Quranic Verse'}
+              </Button>
+            </div>
+          </Card>
+
           {/* Form */}
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">
@@ -375,20 +442,6 @@ const CategoriesManagement = () => {
                 />
                 <p className="text-sm text-muted-foreground mt-1">
                   This information will be shown when users click the info icon on the kiosk
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="quranic_verse">Quranic Verse (Arabic)</Label>
-                <Textarea
-                  id="quranic_verse"
-                  value={formData.quranic_verse || ''}
-                  onChange={(e) => setFormData({ ...formData, quranic_verse: e.target.value })}
-                  placeholder="الآية القرآنية التي تظهر في الصفحة الرئيسية"
-                  rows={2}
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  The Quranic verse shown on the kiosk homepage (leave empty to use default)
                 </p>
               </div>
 
