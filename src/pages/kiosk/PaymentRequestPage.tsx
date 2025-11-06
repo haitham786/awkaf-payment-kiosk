@@ -27,16 +27,6 @@ const PaymentRequestPage = () => {
   return (
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            طلب الدفع
-          </h1>
-          <p className="text-base text-gray-600">
-            يرجى استخدام البطاقة البنكية للدفع
-          </p>
-        </div>
-
         <div className="space-y-4">
           {/* Amount Display */}
           <Card className="p-4 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
@@ -49,41 +39,30 @@ const PaymentRequestPage = () => {
           {/* POS Terminal Instructions */}
           <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
             <div className="space-y-4">
-              {/* POS Terminal Image Placeholder */}
-              <div className="w-36 h-24 mx-auto bg-gray-100 rounded-lg shadow-md border-2 border-gray-300 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-3xl mb-1">💳</div>
-                  <p className="text-xs font-medium text-gray-700">جهاز نقاط البيع</p>
+              {/* Animated Card on POS */}
+              <div className="relative w-48 h-32 mx-auto">
+                {/* POS Terminal Base */}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-20 bg-gradient-to-b from-gray-700 to-gray-900 rounded-lg shadow-lg">
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-12 bg-gray-800 rounded border-2 border-gray-600"></div>
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-emerald-500 rounded-full"></div>
+                </div>
+                
+                {/* Animated Card */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-16 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 rounded-lg shadow-xl animate-bounce border-2 border-yellow-300">
+                  <div className="absolute top-2 right-2 w-8 h-6 bg-yellow-300/50 rounded"></div>
+                  <div className="absolute bottom-2 left-2 right-2 h-1 bg-yellow-300/60 rounded"></div>
                 </div>
               </div>
 
-              {/* Instructions */}
+              {/* Single Instruction */}
               <div className="space-y-3">
-                <h2 className="text-xl font-bold text-gray-900">
-                  يرجى اتباع التعليمات التالية:
+                <h2 className="text-2xl font-bold text-gray-900">
+                  يرجى وضع البطاقة على جهاز نقاط البيع
                 </h2>
-                
-                <div className="space-y-2 text-base">
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">١</span>
-                    <p className="text-gray-800">أدخل البطاقة في الجهاز</p>
-                  </div>
-                  
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">٢</span>
-                    <p className="text-gray-800">أو مرر البطاقة على الجهاز</p>
-                  </div>
-                  
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm ml-2">٣</span>
-                    <p className="text-gray-800">أو قرب البطاقة من الجهاز (الدفع اللاتلامسي)</p>
-                  </div>
-                </div>
               </div>
 
               {/* Supported Cards */}
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <p className="text-sm font-semibold mb-2 text-gray-900">البطاقات المدعومة:</p>
                 <div className="flex justify-center items-center gap-3 flex-wrap">
                   <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 object-contain" />
                   <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-4 object-contain" />

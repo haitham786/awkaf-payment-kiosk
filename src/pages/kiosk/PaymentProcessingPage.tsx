@@ -73,16 +73,6 @@ const PaymentProcessingPage = () => {
   return (
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            جاري معالجة الدفع
-          </h1>
-          <p className="text-base text-gray-600">
-            يرجى الانتظار، لا تقم بإزالة البطاقة
-          </p>
-        </div>
-
         <div className="space-y-4">
           {/* Amount Display */}
           <Card className="p-4 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
@@ -123,37 +113,6 @@ const PaymentProcessingPage = () => {
                     {Math.round(progress)}%
                   </p>
                 </div>
-
-                {/* Processing Steps */}
-                <div className="space-y-2 text-base">
-                  <div className={`flex items-center justify-center space-x-3 ${progress > 20 ? 'text-emerald-700' : 'text-gray-500'}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 20 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
-                      {progress > 20 ? '✓' : '•'}
-                    </span>
-                    <p>التحقق من البطاقة</p>
-                  </div>
-                  
-                  <div className={`flex items-center justify-center space-x-3 ${progress > 50 ? 'text-emerald-700' : 'text-gray-500'}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 50 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
-                      {progress > 50 ? '✓' : '•'}
-                    </span>
-                    <p>الاتصال بالبنك</p>
-                  </div>
-                  
-                  <div className={`flex items-center justify-center space-x-3 ${progress > 80 ? 'text-emerald-700' : 'text-gray-500'}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ml-2 ${progress > 80 ? 'bg-emerald-600 text-white' : 'bg-gray-300'}`}>
-                      {progress > 80 ? '✓' : '•'}
-                    </span>
-                    <p>تأكيد العملية</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Security Message */}
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <p className="text-sm text-gray-800">
-                  🔒 جميع المعاملات مؤمنة ومشفرة
-                </p>
               </div>
             </div>
           </Card>

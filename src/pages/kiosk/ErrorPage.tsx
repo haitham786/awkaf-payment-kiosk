@@ -16,6 +16,15 @@ const ErrorPage = () => {
   // Get error type from URL params or default to payment
   const errorType = searchParams.get('error') || 'payment';
 
+  // Auto-navigate to home after 10 seconds of inactivity
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate('/kiosk');
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
   useEffect(() => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
@@ -110,16 +119,6 @@ const ErrorPage = () => {
           </div>
         )}
 
-        {/* Error Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-1">
-            {errorInfo.title}
-          </h1>
-          <p className="text-base text-gray-600">
-            نعتذر عن هذا الإزعاج
-          </p>
-        </div>
-
         {/* Error Card */}
         <Card className="p-6 bg-white shadow-lg border-2 border-red-300 text-center">
           <div className="space-y-4">
@@ -133,9 +132,6 @@ const ErrorPage = () => {
               <h2 className="text-xl font-bold text-red-600">
                 {errorInfo.title}
               </h2>
-              <p className="text-base text-gray-800 leading-relaxed">
-                {errorInfo.description}
-              </p>
             </div>
 
             {/* Transaction Details */}
@@ -159,7 +155,7 @@ const ErrorPage = () => {
             variant="confirm"
             size="xl"
             onClick={handleTryAgain}
-            className="min-w-[240px] bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center"
+            className="min-w-[240px] bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 flex items-center justify-center border border-white/40"
           >
             <RefreshCw className="w-5 h-5 ml-2" />
             المحاولة مرة أخرى
