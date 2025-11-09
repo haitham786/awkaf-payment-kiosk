@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Wifi, HardDrive, Settings } from "lucide-react";
+import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 
@@ -22,6 +22,7 @@ const KioskSetupPanel = () => {
     email: "",
     password: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const [kioskForm, setKioskForm] = useState({
     name: "",
@@ -235,15 +236,30 @@ const KioskSetupPanel = () => {
 
             <div>
               <Label htmlFor="password" className="text-gray-900 text-sm">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                required
-                placeholder="••••••••"
-                className="bg-white text-gray-900 border-gray-300 h-10"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  required
+                  placeholder="••••••••"
+                  className="bg-white text-gray-900 border-gray-300 h-10 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-600" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full h-10">

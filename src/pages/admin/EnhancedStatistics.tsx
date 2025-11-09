@@ -56,7 +56,7 @@ const EnhancedStatistics = () => {
     try {
       let query = supabase
         .from('transactions')
-        .select('*, kiosks(name, reference_number), donation_categories(title, category_reference)')
+        .select('*, kiosks(name, reference_number)')
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
@@ -91,7 +91,24 @@ const EnhancedStatistics = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      setTransactions(data || []);
+      // Load categories for mapping
+      const { data: categoriesData } = await supabase
+        .from('donation_categories')
+        .select('category_reference, title, category_id')
+        .eq('is_visible', true);
+      
+      // Create a map of category references to titles
+      const categoryMap = new Map(
+        categoriesData?.map(c => [c.category_reference, c.title]) || []
+      );
+
+      // Enrich transactions with category titles
+      const enrichedTransactions = (data || []).map(t => ({
+        ...t,
+        category_title: categoryMap.get(t.category_reference) || t.category
+      }));
+
+      setTransactions(enrichedTransactions);
 
       // Load kiosks
       const { data: kiosksData } = await supabase
@@ -99,11 +116,6 @@ const EnhancedStatistics = () => {
         .select('*');
       setKiosks(kiosksData || []);
 
-      // Load categories
-      const { data: categoriesData } = await supabase
-        .from('donation_categories')
-        .select('category_reference, title')
-        .eq('is_visible', true);
       setCategories(categoriesData || []);
     } catch (error: any) {
       toast({
@@ -159,8 +171,8 @@ const EnhancedStatistics = () => {
       new Date(t.created_at).toLocaleDateString('en-GB'),
       new Date(t.created_at).toLocaleTimeString('en-GB'),
       t.reference_number || 'N/A',
-      (t.donation_categories as any)?.title || t.category,
-      t.category_reference || (t.donation_categories as any)?.category_reference || 'N/A',
+      t.category_title || t.category,
+      t.category_reference || 'N/A',
       ((t.amount_baisas || 0) / 1000).toFixed(3),
       t.kiosks?.name || 'N/A',
       t.kiosks?.reference_number || 'N/A'

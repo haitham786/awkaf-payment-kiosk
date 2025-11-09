@@ -139,9 +139,12 @@ const SMSSettings = () => {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate('/admin')}
+            >
+              <ArrowLeft className="w-4 h-4" />
             </Button>
             <h1 className="text-3xl font-bold">SMS Settings</h1>
           </div>

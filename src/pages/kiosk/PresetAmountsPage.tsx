@@ -70,23 +70,23 @@ const PresetAmountsPage = () => {
         </div>
 
         {/* Preset Amount Grid */}
-        <div className="grid grid-cols-5 gap-3 max-w-4xl mx-auto">
+        <div className="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
           {presetAmounts.map((amount, index) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white/70 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group aspect-square"
+              className="p-0 overflow-hidden bg-white/70 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group"
             >
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-col items-center justify-center space-y-1 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
+                className="w-full h-full flex flex-col items-center justify-center py-8 space-y-2 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
                 onClick={() => handleAmountSelect(amount)}
               >
-                <div className="text-2xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                <div className="text-4xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                   {amount}
                 </div>
-                <p className="text-[10px] text-gray-600 group-hover:text-emerald-600 transition-colors">
-                  ریال عماني
+                <p className="text-sm text-gray-600 group-hover:text-emerald-600 transition-colors">
+                  ر.ع
                 </p>
               </KioskButton>
             </Card>
