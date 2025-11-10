@@ -41,9 +41,7 @@ const CategoriesManagement = () => {
     title: '',
     description: '',
     is_visible: true,
-    display_order: 0,
     icon_url: '',
-    info_text: '',
     category_reference: ''
   });
   const [iconFile, setIconFile] = useState<File | null>(null);
@@ -221,9 +219,7 @@ const CategoriesManagement = () => {
       title: category.title,
       description: category.description,
       is_visible: category.is_visible,
-      display_order: category.display_order,
       icon_url: category.icon_url || '',
-      info_text: category.info_text || '',
       category_reference: category.category_reference || ''
     });
     setIconPreview(category.icon_url || '');
@@ -327,9 +323,7 @@ const CategoriesManagement = () => {
       title: '',
       description: '',
       is_visible: true,
-      display_order: categories.length + 1,
       icon_url: '',
-      info_text: '',
       category_reference: ''
     });
     setIconFile(null);
@@ -435,20 +429,6 @@ const CategoriesManagement = () => {
               </div>
 
               <div>
-                <Label htmlFor="info_text">Information Text (Arabic)</Label>
-                <Textarea
-                  id="info_text"
-                  value={formData.info_text}
-                  onChange={(e) => setFormData({ ...formData, info_text: e.target.value })}
-                  placeholder="معلومات إضافية عن الفئة"
-                  rows={3}
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  This information will be shown when users click the info icon on the kiosk
-                </p>
-              </div>
-
-              <div>
                 <Label htmlFor="icon">Category Icon</Label>
                 <div className="mt-2">
                   <Button
@@ -493,17 +473,6 @@ const CategoriesManagement = () => {
                     </Button>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <Label htmlFor="display_order">Display Order</Label>
-                <Input
-                  id="display_order"
-                  type="number"
-                  value={formData.display_order}
-                  onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
-                  required
-                />
               </div>
 
               <div className="flex items-center space-x-2">
