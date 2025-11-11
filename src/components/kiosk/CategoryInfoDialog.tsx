@@ -25,7 +25,7 @@ export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInf
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-8 w-7 h-7 rounded-full hover:bg-white/20 z-10"
+          className="w-7 h-7 rounded-full hover:bg-white/20"
           onClick={(e) => e.stopPropagation()}
         >
           <Info className="w-5 h-5 text-gray-700" />

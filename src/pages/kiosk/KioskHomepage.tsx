@@ -232,8 +232,8 @@ const KioskHomepage = () => {
             </p>
           </div>
 
-          <h1 className="text-2xl font-bold mb-2 text-white drop-shadow-lg">نظام التبرعات الرقمي</h1>
-          <p className="text-lg text-white/90 font-semibold drop-shadow">
+          <h1 className="text-2xl font-bold mb-2 text-gray-900 drop-shadow-lg">نظام التبرعات الرقمي</h1>
+          <p className="text-lg text-gray-900 font-semibold drop-shadow">
             اختر نوع التبرع الذي ترغب في المساهمة به
           </p>
         </div>
@@ -255,7 +255,7 @@ const KioskHomepage = () => {
                 className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[140px]"
               >
                 {(category.info_text || category.description) && (
-                  <div className="absolute top-2 right-12 z-10">
+                  <div className="absolute top-2 right-2 z-10">
                     <CategoryInfoDialog
                       title={category.title}
                       description={category.description}

@@ -51,10 +51,10 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-5xl mx-auto space-y-4 pb-20">
+      <div className="w-full max-w-4xl mx-auto space-y-3 pb-12">
         {/* Header with Category */}
         <div className="text-center">
-          <div className="flex flex-col items-center justify-center gap-2 mb-3">
+          <div className="flex flex-col items-center justify-center gap-2 mb-2">
             {categoryData?.icon_url && (
               <img 
                 src={categoryData.icon_url} 
@@ -70,7 +70,7 @@ const PresetAmountsPage = () => {
         </div>
 
         {/* Preset Amount Grid */}
-        <div className="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
+        <div className="grid grid-cols-2 gap-4 max-w-xl mx-auto">
           {presetAmounts.map((amount, index) => (
             <Card
               key={amount}
@@ -79,10 +79,10 @@ const PresetAmountsPage = () => {
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-col items-center justify-center py-8 space-y-2 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
+                className="w-full h-full flex flex-col items-center justify-center py-5 space-y-1 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
                 onClick={() => handleAmountSelect(amount)}
               >
-                <div className="text-4xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                <div className="text-3xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                   {amount}
                 </div>
                 <p className="text-sm text-gray-600 group-hover:text-emerald-600 transition-colors">
@@ -94,7 +94,7 @@ const PresetAmountsPage = () => {
         </div>
 
         {/* Custom Amount Button */}
-        <div className="flex justify-center mt-6">
+        <div className="flex justify-center mt-4">
           <KioskButton
             variant="secondary"
             size="lg"
