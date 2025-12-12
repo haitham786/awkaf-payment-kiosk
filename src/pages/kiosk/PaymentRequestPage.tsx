@@ -1,21 +1,40 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 const PaymentRequestPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
+  const [posType, setPosType] = useState<'hard_pos' | 'soft_pos'>('hard_pos');
 
   useEffect(() => {
-    // Simulate payment processing after 3 seconds
-    const timer = setTimeout(() => {
-      navigate(`/kiosk/payment-processing?category=${category}&amount=${amount}`);
-    }, 3000);
+    // Check POS type from settings
+    const checkPosType = async () => {
+      const { data } = await supabase
+        .from('kiosk_settings')
+        .select('pos_type')
+        .limit(1)
+        .maybeSingle();
+      
+      if (data?.pos_type === 'soft_pos') {
+        // Route directly to NFC payment page for Soft POS
+        navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+        return;
+      }
+      
+      // For Hard POS, continue to payment processing after 3 seconds
+      const timer = setTimeout(() => {
+        navigate(`/kiosk/payment-processing?category=${category}&amount=${amount}`);
+      }, 3000);
 
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    };
+    
+    checkPosType();
   }, [navigate, category, amount]);
 
   const formatAmount = (totalBaisas: number) => {
@@ -41,27 +60,22 @@ const PaymentRequestPage = () => {
             <div className="space-y-4">
               {/* Animated Card on POS */}
               <div className="relative w-48 h-32 mx-auto">
-                {/* POS Terminal Base */}
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-20 bg-gradient-to-b from-gray-700 to-gray-900 rounded-lg shadow-lg">
                   <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-20 h-12 bg-gray-800 rounded border-2 border-gray-600"></div>
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-emerald-500 rounded-full"></div>
                 </div>
-                
-                {/* Animated Card */}
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-16 bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 rounded-lg shadow-xl animate-bounce border-2 border-yellow-300">
                   <div className="absolute top-2 right-2 w-8 h-6 bg-yellow-300/50 rounded"></div>
                   <div className="absolute bottom-2 left-2 right-2 h-1 bg-yellow-300/60 rounded"></div>
                 </div>
               </div>
 
-              {/* Single Instruction */}
               <div className="space-y-3">
                 <h2 className="text-2xl font-bold text-gray-900">
                   يرجى وضع البطاقة على جهاز نقاط البيع
                 </h2>
               </div>
 
-              {/* Supported Cards */}
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div className="flex justify-center items-center gap-3 flex-wrap">
                   <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 object-contain" />
@@ -74,7 +88,6 @@ const PaymentRequestPage = () => {
                 </div>
               </div>
 
-              {/* Waiting Animation */}
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce ml-1"></div>
                 <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce ml-1" style={{ animationDelay: '0.1s' }}></div>
