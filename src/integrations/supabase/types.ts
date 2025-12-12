@@ -62,7 +62,9 @@ export type Database = {
           created_at: string | null
           id: string
           logo_url: string | null
+          pos_type: string | null
           quranic_verse: string | null
+          soft_pos_config: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -70,7 +72,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           logo_url?: string | null
+          pos_type?: string | null
           quranic_verse?: string | null
+          soft_pos_config?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -78,7 +82,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           logo_url?: string | null
+          pos_type?: string | null
           quranic_verse?: string | null
+          soft_pos_config?: Json | null
           updated_at?: string | null
         }
         Relationships: []
@@ -118,6 +124,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      offline_transaction_queue: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          kiosk_id: string | null
+          retry_count: number
+          status: string
+          synced_at: string | null
+          transaction_data: Json
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kiosk_id?: string | null
+          retry_count?: number
+          status?: string
+          synced_at?: string | null
+          transaction_data: Json
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kiosk_id?: string | null
+          retry_count?: number
+          status?: string
+          synced_at?: string | null
+          transaction_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_transaction_queue_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

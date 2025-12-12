@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +16,7 @@ import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
 import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
 import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
 import PaymentProcessingPage from "./pages/kiosk/PaymentProcessingPage";
+import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
 import MobileNumberPage from "./pages/kiosk/MobileNumberPage";
 import ErrorPage from "./pages/kiosk/ErrorPage";
@@ -29,11 +31,17 @@ import ProfilePage from "./pages/admin/ProfilePage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
+import { startBackgroundSync } from "./services/offlineQueueService";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { isAudioReady, showInitPrompt } = useAudioInitializer();
+  
+  // Start background sync for offline transactions
+  React.useEffect(() => {
+    startBackgroundSync();
+  }, []);
 
   return (
     <>
@@ -64,6 +72,7 @@ const AppContent = () => {
             <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
             <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
             <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
+            <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
             <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
             <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
             <Route path="/kiosk/error" element={<ErrorPage />} />
