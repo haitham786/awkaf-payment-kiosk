@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, HardDrive } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
-import POSConfigSection from "@/components/admin/POSConfigSection";
+import SoftPOSConfigSection from "@/components/admin/SoftPOSConfigSection";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -29,44 +29,43 @@ const KiosksManagement = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [globalPosConfig, setGlobalPosConfig] = useState({
-    posType: 'hard_pos' as 'hard_pos' | 'soft_pos',
-    hardPos: { connectionType: 'usb', ipAddress: '', port: '' },
-    softPos: { merchantId: '', terminalId: '', apiKey: '', sdkEndpoint: '', callbackUrl: '', providerName: '' },
+  const [softPosConfig, setSoftPosConfig] = useState({
+    merchantId: '',
+    terminalId: '',
+    apiKey: '',
+    sdkEndpoint: '',
+    callbackUrl: '',
+    providerName: '',
   });
 
-  const loadGlobalPosConfig = async () => {
-    const { data } = await supabase.from('kiosk_settings').select('pos_type, soft_pos_config').limit(1).maybeSingle();
-    if (data) {
-      setGlobalPosConfig(prev => ({
-        ...prev,
-        posType: (data.pos_type as 'hard_pos' | 'soft_pos') || 'hard_pos',
-        softPos: data.soft_pos_config ? {
-          merchantId: (data.soft_pos_config as any).merchant_id || '',
-          terminalId: (data.soft_pos_config as any).terminal_id || '',
-          apiKey: (data.soft_pos_config as any).api_key || '',
-          sdkEndpoint: (data.soft_pos_config as any).sdk_endpoint || '',
-          callbackUrl: (data.soft_pos_config as any).callback_url || '',
-          providerName: (data.soft_pos_config as any).provider_name || '',
-        } : prev.softPos,
-      }));
+  const loadSoftPosConfig = async () => {
+    const { data } = await supabase.from('kiosk_settings').select('soft_pos_config').limit(1).maybeSingle();
+    if (data?.soft_pos_config) {
+      const config = data.soft_pos_config as any;
+      setSoftPosConfig({
+        merchantId: config.merchant_id || '',
+        terminalId: config.terminal_id || '',
+        apiKey: config.api_key || '',
+        sdkEndpoint: config.sdk_endpoint || '',
+        callbackUrl: config.callback_url || '',
+        providerName: config.provider_name || '',
+      });
     }
   };
 
-  const saveGlobalPosConfig = async () => {
+  const saveSoftPosConfig = async () => {
     const { error } = await supabase.from('kiosk_settings').update({
-      pos_type: globalPosConfig.posType,
-      soft_pos_config: globalPosConfig.posType === 'soft_pos' ? {
-        merchant_id: globalPosConfig.softPos.merchantId,
-        terminal_id: globalPosConfig.softPos.terminalId,
-        api_key: globalPosConfig.softPos.apiKey,
-        sdk_endpoint: globalPosConfig.softPos.sdkEndpoint,
-        callback_url: globalPosConfig.softPos.callbackUrl,
-        provider_name: globalPosConfig.softPos.providerName,
-      } : null,
+      soft_pos_config: {
+        merchant_id: softPosConfig.merchantId,
+        terminal_id: softPosConfig.terminalId,
+        api_key: softPosConfig.apiKey,
+        sdk_endpoint: softPosConfig.sdkEndpoint,
+        callback_url: softPosConfig.callbackUrl,
+        provider_name: softPosConfig.providerName,
+      },
     } as any).eq('id', '00000000-0000-0000-0000-000000000001');
-    if (!error) toast.success('POS configuration saved');
-    else toast.error('Failed to save POS configuration');
+    if (!error) toast.success('Soft POS configuration saved');
+    else toast.error('Failed to save Soft POS configuration');
   };
 
   useEffect(() => {
@@ -74,7 +73,7 @@ const KiosksManagement = () => {
     loadKiosks();
     loadBackgroundImage();
     loadLogoImage();
-    loadGlobalPosConfig();
+    loadSoftPosConfig();
 
     // Subscribe to real-time changes in kiosks table
     const channel = supabase
@@ -554,23 +553,23 @@ const KiosksManagement = () => {
           </Card>
         </div>
 
-        {/* Global POS Configuration */}
+        {/* Soft POS Configuration */}
         <Card className="p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <HardDrive className="w-5 h-5" />
-              Global POS Configuration
+              <Smartphone className="w-5 h-5" />
+              Soft POS Configuration
             </h2>
-            <Button onClick={saveGlobalPosConfig} size="sm">
-              Save POS Settings
+            <Button onClick={saveSoftPosConfig} size="sm">
+              Save Soft POS Settings
             </Button>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Configure the payment terminal type for all kiosks. Choose between traditional Hard POS (USB/Ethernet) or Soft POS (NFC contactless).
+            Configure Soft POS (NFC contactless) settings for all kiosks. Hard POS (USB/Ethernet) is configured per-kiosk in the Edit Kiosk dialog.
           </p>
-          <POSConfigSection
-            config={globalPosConfig}
-            onChange={setGlobalPosConfig}
+          <SoftPOSConfigSection
+            config={softPosConfig}
+            onChange={setSoftPosConfig}
             showTitle={false}
           />
         </Card>
