@@ -554,6 +554,27 @@ const KiosksManagement = () => {
           </Card>
         </div>
 
+        {/* Global POS Configuration */}
+        <Card className="p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <HardDrive className="w-5 h-5" />
+              Global POS Configuration
+            </h2>
+            <Button onClick={saveGlobalPosConfig} size="sm">
+              Save POS Settings
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configure the payment terminal type for all kiosks. Choose between traditional Hard POS (USB/Ethernet) or Soft POS (NFC contactless).
+          </p>
+          <POSConfigSection
+            config={globalPosConfig}
+            onChange={setGlobalPosConfig}
+            showTitle={false}
+          />
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Form */}
           <Card className="p-6">
