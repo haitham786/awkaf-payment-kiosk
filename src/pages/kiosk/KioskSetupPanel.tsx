@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff, Smartphone } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -29,15 +30,54 @@ const KioskSetupPanel = () => {
     location: "",
   });
 
+  const [posType, setPosType] = useState<'hard_pos' | 'soft_pos'>('hard_pos');
+  
   const [posConfig, setPosConfig] = useState({
     connectionType: "usb",
     ipAddress: "",
     port: "",
   });
 
+  const [softPosConfig, setSoftPosConfig] = useState({
+    merchantId: "",
+    terminalId: "",
+    apiKey: "",
+    sdkEndpoint: "",
+    callbackUrl: "",
+    providerName: "",
+  });
+
   useEffect(() => {
     checkAuth();
+    loadGlobalPosSettings();
   }, []);
+
+  const loadGlobalPosSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('kiosk_settings')
+        .select('pos_type, soft_pos_config')
+        .limit(1)
+        .maybeSingle();
+      
+      if (data) {
+        setPosType((data.pos_type as 'hard_pos' | 'soft_pos') || 'hard_pos');
+        if (data.soft_pos_config) {
+          const config = data.soft_pos_config as any;
+          setSoftPosConfig({
+            merchantId: config.merchant_id || '',
+            terminalId: config.terminal_id || '',
+            apiKey: config.api_key || '',
+            sdkEndpoint: config.sdk_endpoint || '',
+            callbackUrl: config.callback_url || '',
+            providerName: config.provider_name || '',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading global POS settings:', error);
+    }
+  };
 
   const checkAuth = async () => {
     try {
@@ -359,62 +399,196 @@ const KioskSetupPanel = () => {
             <Card className="p-4 bg-white border-gray-200">
               <h2 className="text-lg font-bold mb-3 text-gray-900">POS Configuration</h2>
               <div className="space-y-3">
+                {/* POS Type Selection */}
                 <div>
-                  <Label className="text-gray-900 text-sm">Connection Type</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant={posConfig.connectionType === 'usb' ? 'default' : 'outline'}
-                      onClick={() => setPosConfig({ ...posConfig, connectionType: 'usb' })}
-                      className="flex-1 h-9 text-sm"
+                  <Label className="text-gray-900 text-sm">Payment Terminal Type</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        posType === 'hard_pos'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setPosType('hard_pos')}
                     >
-                      USB
-                    </Button>
-                    <Button
-                      variant={posConfig.connectionType === 'ethernet' ? 'default' : 'outline'}
-                      onClick={() => setPosConfig({ ...posConfig, connectionType: 'ethernet' })}
-                      className="flex-1 h-9 text-sm"
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          posType === 'hard_pos' ? 'bg-primary text-white' : 'bg-gray-100'
+                        }`}>
+                          <HardDrive className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-xs text-gray-900">Hard POS</p>
+                          <p className="text-[10px] text-gray-600">USB/Ethernet</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        posType === 'soft_pos'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setPosType('soft_pos')}
                     >
-                      Ethernet
-                    </Button>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          posType === 'soft_pos' ? 'bg-primary text-white' : 'bg-gray-100'
+                        }`}>
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-xs text-gray-900">Soft POS</p>
+                          <p className="text-[10px] text-gray-600">NFC Contactless</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {posConfig.connectionType === 'ethernet' && (
+                {/* Hard POS Configuration */}
+                {posType === 'hard_pos' && (
                   <>
                     <div>
-                      <Label htmlFor="ip" className="text-gray-900 text-sm">IP Address</Label>
-                      <Input
-                        id="ip"
-                        value={posConfig.ipAddress}
-                        onChange={(e) => setPosConfig({ ...posConfig, ipAddress: e.target.value })}
-                        placeholder="192.168.1.100"
-                        className="bg-white text-gray-900 border-gray-300 h-9"
-                      />
+                      <Label className="text-gray-900 text-sm">Connection Type</Label>
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant={posConfig.connectionType === 'usb' ? 'default' : 'outline'}
+                          onClick={() => setPosConfig({ ...posConfig, connectionType: 'usb' })}
+                          className="flex-1 h-9 text-sm"
+                        >
+                          USB
+                        </Button>
+                        <Button
+                          variant={posConfig.connectionType === 'ethernet' ? 'default' : 'outline'}
+                          onClick={() => setPosConfig({ ...posConfig, connectionType: 'ethernet' })}
+                          className="flex-1 h-9 text-sm"
+                        >
+                          Ethernet
+                        </Button>
+                      </div>
                     </div>
 
-                    <div>
-                      <Label htmlFor="port" className="text-gray-900 text-sm">Port</Label>
-                      <Input
-                        id="port"
-                        value={posConfig.port}
-                        onChange={(e) => setPosConfig({ ...posConfig, port: e.target.value })}
-                        placeholder="8080"
-                        className="bg-white text-gray-900 border-gray-300 h-9"
-                      />
+                    {posConfig.connectionType === 'ethernet' && (
+                      <>
+                        <div>
+                          <Label htmlFor="ip" className="text-gray-900 text-sm">IP Address</Label>
+                          <Input
+                            id="ip"
+                            value={posConfig.ipAddress}
+                            onChange={(e) => setPosConfig({ ...posConfig, ipAddress: e.target.value })}
+                            placeholder="192.168.1.100"
+                            className="bg-white text-gray-900 border-gray-300 h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="port" className="text-gray-900 text-sm">Port</Label>
+                          <Input
+                            id="port"
+                            value={posConfig.port}
+                            onChange={(e) => setPosConfig({ ...posConfig, port: e.target.value })}
+                            placeholder="8080"
+                            className="bg-white text-gray-900 border-gray-300 h-9"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-semibold text-gray-900">Compatible with all POS devices</p>
+                      <p className="text-[10px] text-gray-600">
+                        Supports any POS terminal (Verifone, Ingenico, or Generic) with USB or Ethernet connectivity
+                      </p>
                     </div>
                   </>
                 )}
 
-                <div className="space-y-1 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-900">Compatible with all POS devices</p>
-                  <p className="text-[10px] text-gray-600">
-                    Supports any POS terminal (Verifone, Ingenico, or Generic) with USB or Ethernet connectivity
-                  </p>
-                </div>
+                {/* Soft POS Configuration */}
+                {posType === 'soft_pos' && (
+                  <>
+                    <div>
+                      <Label className="text-gray-900 text-sm">Provider</Label>
+                      <Select
+                        value={softPosConfig.providerName}
+                        onValueChange={(value) => setSoftPosConfig({ ...softPosConfig, providerName: value })}
+                      >
+                        <SelectTrigger className="bg-white text-gray-900 border-gray-300 h-9">
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank_muscat">Bank Muscat</SelectItem>
+                          <SelectItem value="thawani">Thawani</SelectItem>
+                          <SelectItem value="oman_arab_bank">Oman Arab Bank</SelectItem>
+                          <SelectItem value="ahli_bank">Ahli Bank</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-gray-900 text-sm">Merchant ID</Label>
+                        <Input
+                          value={softPosConfig.merchantId}
+                          onChange={(e) => setSoftPosConfig({ ...softPosConfig, merchantId: e.target.value })}
+                          placeholder="MID"
+                          className="bg-white text-gray-900 border-gray-300 h-9"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-900 text-sm">Terminal ID</Label>
+                        <Input
+                          value={softPosConfig.terminalId}
+                          onChange={(e) => setSoftPosConfig({ ...softPosConfig, terminalId: e.target.value })}
+                          placeholder="TID"
+                          className="bg-white text-gray-900 border-gray-300 h-9"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-900 text-sm">API Key / Secret Token</Label>
+                      <Input
+                        type="password"
+                        value={softPosConfig.apiKey}
+                        onChange={(e) => setSoftPosConfig({ ...softPosConfig, apiKey: e.target.value })}
+                        placeholder="Enter API Key"
+                        className="bg-white text-gray-900 border-gray-300 h-9"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-900 text-sm">SDK Endpoint URL</Label>
+                      <Input
+                        value={softPosConfig.sdkEndpoint}
+                        onChange={(e) => setSoftPosConfig({ ...softPosConfig, sdkEndpoint: e.target.value })}
+                        placeholder="https://api.provider.com/v1"
+                        className="bg-white text-gray-900 border-gray-300 h-9"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-gray-900 text-sm">Callback URL</Label>
+                      <Input
+                        value={softPosConfig.callbackUrl}
+                        onChange={(e) => setSoftPosConfig({ ...softPosConfig, callbackUrl: e.target.value })}
+                        placeholder="https://your-domain.com/callback"
+                        className="bg-white text-gray-900 border-gray-300 h-9"
+                      />
+                    </div>
+
+                    <div className="space-y-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-[10px] text-blue-700">
+                        <strong>Sunmi Flex 3 Ready:</strong> Supports NFC contactless payments via SoftPOS SDK. 
+                        Card data is handled securely by the SDK.
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex gap-2">
                   <Button onClick={handleTestPosConnection} className="flex-1 h-9 text-sm">
-                    <HardDrive className="w-3 h-3 mr-1" />
+                    {posType === 'hard_pos' ? <HardDrive className="w-3 h-3 mr-1" /> : <Smartphone className="w-3 h-3 mr-1" />}
                     Test
                   </Button>
                   <Button onClick={handleRegisterKiosk} variant="outline" className="flex-1 h-9 text-sm">
