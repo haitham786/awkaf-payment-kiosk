@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff, Smartphone } from "lucide-react";
+import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { testConnection, ConnectionStatus, getConnectionStatus, onConnectionStatusChange, initializePOS } from "@/services/hardPosService";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -31,10 +32,13 @@ const KioskSetupPanel = () => {
   });
 
   const [posConfig, setPosConfig] = useState({
-    connectionType: "usb",
+    connectionType: "usb" as "usb" | "ethernet",
     ipAddress: "",
     port: "",
   });
+  
+  const [posConnectionStatus, setPosConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const [softPosConfig, setSoftPosConfig] = useState({
     merchantId: "",
@@ -217,21 +221,46 @@ const KioskSetupPanel = () => {
     }
   };
 
-  const handleTestPosConnection = () => {
+  const handleTestPosConnection = async () => {
+    setIsTestingConnection(true);
     toast({
       title: "POS Connection Test",
       description: `Testing ${posConfig.connectionType.toUpperCase()} connection...`,
     });
     
-    // TODO: Implement actual POS connection test
-    // This will work with any POS device that provides SDK integration
-    setTimeout(() => {
+    try {
+      const result = await testConnection({
+        connectionType: posConfig.connectionType,
+        ipAddress: posConfig.ipAddress,
+        port: posConfig.port,
+      });
+      
+      setPosConnectionStatus(result.connected ? 'connected' : 'disconnected');
+      
       toast({
-        title: "POS Not Connected",
-        description: "Please ensure the POS device is connected and properly configured",
+        title: result.connected ? "Connection Successful" : "Connection Failed",
+        description: result.message,
+        variant: result.connected ? "default" : "destructive",
+      });
+      
+      // If connected, initialize the POS for use
+      if (result.connected) {
+        await initializePOS({
+          connectionType: posConfig.connectionType,
+          ipAddress: posConfig.ipAddress,
+          port: posConfig.port,
+        });
+      }
+    } catch (error: any) {
+      setPosConnectionStatus('error');
+      toast({
+        title: "Connection Error",
+        description: error.message || "Failed to test POS connection",
         variant: "destructive",
       });
-    }, 2000);
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   if (loading) {
@@ -397,25 +426,74 @@ const KioskSetupPanel = () => {
               <h2 className="text-lg font-bold mb-3 text-gray-900">Hard POS Configuration</h2>
               <p className="text-xs text-gray-600 mb-3">Configure USB or Ethernet POS terminal connection for this kiosk.</p>
               <div className="space-y-3">
+                {/* Connection Status Display */}
+                <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                  posConnectionStatus === 'connected' 
+                    ? 'bg-emerald-50 border border-emerald-200' 
+                    : posConnectionStatus === 'error'
+                    ? 'bg-red-50 border border-red-200'
+                    : 'bg-gray-50 border border-gray-200'
+                }`}>
+                  {posConnectionStatus === 'connected' ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : posConnectionStatus === 'error' ? (
+                    <XCircle className="w-4 h-4 text-red-600" />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-gray-400" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    posConnectionStatus === 'connected' 
+                      ? 'text-emerald-700' 
+                      : posConnectionStatus === 'error'
+                      ? 'text-red-700'
+                      : 'text-gray-700'
+                  }`}>
+                    {posConnectionStatus === 'connected' 
+                      ? 'Connected' 
+                      : posConnectionStatus === 'error'
+                      ? 'Connection Error'
+                      : posConnectionStatus === 'connecting'
+                      ? 'Connecting...'
+                      : 'Not Connected'}
+                  </span>
+                </div>
+
                 <div>
                   <Label className="text-gray-900 text-sm">Connection Type</Label>
                   <div className="flex gap-2 mt-2">
                     <Button
                       variant={posConfig.connectionType === 'usb' ? 'default' : 'outline'}
-                      onClick={() => setPosConfig({ ...posConfig, connectionType: 'usb' })}
+                      onClick={() => {
+                        setPosConfig({ ...posConfig, connectionType: 'usb' });
+                        setPosConnectionStatus('disconnected');
+                      }}
                       className="flex-1 h-9 text-sm"
                     >
+                      <HardDrive className="w-3 h-3 mr-1" />
                       USB
                     </Button>
                     <Button
                       variant={posConfig.connectionType === 'ethernet' ? 'default' : 'outline'}
-                      onClick={() => setPosConfig({ ...posConfig, connectionType: 'ethernet' })}
+                      onClick={() => {
+                        setPosConfig({ ...posConfig, connectionType: 'ethernet' });
+                        setPosConnectionStatus('disconnected');
+                      }}
                       className="flex-1 h-9 text-sm"
                     >
+                      <Wifi className="w-3 h-3 mr-1" />
                       Ethernet
                     </Button>
                   </div>
                 </div>
+
+                {posConfig.connectionType === 'usb' && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs font-semibold text-blue-900">USB Auto-Detection</p>
+                    <p className="text-[10px] text-blue-700 mt-1">
+                      POS device will be automatically detected when connected via USB. No manual configuration required.
+                    </p>
+                  </div>
+                )}
 
                 {posConfig.connectionType === 'ethernet' && (
                   <>
@@ -443,16 +521,24 @@ const KioskSetupPanel = () => {
                 )}
 
                 <div className="space-y-1 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-900">Compatible with all POS devices</p>
+                  <p className="text-xs font-semibold text-gray-900">POS-Agnostic Design</p>
                   <p className="text-[10px] text-gray-600">
-                    Supports any POS terminal (Verifone, Ingenico, or Generic) with USB or Ethernet connectivity
+                    Compatible with Verifone, Ingenico, PAX, and other POS terminals. No vendor-specific SDK required.
                   </p>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button onClick={handleTestPosConnection} className="flex-1 h-9 text-sm">
-                    <HardDrive className="w-3 h-3 mr-1" />
-                    Test Connection
+                  <Button 
+                    onClick={handleTestPosConnection} 
+                    className="flex-1 h-9 text-sm"
+                    disabled={isTestingConnection || (posConfig.connectionType === 'ethernet' && (!posConfig.ipAddress || !posConfig.port))}
+                  >
+                    {isTestingConnection ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <HardDrive className="w-3 h-3 mr-1" />
+                    )}
+                    {isTestingConnection ? 'Testing...' : 'Test Connection'}
                   </Button>
                   <Button onClick={handleRegisterKiosk} variant="outline" className="flex-1 h-9 text-sm">
                     Save
