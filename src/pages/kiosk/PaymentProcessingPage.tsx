@@ -8,10 +8,28 @@ import {
   startTransaction, 
   getConnectionStatus, 
   getErrorMessage,
-  TransactionResponse 
+  onIntermediateStatusChange,
+  getIntermediateStatusMessage,
+  TransactionResponse,
+  POSIntermediateStatus
 } from "@/services/hardPosService";
+import { CreditCard, Smartphone, Keyboard, Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
+
+// Icons for different intermediate statuses
+const StatusIcons: Record<POSIntermediateStatus, React.ReactNode> = {
+  'INITIALIZING': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
+  'INSERT_CARD': <CreditCard className="w-16 h-16 text-blue-600 animate-pulse" />,
+  'TAP_CARD': <Smartphone className="w-16 h-16 text-blue-600 animate-bounce" />,
+  'SWIPE_CARD': <CreditCard className="w-16 h-16 text-blue-600 animate-pulse" />,
+  'ENTER_PIN': <Keyboard className="w-16 h-16 text-amber-600 animate-pulse" />,
+  'PROCESSING': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
+  'COMMUNICATING_WITH_BANK': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
+  'REMOVE_CARD': <CreditCard className="w-16 h-16 text-green-600" />,
+  'PRINTING_RECEIPT': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
+  'TRANSACTION_COMPLETE': <CheckCircle className="w-16 h-16 text-green-600" />,
+};
 
 const PaymentProcessingPage = () => {
   const navigate = useNavigate();
@@ -24,6 +42,33 @@ const PaymentProcessingPage = () => {
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
+  const [intermediateStatus, setIntermediateStatus] = useState<POSIntermediateStatus | null>(null);
+  const [intermediateMessage, setIntermediateMessage] = useState('');
+
+  useEffect(() => {
+    // Subscribe to intermediate status updates from POS
+    const unsubscribe = onIntermediateStatusChange((status, message) => {
+      setIntermediateStatus(status);
+      setIntermediateMessage(message);
+      
+      // Update progress based on status
+      const progressMap: Record<POSIntermediateStatus, number> = {
+        'INITIALIZING': 10,
+        'INSERT_CARD': 20,
+        'TAP_CARD': 20,
+        'SWIPE_CARD': 20,
+        'ENTER_PIN': 40,
+        'PROCESSING': 60,
+        'COMMUNICATING_WITH_BANK': 75,
+        'REMOVE_CARD': 85,
+        'PRINTING_RECEIPT': 95,
+        'TRANSACTION_COMPLETE': 100,
+      };
+      setProgress(progressMap[status] || progress);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const processPayment = async () => {
@@ -43,26 +88,22 @@ const PaymentProcessingPage = () => {
         }
 
         setStage('processing');
+        setIntermediateStatus('INITIALIZING');
+        setIntermediateMessage(getIntermediateStatusMessage('INITIALIZING'));
 
-        // Start progress animation
-        const progressInterval = setInterval(() => {
-          setProgress(prev => Math.min(prev + 2, 90));
-        }, 100);
-
-        // Send transaction to POS
+        // Send transaction to POS - amount formatted as integer without decimals
         const posResponse: TransactionResponse = await startTransaction({
           transactionId,
-          amount,
+          amount, // Already in baisas, will be formatted by the service
+          merchantReference: transactionId,
         });
-
-        clearInterval(progressInterval);
 
         if (posResponse.success) {
           setProgress(100);
           setStage('success');
-          setTransactionRef(posResponse.referenceNumber || '');
+          setTransactionRef(posResponse.posRRN || transactionId);
 
-          // Call edge function to record successful payment
+          // Call edge function to record successful payment with POS data
           const { data, error } = await supabase.functions.invoke('process-payment', {
             body: {
               transactionId,
@@ -71,8 +112,11 @@ const PaymentProcessingPage = () => {
               category,
               mobileNumber: mobile,
               posResponse: {
-                referenceNumber: posResponse.referenceNumber,
-                authCode: posResponse.authCode,
+                rrn: posResponse.posRRN,
+                authCode: posResponse.posAuthCode,
+                tid: posResponse.posTID,
+                mid: posResponse.posMID,
+                responseCode: posResponse.posResponseCode,
                 cardLastFour: posResponse.cardLastFour,
                 cardType: posResponse.cardType,
               },
@@ -92,7 +136,7 @@ const PaymentProcessingPage = () => {
 
           // Navigate to thank you page
           setTimeout(() => {
-            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data?.transaction?.reference_number || transactionId}&catRef=${categoryData?.category_reference || ''}`);
+            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data?.transaction?.reference_number || transactionId}&catRef=${categoryData?.category_reference || ''}&posRef=${posResponse.posRRN || ''}`);
           }, 2000);
         } else {
           setStage('declined');
@@ -120,6 +164,8 @@ const PaymentProcessingPage = () => {
     setStage('waiting');
     setProgress(0);
     setErrorMessage('');
+    setIntermediateStatus(null);
+    setIntermediateMessage('');
     // Trigger re-process
     window.location.reload();
   };
@@ -140,26 +186,65 @@ const PaymentProcessingPage = () => {
             </p>
           </Card>
 
-          {/* Processing Animation */}
+          {/* Processing Animation with Intermediate Status */}
           {(stage === 'waiting' || stage === 'processing') && (
             <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
               <div className="space-y-4">
-                {/* Animated Circle */}
-                <div className="relative w-24 h-24 mx-auto">
-                  <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
-                  <div 
-                    className="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"
-                  ></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl">💳</span>
-                  </div>
+                {/* Status Icon */}
+                <div className="flex justify-center">
+                  {intermediateStatus && StatusIcons[intermediateStatus] ? (
+                    StatusIcons[intermediateStatus]
+                  ) : (
+                    <div className="relative w-24 h-24 mx-auto">
+                      <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+                      <div 
+                        className="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"
+                      ></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl">💳</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress Text */}
                 <div className="space-y-3">
                   <h2 className="text-xl font-bold text-gray-900">
-                    {stage === 'waiting' ? 'في انتظار الاتصال بالجهاز...' : 'معالجة العملية...'}
+                    {intermediateMessage || (stage === 'waiting' ? 'في انتظار الاتصال بالجهاز...' : 'معالجة العملية...')}
                   </h2>
+                  
+                  {/* Visual indicator for card actions */}
+                  {intermediateStatus === 'TAP_CARD' && (
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <p className="text-lg text-blue-700 font-semibold animate-pulse">
+                        📱 قرّب البطاقة من جهاز الدفع
+                      </p>
+                    </div>
+                  )}
+                  
+                  {intermediateStatus === 'INSERT_CARD' && (
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <p className="text-lg text-blue-700 font-semibold animate-pulse">
+                        💳 أدخل البطاقة في جهاز الدفع
+                      </p>
+                    </div>
+                  )}
+                  
+                  {intermediateStatus === 'ENTER_PIN' && (
+                    <div className="p-4 bg-amber-50 rounded-lg">
+                      <p className="text-lg text-amber-700 font-semibold animate-pulse">
+                        🔐 أدخل الرقم السري على جهاز الدفع
+                      </p>
+                    </div>
+                  )}
+                  
+                  {intermediateStatus === 'REMOVE_CARD' && (
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <p className="text-lg text-green-700 font-semibold">
+                        ✅ أزل البطاقة من جهاز الدفع
+                      </p>
+                    </div>
+                  )}
                   
                   <div className="space-y-2">
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -182,14 +267,14 @@ const PaymentProcessingPage = () => {
             <Card className="p-6 bg-emerald-50 shadow-lg border-2 border-emerald-300 text-center">
               <div className="space-y-4">
                 <div className="w-20 h-20 mx-auto bg-emerald-500 rounded-full flex items-center justify-center">
-                  <span className="text-4xl text-white">✓</span>
+                  <CheckCircle className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-emerald-700">
                   تمت العملية بنجاح
                 </h2>
                 {transactionRef && (
                   <p className="text-gray-600">
-                    رقم المرجع: {transactionRef}
+                    رقم مرجع البنك: {transactionRef}
                   </p>
                 )}
               </div>
@@ -201,7 +286,7 @@ const PaymentProcessingPage = () => {
             <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
               <div className="space-y-4">
                 <div className="w-20 h-20 mx-auto bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-4xl text-white">✗</span>
+                  <XCircle className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-red-700">
                   تم رفض العملية
@@ -226,7 +311,7 @@ const PaymentProcessingPage = () => {
             <Card className="p-6 bg-amber-50 shadow-lg border-2 border-amber-300 text-center">
               <div className="space-y-4">
                 <div className="w-20 h-20 mx-auto bg-amber-500 rounded-full flex items-center justify-center">
-                  <span className="text-4xl text-white">⚠</span>
+                  <AlertTriangle className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-amber-700">
                   خطأ في الاتصال

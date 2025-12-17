@@ -246,7 +246,12 @@ export type Database = {
           mobile_number: string | null
           payment_method: string | null
           payment_reference: string | null
+          pos_auth_code: string | null
+          pos_mid: string | null
           pos_response: Json | null
+          pos_response_code: string | null
+          pos_rrn: string | null
+          pos_tid: string | null
           receipt_printed: boolean | null
           receipt_sent: boolean | null
           reference_number: string | null
@@ -266,7 +271,12 @@ export type Database = {
           mobile_number?: string | null
           payment_method?: string | null
           payment_reference?: string | null
+          pos_auth_code?: string | null
+          pos_mid?: string | null
           pos_response?: Json | null
+          pos_response_code?: string | null
+          pos_rrn?: string | null
+          pos_tid?: string | null
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
           reference_number?: string | null
@@ -286,7 +296,12 @@ export type Database = {
           mobile_number?: string | null
           payment_method?: string | null
           payment_reference?: string | null
+          pos_auth_code?: string | null
+          pos_mid?: string | null
           pos_response?: Json | null
+          pos_response_code?: string | null
+          pos_rrn?: string | null
+          pos_tid?: string | null
           receipt_printed?: boolean | null
           receipt_sent?: boolean | null
           reference_number?: string | null

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Mail, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
@@ -22,8 +22,9 @@ const EnhancedStatistics = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [categories, setCategories] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchType, setSearchType] = useState<"reference" | "mobile">("reference");
+  const [searchType, setSearchType] = useState<"reference" | "mobile" | "pos_rrn">("reference");
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
+  const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -35,6 +36,9 @@ const EnhancedStatistics = () => {
       const filtered = transactions.filter((t) => {
         if (searchType === "mobile") {
           return t.mobile_number?.includes(searchTerm);
+        }
+        if (searchType === "pos_rrn") {
+          return t.pos_rrn?.toLowerCase().includes(searchTerm.toLowerCase());
         }
         return t.reference_number?.toLowerCase().includes(searchTerm.toLowerCase());
       });
@@ -165,17 +169,28 @@ const EnhancedStatistics = () => {
   const stats = calculateStats();
 
   const handleDownloadXLSX = () => {
-    // Create CSV content
-    const headers = ['Date', 'Time', 'Reference', 'Category', 'Cat. Ref', 'Amount (OMR)', 'Kiosk', 'Kiosk Ref'];
+    // Create CSV content with dual reference columns
+    const headers = [
+      'Date', 'Time', 'System Reference', 'POS/Bank RRN', 'Auth Code', 
+      'TID', 'MID', 'Category', 'Cat. Ref', 'Amount (OMR)', 
+      'Payment Method', 'Card Last 4', 'Kiosk', 'Kiosk Ref', 'Mobile'
+    ];
     const rows = transactions.map(t => [
       new Date(t.created_at).toLocaleDateString('en-GB'),
       new Date(t.created_at).toLocaleTimeString('en-GB'),
       t.reference_number || 'N/A',
+      t.pos_rrn || 'N/A',
+      t.pos_auth_code || 'N/A',
+      t.pos_tid || 'N/A',
+      t.pos_mid || 'N/A',
       t.category_title || t.category,
       t.category_reference || 'N/A',
       ((t.amount_baisas || 0) / 1000).toFixed(3),
+      t.payment_method || 'N/A',
+      t.card_last_four || 'N/A',
       t.kiosks?.name || 'N/A',
-      t.kiosks?.reference_number || 'N/A'
+      t.kiosks?.reference_number || 'N/A',
+      t.mobile_number || 'N/A'
     ]);
 
     const csvContent = [headers, ...rows]
@@ -195,6 +210,10 @@ const EnhancedStatistics = () => {
   const handlePrint = () => {
     window.print();
     toast({ title: "Opening print dialog" });
+  };
+
+  const toggleTransactionDetails = (id: string) => {
+    setExpandedTransaction(expandedTransaction === id ? null : id);
   };
 
   return (
@@ -271,24 +290,34 @@ const EnhancedStatistics = () => {
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search with Dual Reference Support */}
         <Card className="p-4 mb-8">
           <div className="flex items-center gap-4">
             <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="reference">Reference Number</SelectItem>
+                <SelectItem value="reference">System Reference</SelectItem>
+                <SelectItem value="pos_rrn">POS/Bank RRN</SelectItem>
                 <SelectItem value="mobile">Mobile Number</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              placeholder={searchType === "mobile" ? "Search by mobile number..." : "Search by reference number..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder={
+                  searchType === "mobile" 
+                    ? "Search by mobile number..." 
+                    : searchType === "pos_rrn"
+                    ? "Search by POS/Bank RRN (for bank reconciliation)..."
+                    : "Search by system reference number..."
+                }
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
           {searchTerm && (
             <div className="mt-4">
@@ -296,14 +325,24 @@ const EnhancedStatistics = () => {
                 Found {filteredTransactions.length} transaction(s)
               </p>
               {filteredTransactions.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {filteredTransactions.map(t => (
                     <div key={t.id} className="p-3 bg-muted/50 rounded-lg text-sm">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold">{t.reference_number}</p>
+                      <div 
+                        className="flex justify-between items-start cursor-pointer"
+                        onClick={() => toggleTransactionDetails(t.id)}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{t.reference_number}</p>
+                            {expandedTransaction === t.id ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </div>
                           <p className="text-muted-foreground">
-                            {t.category} • {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR
+                            {t.category_title || t.category} • {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR
                           </p>
                           {t.mobile_number && (
                             <p className="text-muted-foreground">Mobile: {t.mobile_number}</p>
@@ -318,6 +357,49 @@ const EnhancedStatistics = () => {
                           </p>
                         </div>
                       </div>
+                      
+                      {/* Expanded POS Details */}
+                      {expandedTransaction === t.id && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <h4 className="font-semibold text-xs uppercase text-muted-foreground mb-2">
+                            POS / Bank Reference Details
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Bank RRN</p>
+                              <p className="font-medium">{t.pos_rrn || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Auth Code</p>
+                              <p className="font-medium">{t.pos_auth_code || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Terminal ID</p>
+                              <p className="font-medium">{t.pos_tid || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Merchant ID</p>
+                              <p className="font-medium">{t.pos_mid || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Payment Method</p>
+                              <p className="font-medium">{t.payment_method || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Card Last 4</p>
+                              <p className="font-medium">{t.card_last_four ? `****${t.card_last_four}` : 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Response Code</p>
+                              <p className="font-medium">{t.pos_response_code || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Kiosk</p>
+                              <p className="font-medium">{t.kiosks?.name || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
