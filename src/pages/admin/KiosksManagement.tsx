@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Wifi, WifiOff, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import SoftPOSConfigSection from "@/components/admin/SoftPOSConfigSection";
+import { testConnection, POSConfig } from "@/services/hardPosService";
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -631,9 +632,13 @@ const KiosksManagement = () => {
                 </Select>
               </div>
 
-              {/* POS Configuration Section */}
+              {/* Hardware POS Configuration Section */}
               <div className="space-y-4 border-t pt-4">
-                <h3 className="font-semibold text-sm">POS Configuration</h3>
+                <h3 className="font-semibold text-sm">Hardware POS Configuration (OM-A880)</h3>
+                <p className="text-xs text-muted-foreground">
+                  Configure per-kiosk POS connection settings. Each kiosk can have its own USB or Ethernet configuration.
+                </p>
+                
                 <div>
                   <Label>Connection Type</Label>
                   <Select
@@ -650,11 +655,19 @@ const KiosksManagement = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="usb">USB</SelectItem>
-                      <SelectItem value="ethernet">Ethernet</SelectItem>
+                      <SelectItem value="usb">USB (Auto-detect)</SelectItem>
+                      <SelectItem value="ethernet">Ethernet (TCP/IP)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {formData.configuration.pos.connectionType === 'usb' && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                      USB mode will automatically detect the connected OM-A880 POS device. No manual configuration required.
+                    </p>
+                  </div>
+                )}
 
                 {formData.configuration.pos.connectionType === 'ethernet' && (
                   <>
@@ -690,6 +703,9 @@ const KiosksManagement = () => {
                     </div>
                   </>
                 )}
+
+                {/* Test POS Connection Button */}
+                <TestPOSConnectionButton config={formData.configuration.pos} />
               </div>
 
               <div className="flex gap-2">
@@ -824,6 +840,76 @@ const KiosksManagement = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Test POS Connection Component
+const TestPOSConnectionButton = ({ config }: { config: { connectionType: string; ipAddress?: string; port?: string } }) => {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ connected: boolean; message: string } | null>(null);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setResult(null);
+    
+    try {
+      const posConfig: POSConfig = {
+        connectionType: config.connectionType as 'usb' | 'ethernet',
+        ipAddress: config.ipAddress,
+        port: config.port,
+      };
+      
+      const testResult = await testConnection(posConfig);
+      setResult(testResult);
+      
+      if (testResult.connected) {
+        toast.success(testResult.message);
+      } else {
+        toast.error(testResult.message);
+      }
+    } catch (error: any) {
+      setResult({ connected: false, message: error.message || 'Connection test failed' });
+      toast.error('Connection test failed');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleTestConnection}
+        disabled={testing || (config.connectionType === 'ethernet' && (!config.ipAddress || !config.port))}
+        className="w-full"
+      >
+        {testing ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Testing Connection...
+          </>
+        ) : (
+          <>
+            <Wifi className="w-4 h-4 mr-2" />
+            Test POS Connection
+          </>
+        )}
+      </Button>
+      
+      {result && (
+        <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${
+          result.connected ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+        }`}>
+          {result.connected ? (
+            <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          ) : (
+            <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          )}
+          <span>{result.message}</span>
+        </div>
+      )}
     </div>
   );
 };

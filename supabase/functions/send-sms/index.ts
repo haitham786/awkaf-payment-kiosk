@@ -8,7 +8,9 @@ const corsHeaders = {
 interface SMSRequest {
   mobile_number: string;
   category: string;
-  reference_number: string;
+  reference_number: string; // System reference
+  pos_rrn?: string; // POS/Bank reference (RRN)
+  pos_auth_code?: string; // Authorization code
   amount_baisas: number;
 }
 
@@ -19,14 +21,44 @@ serve(async (req) => {
   }
 
   try {
-    const { mobile_number, category, reference_number, amount_baisas }: SMSRequest = await req.json();
+    const { 
+      mobile_number, 
+      category, 
+      reference_number, 
+      pos_rrn,
+      pos_auth_code,
+      amount_baisas 
+    }: SMSRequest = await req.json();
 
-    console.log('SMS Request:', { mobile_number, category, reference_number, amount_baisas });
+    console.log('SMS Request:', { mobile_number, category, reference_number, pos_rrn, amount_baisas });
+
+    // Validate required fields
+    if (!mobile_number || !reference_number || !amount_baisas) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Format amount
     const rials = Math.floor(amount_baisas / 1000);
     const baisas = amount_baisas % 1000;
     const formattedAmount = `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
+
+    // Format date and time
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ar-OM', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+    const timeStr = now.toLocaleTimeString('ar-OM', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
 
     // Translate category to Arabic
     const categoryNames: Record<string, string> = {
@@ -42,46 +74,60 @@ serve(async (req) => {
 
     const categoryArabic = categoryNames[category] || category;
 
-    // Create SMS message in Arabic
-    const smsMessage = `شكراً لتبرعكم!
+    // Create SMS message in Arabic with BOTH references
+    // System reference and POS/Bank reference must both be included
+    let smsMessage = `شكراً لتبرعكم!
 الفئة: ${categoryArabic}
 المبلغ: ${formattedAmount}
-رقم المعاملة: ${reference_number}
+التاريخ: ${dateStr} ${timeStr}
+رقم المعاملة: ${reference_number}`;
+
+    // Add POS/Bank reference if available
+    if (pos_rrn) {
+      smsMessage += `
+رقم مرجع البنك: ${pos_rrn}`;
+    }
+
+    smsMessage += `
 جزاكم الله خيراً`;
 
-    // TODO: Integrate with SMS provider (e.g., Twilio, AWS SNS, etc.)
-    // For now, we'll just log the message
     console.log('SMS Message to', mobile_number, ':', smsMessage);
 
-    // Simulated SMS sending
-    // In production, you would call your SMS provider's API here
-    // Example with Twilio:
-    // const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    // const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    // const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    // TODO: Integrate with SMS provider (e.g., local Omani SMS gateway)
+    // The SMS should only be sent AFTER:
+    // 1. POS returns successful final response
+    // 2. POS reference values are captured and stored
+    // 3. Transaction is saved in backend with both references
+    // 4. Donor requests SMS by entering mobile number
     
-    // const twilioResponse = await fetch(
-    //   `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
-    //   {
-    //     method: 'POST',
-    //     headers: {
-    //       'Authorization': `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
-    //       'Content-Type': 'application/x-www-form-urlencoded',
-    //     },
-    //     body: new URLSearchParams({
-    //       From: twilioPhoneNumber,
-    //       To: mobile_number,
-    //       Body: smsMessage,
-    //     }),
-    //   }
-    // );
+    // Example integration with SMS gateway:
+    // const smsGatewayUrl = Deno.env.get('SMS_GATEWAY_URL');
+    // const smsApiKey = Deno.env.get('SMS_API_KEY');
+    // const smsSenderId = Deno.env.get('SMS_SENDER_ID');
+    //
+    // const smsResponse = await fetch(smsGatewayUrl, {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${smsApiKey}`,
+    //   },
+    //   body: JSON.stringify({
+    //     to: mobile_number,
+    //     from: smsSenderId,
+    //     message: smsMessage,
+    //   }),
+    // });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'SMS sent successfully',
         // For development/testing purposes
-        preview: smsMessage
+        preview: smsMessage,
+        references: {
+          system_reference: reference_number,
+          bank_reference: pos_rrn || null,
+        }
       }),
       {
         status: 200,
