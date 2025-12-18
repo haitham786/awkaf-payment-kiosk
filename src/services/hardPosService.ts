@@ -10,8 +10,8 @@
  * The KIOSK app must NOT process, store, or interpret card data.
  * 
  * Supported connection modes:
- * - USB (Auto-detect): Uses Android USB Host / Serial APIs
- * - Ethernet (TCP/IP): Uses TCP socket with timeout and retry
+ * - Ethernet (TCP/IP): PRIMARY - Uses TCP socket with ECR protocol (RECOMMENDED)
+ * - USB (Auto-detect): SECONDARY - Uses Android USB Host / Serial APIs
  * 
  * Compatible devices:
  * - Samsung Galaxy A13/A33 (trial phase)
@@ -45,6 +45,25 @@ import {
   formatAmountForECR,
   ECRResponse,
 } from './ecrProtocol';
+
+// Import Ethernet ECR Service (PRIMARY connection method)
+import {
+  initializeEthernet,
+  disconnectEthernet,
+  sendCommand as sendEthernetCommand,
+  buildPurchaseRequest,
+  buildStatusRequest,
+  buildTerminalInfoRequest,
+  buildReconciliationRequest,
+  buildLastTransactionRequest,
+  buildTotalsRequest,
+  getConnectionState as getEthernetState,
+  onConnectionStateChange as onEthernetStateChange,
+  onData as onEthernetData,
+  testEthernetConnection,
+  isEthernetAvailable,
+  TCPConnectionState,
+} from './ethernetEcrService';
 
 // Connection types
 export type ConnectionType = 'usb' | 'ethernet';
@@ -261,6 +280,7 @@ export const getIntermediateStatusMessage = (status: POSIntermediateStatus): str
 
 /**
  * Initialize the POS connection with configuration
+ * PRIORITY: Ethernet (TCP/IP) > USB
  */
 export const initializePOS = async (config: POSConfig): Promise<boolean> => {
   try {
@@ -268,11 +288,21 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
     setConnectionStatus('connecting');
     
     console.log('Initializing POS with config:', config);
+    console.log('Connection type:', config.connectionType);
     
-    if (config.connectionType === 'usb') {
-      return await initializeUSBConnection();
-    } else if (config.connectionType === 'ethernet') {
+    // ETHERNET is the PRIMARY connection method
+    if (config.connectionType === 'ethernet') {
       return await initializeEthernetConnection(config.ipAddress!, config.port!);
+    } else if (config.connectionType === 'usb') {
+      // USB is secondary/fallback
+      console.log('Using USB connection (secondary method)');
+      return await initializeUSBConnection();
+    }
+    
+    // Default to Ethernet if available
+    if (config.ipAddress && config.port) {
+      console.log('Defaulting to Ethernet connection');
+      return await initializeEthernetConnection(config.ipAddress, config.port);
     }
     
     return false;
@@ -284,11 +314,11 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
 };
 
 /**
- * Initialize USB connection
+ * Initialize USB connection (SECONDARY method)
  * Uses Android USB Host / Serial APIs
  */
 const initializeUSBConnection = async (): Promise<boolean> => {
-  console.log('Initializing USB connection...');
+  console.log('Initializing USB connection (secondary method)...');
   
   try {
     const deviceDetected = await detectUSBDevice();
@@ -340,62 +370,123 @@ const detectUSBDevice = async (): Promise<boolean> => {
 };
 
 /**
- * Initialize Ethernet/TCP connection
+ * Initialize Ethernet/TCP connection (PRIMARY method)
+ * Uses the ethernetEcrService for proper ECR protocol communication
  */
 const initializeEthernetConnection = async (ipAddress: string, port: string): Promise<boolean> => {
-  console.log(`Initializing Ethernet connection to ${ipAddress}:${port}...`);
+  console.log(`Initializing Ethernet ECR connection to ${ipAddress}:${port}...`);
   
   if (!ipAddress || !port) {
     console.error('IP address and port are required for Ethernet connection');
     setConnectionStatus('error');
+    lastErrorMessage = 'IP address and port are required';
     return false;
   }
   
   try {
-    const connected = await validateEthernetConnection(ipAddress, port);
+    // Use the dedicated Ethernet ECR service
+    const connected = await initializeEthernet({
+      ipAddress,
+      port: parseInt(port),
+      timeout: currentConfig?.timeout || 120000,
+      retryAttempts: currentConfig?.retryAttempts || 3,
+      keepAliveInterval: 30000,
+    });
     
     if (connected) {
       setConnectionStatus('connected');
+      
+      // Subscribe to Ethernet state changes
+      onEthernetStateChange((state) => {
+        console.log('Ethernet state changed:', state);
+        if (state === 'disconnected' || state === 'error') {
+          setConnectionStatus(state === 'error' ? 'error' : 'disconnected');
+        }
+      });
+      
+      // Subscribe to incoming data for intermediate status
+      onEthernetData((data) => {
+        handleIncomingPOSData(data);
+      });
+      
+      // Verify connection with terminal info request
+      try {
+        const infoXml = buildTerminalInfoRequest();
+        const terminalInfo = await sendEthernetCommand(infoXml, 10000);
+        
+        if (terminalInfo) {
+          console.log('Terminal connected:', {
+            tid: terminalInfo.tid,
+            mid: terminalInfo.mid,
+            errorCode: terminalInfo.errorCode,
+          });
+          setConnectionStatus('ready');
+        }
+      } catch (infoError) {
+        console.warn('Could not get terminal info, but connection established');
+      }
+      
       startConnectionMonitoring();
       return true;
     } else {
       setConnectionStatus('disconnected');
+      lastErrorMessage = `Unable to connect to ${ipAddress}:${port}`;
       return false;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Ethernet connection error:', error);
     setConnectionStatus('error');
+    lastErrorMessage = error.message || 'Ethernet connection failed';
     return false;
   }
 };
 
 /**
- * Validate Ethernet connection with timeout and retry logic
+ * Handle incoming data from POS (for intermediate status messages)
  */
-const validateEthernetConnection = async (ipAddress: string, port: string): Promise<boolean> => {
-  const timeout = currentConfig?.timeout || 5000;
-  const retryAttempts = currentConfig?.retryAttempts || 3;
+const handleIncomingPOSData = (data: string) => {
+  console.log('Incoming POS data:', data.substring(0, 200));
   
-  for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-    console.log(`Connection attempt ${attempt}/${retryAttempts}...`);
-    
-    try {
-      const connected = await attemptTCPConnection(ipAddress, port, timeout);
+  // Check for intermediate status messages
+  if (data.includes('<IntermediateStatus>') || data.includes('<StatusCode>')) {
+    const statusMatch = data.match(/<StatusCode>(\d+)<\/StatusCode>/);
+    if (statusMatch) {
+      const statusCode = statusMatch[1];
+      const statusInfo = INTERMEDIATE_MESSAGES[statusCode];
       
-      if (connected) {
-        console.log('Connection established successfully');
-        return true;
+      if (statusInfo) {
+        const mappedStatus = mapIntermediateCode(statusCode);
+        if (mappedStatus) {
+          setIntermediateStatus(mappedStatus);
+        }
       }
-    } catch (error) {
-      console.error(`Connection attempt ${attempt} failed:`, error);
-    }
-    
-    if (attempt < retryAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
+};
+
+/**
+ * Map ECR intermediate status code to app status
+ */
+const mapIntermediateCode = (code: string): POSIntermediateStatus | null => {
+  const codeMap: Record<string, POSIntermediateStatus> = {
+    '001': 'INSERT_CARD',
+    '002': 'INSERT_CARD', // Card inserted
+    '003': 'FALLBACK',
+    '005': 'SWIPE_CARD',
+    '006': 'ENTER_PIN',
+    '007': 'PIN_ENTERED',
+    '008': 'COMMUNICATING_WITH_BANK',
+    '009': 'RESPONSE_RECEIVED',
+    '010': 'PRINTING_RECEIPT',
+    '011': 'REMOVE_CARD',
+    '012': 'CARD_REMOVED',
+    '013': 'TRANSACTION_COMPLETE',
+    '014': 'TRANSACTION_FAILED',
+    '015': 'REVERSAL_IN_PROGRESS',
+    '018': 'TRANSACTION_COMPLETE',
+  };
   
-  return false;
+  return codeMap[code] || null;
 };
 
 /**
@@ -745,59 +836,173 @@ export const getLastTransactionStatus = async (transactionId: string): Promise<T
 
 /**
  * Send ECR Command to POS and receive response
+ * PRIORITY: Ethernet (TCP/IP) > Native Bridge > USB
  */
 const sendECRCommand = async (message: POSMessage): Promise<TransactionResponse> => {
   const timeout = currentConfig?.timeout || 120000;
   
+  // ETHERNET is the PRIMARY method
+  if (currentConfig?.connectionType === 'ethernet' && getEthernetState() === 'connected') {
+    console.log('Sending ECR command via Ethernet:', message.command);
+    return await sendECRViaEthernet(message, timeout);
+  }
+  
+  // Fall back to native bridge if available
+  if (typeof (window as any).OMA880Bridge !== 'undefined') {
+    console.log('Sending ECR command via Native Bridge:', message.command);
+    return await sendECRViaNativeBridge(message, timeout);
+  }
+  
+  // Fall back to USB if configured
+  if (currentConfig?.connectionType === 'usb') {
+    console.log('Sending ECR command via USB:', message.command);
+    return await sendECRViaUSB(message, timeout);
+  }
+  
+  // Simulation mode for development/testing
+  console.log('No POS connection - entering simulation mode');
+  return new Promise((resolve) => {
+    simulatePOSTransaction(message, resolve);
+  });
+};
+
+/**
+ * Send ECR command via Ethernet (TCP/IP) - PRIMARY METHOD
+ */
+const sendECRViaEthernet = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
+  let xmlRequest: string;
+  
+  switch (message.command) {
+    case 'PURCHASE':
+      xmlRequest = buildPurchaseRequest(
+        parseInt(message.payload?.amount || '0'),
+        message.payload?.invoiceNumber,
+        message.payload?.merchantReference
+      );
+      break;
+    case 'GET_STATUS':
+      xmlRequest = buildStatusRequest();
+      break;
+    case 'GET_TERMINAL_INFO':
+      xmlRequest = buildTerminalInfoRequest();
+      break;
+    case 'RECONCILIATION':
+      xmlRequest = buildReconciliationRequest();
+      break;
+    case 'LAST_TRANSACTION_STATUS':
+      xmlRequest = buildLastTransactionRequest();
+      break;
+    case 'GET_TOTALS':
+      xmlRequest = buildTotalsRequest();
+      break;
+    default:
+      // Build generic request
+      xmlRequest = `<?xml version="1.0" encoding="UTF-8"?><ECRMessage><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></ECRMessage>`;
+  }
+  
+  try {
+    const ecrResponse = await sendEthernetCommand(xmlRequest, timeout);
+    
+    if (!ecrResponse) {
+      throw new Error('No response from POS');
+    }
+    
+    // Convert ECRResponse to TransactionResponse
+    return convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
+  } catch (error: any) {
+    console.error('Ethernet ECR command failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Convert ECRResponse to TransactionResponse
+ */
+const convertECRToTransactionResponse = (ecr: ECRResponse, transactionId: string): TransactionResponse => {
+  // Success if responseCode is '00' or hostRspCode is '00' and errorCode is 'E000'
+  const success = (
+    ecr.responseCode === '00' || 
+    ecr.hostRspCode === '00' ||
+    (ecr.errorCode === 'E000' && ecr.txnStatus === 'OK')
+  );
+  
+  return {
+    success,
+    transactionId,
+    posRRN: ecr.rrn,
+    posAuthCode: ecr.authCode,
+    posTID: ecr.tid,
+    posMID: ecr.mid,
+    posResponseCode: ecr.responseCode || ecr.hostRspCode,
+    cardLastFour: ecr.maskCardNumber?.slice(-4),
+    cardType: ecr.cardSchemeName,
+    receiptData: ecr.receiptDataCustomer || ecr.receiptDataMerchant,
+    errorCode: success ? undefined : ecr.errorCode,
+    errorMessage: success ? undefined : (ecr.responseDesc || getErrorMessage(ecr.errorCode)),
+    rawResponse: ecr as any,
+  };
+};
+
+/**
+ * Send ECR command via Native Bridge (Android)
+ */
+const sendECRViaNativeBridge = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       reject(new Error('POS_TIMEOUT: Transaction timed out waiting for POS response'));
     }, timeout);
     
-    // Check for OM-A880 native bridge
-    if (typeof (window as any).OMA880Bridge !== 'undefined') {
-      const bridge = (window as any).OMA880Bridge;
-      
-      // Set up intermediate status listener
-      bridge.onStatusUpdate = (status: string) => {
-        const mappedStatus = mapPOSStatus(status);
-        if (mappedStatus) {
-          setIntermediateStatus(mappedStatus);
-        }
-      };
-      
-      // Send command based on type
-      let commandPromise: Promise<any>;
-      
-      switch (message.command) {
-        case 'PURCHASE':
-          commandPromise = bridge.purchase(
-            message.payload?.amount,
-            message.payload?.merchantReference
-          );
-          break;
-        case 'CANCEL':
-          commandPromise = bridge.cancel();
-          break;
-        default:
-          commandPromise = bridge.sendCommand(message);
+    const bridge = (window as any).OMA880Bridge;
+    
+    // Set up intermediate status listener
+    bridge.onStatusUpdate = (status: string) => {
+      const mappedStatus = mapPOSStatus(status);
+      if (mappedStatus) {
+        setIntermediateStatus(mappedStatus);
       }
-      
-      commandPromise
-        .then((xmlResponse: any) => {
-          clearTimeout(timeoutId);
-          const response = parseXMLResponse(xmlResponse, message.payload?.transactionId || '');
-          resolve(response);
-        })
-        .catch((error: any) => {
-          clearTimeout(timeoutId);
-          reject(error);
-        });
-      
-      return;
+    };
+    
+    // Send command based on type
+    let commandPromise: Promise<any>;
+    
+    switch (message.command) {
+      case 'PURCHASE':
+        commandPromise = bridge.purchase(
+          message.payload?.amount,
+          message.payload?.merchantReference
+        );
+        break;
+      case 'CANCEL':
+        commandPromise = bridge.cancel();
+        break;
+      default:
+        commandPromise = bridge.sendCommand(message);
     }
     
-    // Simulation mode for development/testing
+    commandPromise
+      .then((xmlResponse: any) => {
+        clearTimeout(timeoutId);
+        const response = parseXMLResponse(xmlResponse, message.payload?.transactionId || '');
+        resolve(response);
+      })
+      .catch((error: any) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+};
+
+/**
+ * Send ECR command via USB (fallback)
+ */
+const sendECRViaUSB = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('POS_TIMEOUT: Transaction timed out waiting for USB POS response'));
+    }, timeout);
+    
+    // USB communication would be implemented here using usbHostService
+    // For now, fall back to simulation
     clearTimeout(timeoutId);
     simulatePOSTransaction(message, resolve);
   });
@@ -918,6 +1123,11 @@ export const disconnectPOS = async (): Promise<void> => {
     connectionCheckInterval = null;
   }
   
+  // Disconnect Ethernet if connected
+  if (currentConfig?.connectionType === 'ethernet') {
+    await disconnectEthernet();
+  }
+  
   setConnectionStatus('disconnected');
   currentConfig = null;
   
@@ -925,11 +1135,58 @@ export const disconnectPOS = async (): Promise<void> => {
 };
 
 /**
- * Test POS connection
+ * Test POS connection (Ethernet-first approach)
  */
 export const testConnection = async (config: POSConfig): Promise<{ connected: boolean; message: string; status?: POSStatusResponse }> => {
   try {
-    // First try to connect
+    // ETHERNET is the PRIMARY connection method
+    if (config.connectionType === 'ethernet' || (config.ipAddress && config.port)) {
+      if (!config.ipAddress || !config.port) {
+        return {
+          connected: false,
+          message: 'IP address and port are required for Ethernet connection',
+        };
+      }
+      
+      console.log(`Testing Ethernet connection to ${config.ipAddress}:${config.port}`);
+      
+      const result = await testEthernetConnection(
+        config.ipAddress, 
+        parseInt(config.port), 
+        5000
+      );
+      
+      if (!result.connected) {
+        return {
+          connected: false,
+          message: result.error || `Unable to connect to ${config.ipAddress}:${config.port}. Please verify the IP and port settings.`,
+        };
+      }
+      
+      // Return terminal info if available
+      if (result.terminalInfo) {
+        const info = result.terminalInfo;
+        return {
+          connected: true,
+          message: `POS connected successfully via Ethernet. TID: ${info.tid || 'N/A'}, MID: ${info.mid || 'N/A'}`,
+          status: {
+            ready: info.errorCode === 'E000',
+            printerStatus: 'ok',
+            readerStatus: 'ok',
+            connectivity: 'online',
+            terminalId: info.tid,
+            merchantId: info.mid,
+          },
+        };
+      }
+      
+      return {
+        connected: true,
+        message: `Connected to POS at ${config.ipAddress}:${config.port}`,
+      };
+    }
+    
+    // USB connection (secondary)
     if (config.connectionType === 'usb') {
       const detected = await detectUSBDevice();
       if (!detected) {
@@ -938,41 +1195,16 @@ export const testConnection = async (config: POSConfig): Promise<{ connected: bo
           message: 'No USB POS device detected. Please connect the OM-A880 device.',
         };
       }
-    } else {
-      if (!config.ipAddress || !config.port) {
-        return {
-          connected: false,
-          message: 'IP address and port are required for Ethernet connection',
-        };
-      }
       
-      const connected = await attemptTCPConnection(config.ipAddress, config.port, 5000);
-      if (!connected) {
-        return {
-          connected: false,
-          message: `Unable to connect to ${config.ipAddress}:${config.port}. Please verify the IP and port settings.`,
-        };
-      }
-    }
-    
-    // If connected, get POS status
-    const tempConfig = currentConfig;
-    currentConfig = config;
-    const status = await getPOSStatus();
-    currentConfig = tempConfig;
-    
-    if (!status.ready) {
       return {
         connected: true,
-        message: 'POS connected but not ready. Please check printer and card reader.',
-        status,
+        message: 'USB POS device detected',
       };
     }
     
     return {
-      connected: true,
-      message: `POS connected successfully. TID: ${status.terminalId || 'N/A'}, MID: ${status.merchantId || 'N/A'}`,
-      status,
+      connected: false,
+      message: 'No connection method configured. Please set IP address and port for Ethernet connection.',
     };
   } catch (error: any) {
     return {
