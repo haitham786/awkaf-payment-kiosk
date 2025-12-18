@@ -37,8 +37,8 @@ import {
 import {
   ECR_COMMANDS,
   INTERMEDIATE_MESSAGES,
-  ERROR_CODES,
-  parseXMLResponse,
+  ERROR_CODES as ECR_ERROR_CODES,
+  parseXMLResponse as parseECRXMLResponse,
   getErrorInfo,
   getIntermediateMessageInfo,
   isSuccessResponse,
@@ -245,7 +245,11 @@ export const formatAmountForPOS = (amountInBaisas: number): string => {
  * Get error message for error code
  */
 export const getErrorMessage = (errorCode: string): string => {
-  return ERROR_CODES[errorCode] || ERROR_CODES['UNKNOWN_ERROR'];
+  const errorInfo = ECR_ERROR_CODES[errorCode] || getErrorInfo(errorCode);
+  if (typeof errorInfo === 'object' && errorInfo.arabicMessage) {
+    return errorInfo.arabicMessage;
+  }
+  return 'خطأ غير معروف';
 };
 
 /**
@@ -652,12 +656,20 @@ export const performReconciliation = async (): Promise<ReconciliationResponse> =
     
     if (typeof (window as any).OMA880Bridge !== 'undefined') {
       const result = await (window as any).OMA880Bridge.reconciliation();
+      const resultCode = result.transactionResult || '0';
+      const resultMap: Record<string, ReconciliationResponse['result']> = {
+        '0': 'failed',
+        '1': 'rejected',
+        '2': 'accepted',
+        '3': 'accepted_with_upload',
+      };
       return {
         success: result.success,
         totalTransactions: result.count || 0,
         totalAmount: result.amount || 0,
         batchNumber: result.batchNo || '',
         timestamp: new Date().toISOString(),
+        result: resultMap[resultCode] || 'failed',
       };
     }
     
@@ -668,6 +680,7 @@ export const performReconciliation = async (): Promise<ReconciliationResponse> =
       totalAmount: 0,
       batchNumber: '',
       timestamp: new Date().toISOString(),
+      result: 'failed',
     };
   } catch (error) {
     console.error('Reconciliation failed:', error);
