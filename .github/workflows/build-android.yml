@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,21 +34,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install USB Serial Plugin
-        run: npm install capacitor-plugin-usb-serial
-
       - name: Create .env file
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          # Backward-compat (if anything still reads the older name)
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
 
       - name: Build web assets
         run: npm run build
         env:
           NODE_ENV: production
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Add Android platform (if needed)
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
+      - name: Sync Capacitor
+        run: npx cap sync android
 
       - name: Create USB device filter XML
         run: |
@@ -92,56 +100,20 @@ jobs:
           # Add USB intent filter and meta-data to MainActivity
           sed -i 's|</activity>|    <intent-filter>\n                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n            </intent-filter>\n            <meta-data\n                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n                android:resource="@xml/device_filter" />\n        </activity>|' android/app/src/main/AndroidManifest.xml
 
-      - name: Sync Capacitor
-        run: npx cap sync android
-
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Generate keystore
-        run: |
-          keytool -genkey -v -keystore ${{ github.workspace }}/release.keystore \
-            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=Muscat, S=Muscat, C=OM"
-
-      - name: Create gradle.properties for signing
-        run: |
-          cat > android/gradle.properties << EOF
-          android.useAndroidX=true
-          android.enableJetifier=true
-          RELEASE_STORE_FILE=${{ github.workspace }}/release.keystore
-          RELEASE_STORE_PASSWORD=android
-          RELEASE_KEY_ALIAS=release
-          RELEASE_KEY_PASSWORD=android
-          EOF
-
-      - name: Configure signing in build.gradle
-        run: |
-          sed -i '/android {/a\
-              signingConfigs {\
-                  release {\
-                      storeFile file(project.properties["RELEASE_STORE_FILE"])\
-                      storePassword project.properties["RELEASE_STORE_PASSWORD"]\
-                      keyAlias project.properties["RELEASE_KEY_ALIAS"]\
-                      keyPassword project.properties["RELEASE_KEY_PASSWORD"]\
-                  }\
-              }' android/app/build.gradle
-          
-          sed -i '/buildTypes {/,/release {/s/release {/release {\
-                  signingConfig signingConfigs.release/' android/app/build.gradle
-
-      - name: Build Release APK
+      - name: Build Debug APK (USB enabled)
         working-directory: android
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --info
 
       - name: Rename APK
         run: |
           mkdir -p release-apks
-          cp android/app/build/outputs/apk/release/app-release.apk \
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
             release-apks/awkaf-kiosk-usb.apk
 
       - name: Upload APK
