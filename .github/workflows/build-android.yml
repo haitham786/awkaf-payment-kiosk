@@ -9,18 +9,32 @@ permissions:
   contents: write
 
 jobs:
+  build:
     runs-on: ubuntu-24.04
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout code (git clone - avoids action download timeouts)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          rm -rf ./* ./.??* || true
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth 1 origin "${GITHUB_REF_NAME}"
+          git checkout -q FETCH_HEAD
+          git rev-parse --short HEAD
 
-      - name: Show Node.js toolchain (preinstalled)
+      - name: Show toolchain (preinstalled)
         shell: bash
         run: |
           set -euxo pipefail
           node -v
           npm -v
+          which sdkmanager || true
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}" 
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
 
       - name: Install Java 17 (APT) - avoid action download timeouts
         shell: bash
@@ -35,8 +49,18 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Ensure Android SDK is available
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # ubuntu runners usually include Android SDK at /usr/local/lib/android/sdk
+          if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -d "/usr/local/lib/android/sdk" ]; then
+            echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+            echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          fi
+          source "$GITHUB_ENV" || true
+          which sdkmanager
+          sdkmanager --version
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -188,36 +212,23 @@ jobs:
           set -euxo pipefail
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
-      - name: Upload Gradle reports (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-gradle-reports
-          path: |
-            android/app/build/reports/**
-            android/app/build/outputs/logs/**
-            android/build/reports/**
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload Gradle console log (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-gradle-log
-          path: android-gradle.log
-          if-no-files-found: warn
-          retention-days: 7
-
       - name: List Android build outputs (always)
         if: always()
+        shell: bash
         run: |
+          set -euxo pipefail
           echo "Android build outputs:"
-          find android -maxdepth 5 -type f -name "*.apk" -o -name "*.aab" -o -name "*.log" -o -name "*.txt" 2>/dev/null || true
-          find android/app/build/outputs -maxdepth 8 -type f 2>/dev/null || true
+          find android -maxdepth 8 -type f \( -name "*.apk" -o -name "*.aab" -o -name "*.log" -o -name "*.txt" \) 2>/dev/null || true
+          find android/app/build/outputs -maxdepth 10 -type f 2>/dev/null || true
+
+          if [ -f android-gradle.log ]; then
+            echo "---- Last 200 lines of android-gradle.log ----"
+            tail -n 200 android-gradle.log || true
+          fi
 
       - name: Collect APK
         if: success()
+        shell: bash
         run: |
           set -euxo pipefail
           mkdir -p release-apks
@@ -235,37 +246,24 @@ jobs:
             exit 1
           fi
 
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: awkaf-kiosk-usb-apk
-          path: release-apks/awkaf-kiosk-usb.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Create Release (on main branch)
+      - name: Create GitHub Release with APK (main branch)
         if: success() && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
-          files: release-apks/awkaf-kiosk-usb.apk
-          body: |
-            ## Awkaf Payment Kiosk APK
-            
-            **USB POS Support Included**
-            
-            ### Installation:
-            1. Download `awkaf-kiosk-usb.apk`
-            2. Transfer to Samsung A13
-            3. Enable "Install from unknown sources" if prompted
-            4. Install the APK
-            5. Connect OM-A880 POS via USB OTG cable
-            6. Grant USB permission when prompted
-            
-            ### Supported POS:
-            - OM-A880 (Vendor: 05C6, Product: 903B)
-            - Other CDC ACM USB serial devices
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y gh
+          fi
+
+          TAG="v${GITHUB_RUN_NUMBER}"
+          gh --version
+
+          # Create (or replace) release
+          gh release delete "$TAG" -y || true
+          gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
+            --title "Release $TAG" \
+            --notes "## Awkaf Payment Kiosk APK\n\nUSB POS Support Included\n\n### Installation:\n1. Download awkaf-kiosk-usb.apk\n2. Transfer to Samsung A13\n3. Install the APK\n4. Connect OM-A880 POS via USB OTG\n5. Grant USB permission\n"
