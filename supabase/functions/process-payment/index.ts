@@ -11,6 +11,60 @@ const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'm
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OMAN_MOBILE_REGEX = /^\+968[0-9]{8}$/;
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_KIOSK = 20; // Max 20 requests per kiosk per minute
+const MAX_REQUESTS_PER_IP = 30; // Max 30 requests per IP per minute
+
+// In-memory rate limit store (resets on cold start, which is acceptable for edge functions)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Clean up expired rate limit entries
+function cleanupRateLimits() {
+  const now = Date.now();
+  for (const [key, value] of rateLimitStore.entries()) {
+    if (now > value.resetTime) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
+// Check rate limit for a given key
+function checkRateLimit(key: string, maxRequests: number): { allowed: boolean; remaining: number; resetIn: number } {
+  cleanupRateLimits();
+  
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  
+  if (!entry || now > entry.resetTime) {
+    // Create new window
+    rateLimitStore.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: maxRequests - 1, resetIn: RATE_LIMIT_WINDOW_MS };
+  }
+  
+  if (entry.count >= maxRequests) {
+    return { allowed: false, remaining: 0, resetIn: entry.resetTime - now };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: maxRequests - entry.count, resetIn: entry.resetTime - now };
+}
+
+// Get client IP from request headers
+function getClientIP(req: Request): string {
+  // Check common headers for real IP (behind proxies/load balancers)
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  const realIP = req.headers.get('x-real-ip');
+  if (realIP) {
+    return realIP;
+  }
+  // Fallback - connection info not available in Deno Deploy
+  return 'unknown';
+}
+
 // Validation helper
 function validatePaymentInput(data: any) {
   const errors: string[] = [];
@@ -54,6 +108,32 @@ serve(async (req) => {
   }
 
   try {
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(req);
+    
+    // Check IP-based rate limit first (before parsing body)
+    const ipRateLimit = checkRateLimit(`ip:${clientIP}`, MAX_REQUESTS_PER_IP);
+    if (!ipRateLimit.allowed) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Rate limit exceeded. Please try again later.',
+          retryAfter: Math.ceil(ipRateLimit.resetIn / 1000)
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(ipRateLimit.resetIn / 1000)),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(ipRateLimit.resetIn / 1000))
+          },
+          status: 429 
+        }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -78,6 +158,28 @@ serve(async (req) => {
     }
 
     const { transactionId, kioskId, amount, category, mobileNumber, posResponse } = requestData;
+    
+    // Check kiosk-based rate limit
+    const kioskRateLimit = checkRateLimit(`kiosk:${kioskId}`, MAX_REQUESTS_PER_KIOSK);
+    if (!kioskRateLimit.allowed) {
+      console.warn(`Rate limit exceeded for kiosk: ${kioskId}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Too many requests from this kiosk. Please wait before retrying.',
+          retryAfter: Math.ceil(kioskRateLimit.resetIn / 1000)
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(kioskRateLimit.resetIn / 1000)),
+            'X-RateLimit-Remaining': '0'
+          },
+          status: 429 
+        }
+      );
+    }
     
     // Verify kiosk exists and is active
     const { data: kiosk, error: kioskError } = await supabaseClient
@@ -121,7 +223,7 @@ serve(async (req) => {
       );
     }
     
-    console.log('Processing payment:', { transactionId, kioskId, amount, category });
+    console.log('Processing payment:', { transactionId, kioskId, amount, category, clientIP: clientIP.substring(0, 8) + '...' });
 
     // Fetch category reference
     const { data: categoryData } = await supabaseClient
@@ -214,7 +316,11 @@ serve(async (req) => {
         },
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-RateLimit-Remaining': String(Math.min(ipRateLimit.remaining, kioskRateLimit.remaining))
+        },
         status: 200,
       },
     );
