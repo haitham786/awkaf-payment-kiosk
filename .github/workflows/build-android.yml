@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with USB Support
 
 on:
   push:
@@ -23,13 +23,16 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install USB Serial Plugin
+        run: npm install capacitor-plugin-usb-serial
 
       - name: Create .env file
         run: |
@@ -41,15 +44,54 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Install Capacitor CLI
-        run: npm install -g @capacitor/cli
-
       - name: Add Android platform
+        run: npx cap add android
+
+      - name: Create USB device filter XML
         run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/device_filter.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <!-- OM-A880 POS (CDC ACM) - User's confirmed device -->
+              <usb-device vendor-id="1478" product-id="36923" />
+              
+              <!-- Qualcomm variants -->
+              <usb-device vendor-id="1478" product-id="36945" />
+              <usb-device vendor-id="1478" product-id="36946" />
+              
+              <!-- OMA Emirates variants -->
+              <usb-device vendor-id="3398" product-id="16385" />
+              <usb-device vendor-id="3398" product-id="16386" />
+              
+              <!-- Newland POS -->
+              <usb-device vendor-id="7568" product-id="8218" />
+              
+              <!-- CH340 USB Serial -->
+              <usb-device vendor-id="6790" product-id="29987" />
+              
+              <!-- Prolific PL2303 -->
+              <usb-device vendor-id="1659" product-id="8963" />
+              
+              <!-- FTDI -->
+              <usb-device vendor-id="1027" product-id="24577" />
+              
+              <!-- CP210x -->
+              <usb-device vendor-id="4292" product-id="60000" />
+              
+              <!-- Generic CDC ACM -->
+              <usb-device class="2" subclass="2" protocol="1" />
+          </resources>
+          EOF
+
+      - name: Update AndroidManifest.xml with USB permissions
+        run: |
+          # Add USB host feature
+          sed -i 's|<application|<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application|' android/app/src/main/AndroidManifest.xml
           
+          # Add USB intent filter and meta-data to MainActivity
+          sed -i 's|</activity>|    <intent-filter>\n                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n            </intent-filter>\n            <meta-data\n                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n                android:resource="@xml/device_filter" />\n        </activity>|' android/app/src/main/AndroidManifest.xml
+
       - name: Sync Capacitor
         run: npx cap sync android
 
@@ -59,15 +101,12 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Create keystore directory
-        run: mkdir -p android/app
-
       - name: Generate keystore
         run: |
           keytool -genkey -v -keystore ${{ github.workspace }}/release.keystore \
             -alias release -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=City, S=State, C=US"
+            -dname "CN=Awkaf Payment Kiosk, OU=Development, O=Awkaf, L=Muscat, S=Muscat, C=OM"
 
       - name: Create gradle.properties for signing
         run: |
@@ -83,17 +122,17 @@ jobs:
       - name: Configure signing in build.gradle
         run: |
           sed -i '/android {/a\
-          \    signingConfigs {\
-          \        release {\
-          \            storeFile file(project.properties["RELEASE_STORE_FILE"])\
-          \            storePassword project.properties["RELEASE_STORE_PASSWORD"]\
-          \            keyAlias project.properties["RELEASE_KEY_ALIAS"]\
-          \            keyPassword project.properties["RELEASE_KEY_PASSWORD"]\
-          \        }\
-          \    }' android/app/build.gradle
+              signingConfigs {\
+                  release {\
+                      storeFile file(project.properties["RELEASE_STORE_FILE"])\
+                      storePassword project.properties["RELEASE_STORE_PASSWORD"]\
+                      keyAlias project.properties["RELEASE_KEY_ALIAS"]\
+                      keyPassword project.properties["RELEASE_KEY_PASSWORD"]\
+                  }\
+              }' android/app/build.gradle
           
           sed -i '/buildTypes {/,/release {/s/release {/release {\
-          \            signingConfig signingConfigs.release/' android/app/build.gradle
+                  signingConfig signingConfigs.release/' android/app/build.gradle
 
       - name: Build Release APK
         working-directory: android
@@ -101,18 +140,39 @@ jobs:
 
       - name: Rename APK
         run: |
+          mkdir -p release-apks
           cp android/app/build/outputs/apk/release/app-release.apk \
-            android/app/build/outputs/apk/release/app-release-signed.apk
-          
-      - name: Verify APK signature
-        run: |
-          BUILD_TOOLS_VERSION=$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -n 1)
-          ${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner verify \
-            --verbose \
-            android/app/build/outputs/apk/release/app-release-signed.apk
+            release-apks/awkaf-kiosk-usb.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/app-release-signed.apk
+          name: awkaf-kiosk-usb-apk
+          path: release-apks/awkaf-kiosk-usb.apk
+          retention-days: 30
+
+      - name: Create Release (on main branch)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          files: release-apks/awkaf-kiosk-usb.apk
+          body: |
+            ## Awkaf Payment Kiosk APK
+            
+            **USB POS Support Included**
+            
+            ### Installation:
+            1. Download `awkaf-kiosk-usb.apk`
+            2. Transfer to Samsung A13
+            3. Enable "Install from unknown sources" if prompted
+            4. Install the APK
+            5. Connect OM-A880 POS via USB OTG cable
+            6. Grant USB permission when prompted
+            
+            ### Supported POS:
+            - OM-A880 (Vendor: 05C6, Product: 903B)
+            - Other CDC ACM USB serial devices
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

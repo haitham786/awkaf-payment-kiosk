@@ -1,10 +1,10 @@
 /**
  * POS Diagnostics Page
  * 
- * Use this page to test and diagnose POS connection issues with the OM-A880
+ * Test USB connection with OM-A880 POS
  * Access via: /kiosk/diagnostics
  * 
- * RECOMMENDED: TCPUART app method for Android
+ * IMPORTANT: USB connection only works in the native APK, not in browser!
  */
 
 import { useState, useEffect } from 'react';
@@ -12,8 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   RefreshCw, 
   CheckCircle, 
@@ -23,23 +22,25 @@ import {
   Usb,
   Unplug,
   Terminal,
-  Wifi,
-  Globe,
-  ExternalLink,
   Cable,
+  Smartphone,
+  Globe,
+  Download,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTerminalInfoRequest } from '@/services/ethernetEcrService';
 import { parseXMLResponse } from '@/services/ecrProtocol';
 import {
-  initializeBridge,
-  disconnectBridge,
-  sendBridgeCommand,
-  getBridgeState,
-  testBridgeConnection,
-  getRecommendedApps,
-  onBridgeStateChange,
-} from '@/services/usbBridgeService';
+  initializeUSBSerial,
+  listUSBDevices,
+  findAndConnectPOS,
+  closeUSBConnection,
+  isUSBSerialAvailable,
+  getActivePlugin,
+  writeUSBData,
+  onDataReceived,
+  onConnectionChange,
+} from '@/services/usbSerialPlugin';
 
 interface DiagnosticResult {
   test: string;
@@ -54,26 +55,39 @@ const POSDiagnosticsPage = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionMethod, setConnectionMethod] = useState<string>('none');
   const [lastData, setLastData] = useState<string | null>(null);
-  
-  // Bridge configuration
-  const [bridgeHost, setBridgeHost] = useState('127.0.0.1');
-  const [bridgePort, setBridgePort] = useState('8888');
-  const [showSetup, setShowSetup] = useState(true);
+  const [isNativeApp, setIsNativeApp] = useState(false);
+  const [pluginAvailable, setPluginAvailable] = useState(false);
 
-  // Check connection status on mount
+  // Check environment on mount
   useEffect(() => {
-    setIsConnected(getBridgeState() === 'connected');
-    
-    const unsubscribe = onBridgeStateChange((state) => {
-      setIsConnected(state === 'connected');
-      if (state !== 'connected') {
-        setConnectionMethod('none');
+    const checkEnvironment = async () => {
+      const Capacitor = (window as any).Capacitor;
+      const isNative = Capacitor?.isNativePlatform?.() || false;
+      setIsNativeApp(isNative);
+      
+      if (isNative) {
+        const available = await initializeUSBSerial();
+        setPluginAvailable(available);
       }
+    };
+    
+    checkEnvironment();
+    
+    // Subscribe to connection changes
+    const unsubConn = onConnectionChange((connected) => {
+      setIsConnected(connected);
+    });
+    
+    // Subscribe to data
+    const unsubData = onDataReceived((data) => {
+      setLastData(data);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubConn();
+      unsubData();
+    };
   }, []);
 
   const addResult = (result: Omit<DiagnosticResult, 'timestamp'>) => {
@@ -86,33 +100,106 @@ const POSDiagnosticsPage = () => {
     
     try {
       // Test 1: Check environment
+      const Capacitor = (window as any).Capacitor;
+      const isNative = Capacitor?.isNativePlatform?.() || false;
+      const platform = Capacitor?.getPlatform?.() || 'web';
+      
       addResult({
         test: 'Environment',
-        status: 'info',
-        message: `Running on: ${/Android/i.test(navigator.userAgent) ? 'Android' : 'Other'} | ${typeof (window as any).Capacitor !== 'undefined' ? 'Native App' : 'Browser'}`,
+        status: isNative ? 'pass' : 'warning',
+        message: isNative 
+          ? `Native App (${platform})` 
+          : 'Browser Mode - USB not available',
+        details: {
+          isNative,
+          platform,
+          userAgent: navigator.userAgent.substring(0, 50),
+        }
       });
 
-      // Test 2: Test USB Bridge connection
-      addResult({
-        test: 'USB Bridge',
-        status: 'info',
-        message: `Testing connection to ${bridgeHost}:${bridgePort}...`,
-      });
-
-      const bridgeResult = await testBridgeConnection();
-      
-      if (bridgeResult.connected) {
-        setIsConnected(true);
-        setConnectionMethod('usbbridge');
-        
+      if (!isNative) {
         addResult({
-          test: 'USB Bridge',
+          test: 'USB Plugin',
+          status: 'fail',
+          message: 'USB requires native APK. Please install the APK from GitHub.',
+        });
+        setIsRunning(false);
+        return;
+      }
+
+      // Test 2: Check USB Serial plugin
+      const pluginAvail = await initializeUSBSerial();
+      const activePlugin = getActivePlugin();
+      
+      addResult({
+        test: 'USB Plugin',
+        status: pluginAvail ? 'pass' : 'fail',
+        message: pluginAvail 
+          ? `Plugin loaded: ${activePlugin}`
+          : 'USB Serial plugin not found',
+        details: {
+          available: pluginAvail,
+          plugin: activePlugin,
+          capacitorPlugins: Object.keys(Capacitor?.Plugins || {}),
+        }
+      });
+
+      if (!pluginAvail) {
+        addResult({
+          test: 'USB Plugin',
+          status: 'fail',
+          message: 'capacitor-plugin-usb-serial not installed. Rebuild APK required.',
+        });
+        setIsRunning(false);
+        return;
+      }
+
+      // Test 3: Scan for USB devices
+      addResult({
+        test: 'USB Scan',
+        status: 'info',
+        message: 'Scanning for USB devices...',
+      });
+
+      const devices = await listUSBDevices();
+      
+      addResult({
+        test: 'USB Scan',
+        status: devices.length > 0 ? 'pass' : 'warning',
+        message: devices.length > 0 
+          ? `Found ${devices.length} USB device(s)`
+          : 'No USB devices found. Connect POS via OTG cable.',
+        details: devices.map(d => ({
+          vendorId: `0x${d.vendorId.toString(16).toUpperCase()}`,
+          productId: `0x${d.productId.toString(16).toUpperCase()}`,
+          name: d.deviceName,
+        })),
+      });
+
+      if (devices.length === 0) {
+        setIsRunning(false);
+        return;
+      }
+
+      // Test 4: Connect to POS
+      addResult({
+        test: 'POS Connection',
+        status: 'info',
+        message: 'Connecting to POS...',
+      });
+
+      const connectResult = await findAndConnectPOS();
+      
+      if (connectResult.success) {
+        setIsConnected(true);
+        addResult({
+          test: 'POS Connection',
           status: 'pass',
-          message: `Connected via ${bridgeResult.method}!`,
-          details: bridgeResult,
+          message: 'Connected to POS!',
+          details: connectResult.device,
         });
 
-        // Test 3: Try to communicate with POS
+        // Test 5: Send terminal info request
         addResult({
           test: 'POS Communication',
           status: 'info',
@@ -121,40 +208,33 @@ const POSDiagnosticsPage = () => {
 
         try {
           const infoRequest = buildTerminalInfoRequest();
-          const response = await sendBridgeCommand(infoRequest, 10000);
+          const sent = await writeUSBData(infoRequest);
           
-          if (response) {
-            setLastData(response);
-            const parsed = parseXMLResponse(response);
-            
+          if (sent) {
             addResult({
               test: 'POS Communication',
               status: 'pass',
-              message: 'POS responded successfully!',
-              details: parsed,
+              message: 'Command sent successfully. Waiting for response...',
             });
           } else {
             addResult({
               test: 'POS Communication',
               status: 'warning',
-              message: 'No response from POS (make sure POS is ready)',
+              message: 'Failed to send command',
             });
           }
         } catch (err: any) {
           addResult({
             test: 'POS Communication',
             status: 'warning',
-            message: `Communication: ${err.message}`,
+            message: `Error: ${err.message}`,
           });
         }
       } else {
         addResult({
-          test: 'USB Bridge',
+          test: 'POS Connection',
           status: 'fail',
-          message: bridgeResult.error || 'Cannot connect to bridge app',
-          details: {
-            tip: 'Make sure the USB bridge app is running and TCP server is enabled',
-          },
+          message: connectResult.error || 'Failed to connect to POS',
         });
       }
 
@@ -170,9 +250,8 @@ const POSDiagnosticsPage = () => {
   };
 
   const disconnectPOS = async () => {
-    await disconnectBridge();
+    await closeUSBConnection();
     setIsConnected(false);
-    setConnectionMethod('none');
     addResult({
       test: 'Disconnect',
       status: 'info',
@@ -211,8 +290,6 @@ const POSDiagnosticsPage = () => {
     }
   };
 
-  const recommendedApps = getRecommendedApps();
-
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -221,58 +298,53 @@ const POSDiagnosticsPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2">
               <Terminal className="h-5 w-5" />
-              POS Diagnostics (TCPUART)
+              POS USB Diagnostics
             </CardTitle>
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>
               Back
             </Button>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Connect to OM-A880 POS using <strong>TCPUART</strong> app on your Android device.
-            </p>
-            
-            {/* Bridge Configuration */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <Label className="text-xs">Bridge Host</Label>
-                <Input
-                  value={bridgeHost}
-                  onChange={(e) => setBridgeHost(e.target.value)}
-                  placeholder="127.0.0.1"
-                  className="h-9"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Bridge Port</Label>
-                <Input
-                  value={bridgePort}
-                  onChange={(e) => setBridgePort(e.target.value)}
-                  placeholder="8888"
-                  className="h-9"
-                />
-              </div>
-            </div>
-            
-            {/* Status */}
+            {/* Environment Status */}
             <div className="flex items-center gap-4 mb-4">
               <div className="flex items-center gap-2">
-                {isConnected ? (
+                {isNativeApp ? (
                   <>
-                    <Cable className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-green-500">Connected</span>
+                    <Smartphone className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-500">Native APK</span>
                   </>
                 ) : (
                   <>
-                    <Unplug className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Disconnected</span>
+                    <Globe className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm text-yellow-500">Browser (USB disabled)</span>
                   </>
                 )}
               </div>
-              {connectionMethod !== 'none' && (
-                <Badge variant="secondary">{connectionMethod}</Badge>
+              {isNativeApp && (
+                <Badge variant={pluginAvailable ? "default" : "destructive"}>
+                  {pluginAvailable ? "USB Plugin Ready" : "Plugin Missing"}
+                </Badge>
+              )}
+              {isConnected && (
+                <Badge variant="default" className="bg-green-500">
+                  <Cable className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
               )}
             </div>
+
+            {/* Browser Warning */}
+            {!isNativeApp && (
+              <Alert className="mb-4 border-yellow-500/50 bg-yellow-500/10">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle className="text-yellow-500">Browser Mode</AlertTitle>
+                <AlertDescription className="text-sm">
+                  USB connection is only available in the native Android APK.
+                  <br />
+                  <strong>To test USB:</strong> Download and install the APK from GitHub Releases.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2 flex-wrap">
@@ -281,7 +353,7 @@ const POSDiagnosticsPage = () => {
                 disabled={isRunning}
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-                {isRunning ? 'Testing...' : 'Test Connection'}
+                {isRunning ? 'Testing...' : 'Test USB Connection'}
               </Button>
               {isConnected && (
                 <Button variant="outline" onClick={disconnectPOS}>
@@ -289,58 +361,33 @@ const POSDiagnosticsPage = () => {
                   Disconnect
                 </Button>
               )}
-              <Button variant="ghost" onClick={() => setShowSetup(!showSetup)}>
-                {showSetup ? 'Hide' : 'Show'} Setup Guide
-              </Button>
+              {results.length > 0 && (
+                <Button variant="ghost" onClick={clearResults}>
+                  Clear
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Setup Guide */}
-        {showSetup && (
+        {/* APK Download Instructions */}
+        {!isNativeApp && (
           <Card className="border-primary/30 bg-primary/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Setup Guide - TCPUART App
+                <Download className="h-4 w-4" />
+                How to Get the APK
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm">
-                <p className="mb-3 text-muted-foreground">
-                  TCPUART is a simple app that bridges USB serial to TCP. Our kiosk connects to it on port 8888.
-                </p>
-                
-                {recommendedApps.map((app, idx) => (
-                  <div key={idx} className="p-3 bg-background rounded-lg mb-3 border">
-                    <div className="flex items-center justify-between mb-2">
-                      <strong>{app.name}</strong>
-                      <a 
-                        href={app.playStoreUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary text-xs flex items-center gap-1 hover:underline"
-                      >
-                        Play Store <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">by {app.developer}</p>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {app.features.map((f, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>
-                      ))}
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-xs font-medium mb-1">Setup Steps:</p>
-                      <ol className="text-xs text-muted-foreground space-y-1">
-                        {app.setup.map((step, i) => (
-                          <li key={i}>{i + 1}. {step}</li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <CardContent className="space-y-3 text-sm">
+              <ol className="list-decimal list-inside space-y-2">
+                <li><strong>Connect Lovable to GitHub</strong> (click GitHub button in editor)</li>
+                <li><strong>Wait for build</strong> - APK builds automatically (~5 mins)</li>
+                <li><strong>Go to GitHub → Releases</strong> to download APK</li>
+                <li><strong>Transfer APK</strong> to Samsung A13 and install</li>
+                <li><strong>Connect POS</strong> via USB OTG cable</li>
+                <li><strong>Open app</strong> and navigate to /kiosk/diagnostics</li>
+              </ol>
             </CardContent>
           </Card>
         )}
@@ -348,20 +395,14 @@ const POSDiagnosticsPage = () => {
         {/* Results */}
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Test Results</CardTitle>
-              {results.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearResults}>Clear</Button>
-              )}
-            </div>
+            <CardTitle className="text-base">Test Results</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[300px]">
               {results.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
-                  <Cable className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>Click "Test Connection" to start</p>
-                  <p className="text-xs mt-1">Make sure the bridge app is running first</p>
+                  <Usb className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Click "Test USB Connection" to start</p>
                 </div>
               ) : (
                 <div className="space-y-2">
