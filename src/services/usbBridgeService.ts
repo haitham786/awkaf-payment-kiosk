@@ -3,15 +3,15 @@
  * 
  * This service enables communication with the POS via a USB-to-TCP bridge app.
  * 
- * SETUP INSTRUCTIONS:
- * 1. Install "Serial USB Terminal" by Kai Morich from Play Store (FREE)
- *    - Or any app that can bridge USB serial to TCP server
+ * SETUP INSTRUCTIONS (Using TCPUART app):
+ * 1. Install "TCPUART" from Play Store (FREE)
  * 2. Connect OM-A880 POS to Samsung A13 via USB OTG cable
- * 3. Open Serial USB Terminal app:
- *    - Settings → USB → Baud Rate: 115200
- *    - Settings → TCP Server → Enable → Port: 8888
- * 4. Connect to POS device in the app
- * 5. Now our kiosk can connect to localhost:8888
+ * 3. Open TCPUART app:
+ *    - Select the USB device (Vendor: 05C6, Product: 903B)
+ *    - Set Baud Rate: 115200
+ *    - Set Port: 8888
+ *    - Tap "Start" to begin bridging
+ * 4. Now our kiosk can connect to localhost:8888
  */
 
 // Bridge connection state
@@ -348,23 +348,25 @@ export const testBridgeConnection = async (): Promise<{
  */
 export const getRecommendedApps = () => [
   {
-    name: 'Serial USB Terminal',
-    developer: 'Kai Morich',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=de.kai_morich.serial_usb_terminal',
-    features: ['Free', 'TCP Server mode', 'Works with most USB serial devices'],
+    name: 'TCPUART',
+    developer: 'h4ck3d',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.hardcodedjoy.tcpuart',
+    features: ['Free', 'Simple USB-to-TCP bridge', 'No complex setup'],
     setup: [
-      'Install from Play Store',
-      'Connect POS via USB OTG',
-      'Settings → USB → Baud Rate: 115200',
-      'Settings → TCP Server → Enable → Port: 8888',
-      'Connect to POS in the app',
+      'Install TCPUART from Play Store',
+      'Connect OM-A880 POS via USB OTG cable',
+      'Open TCPUART app',
+      'Select USB device (Vendor: 05C6, Product: 903B)',
+      'Set Baud Rate: 115200',
+      'Set Port: 8888',
+      'Tap "Start" to begin TCP server',
     ],
   },
   {
-    name: 'USB Serial Console',
-    developer: 'Felipe Herranz',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=jp.sugnakys.usbserialconsole',
-    features: ['Free', 'Simple interface', 'TCP forwarding'],
+    name: 'USB TCP Bridge',
+    developer: 'FTDI',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.ftdi.j2xx.hyperterm',
+    features: ['Free', 'FTDI compatible', 'TCP server mode'],
     setup: [
       'Install from Play Store',
       'Connect POS via USB OTG',
