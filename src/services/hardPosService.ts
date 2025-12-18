@@ -77,8 +77,20 @@ import {
   onDataReceived as webSerialOnDataReceived,
 } from './webSerialService';
 
-// Connection types - added 'webserial' for Chrome/PWA
-export type ConnectionType = 'usb' | 'ethernet' | 'webserial';
+// Import USB Bridge Service (for USB-to-TCP bridge apps)
+import {
+  initializeBridge,
+  disconnectBridge,
+  sendBridgeCommand,
+  getBridgeState,
+  onBridgeStateChange,
+  onBridgeData,
+  testBridgeConnection,
+  getRecommendedApps,
+} from './usbBridgeService';
+
+// Connection types - added 'usbbridge' for USB bridge apps
+export type ConnectionType = 'usb' | 'ethernet' | 'webserial' | 'usbbridge';
 
 // POS Connection Status
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'ready' | 'error';
@@ -116,6 +128,9 @@ export interface POSConfig {
   vendorId?: number;
   productId?: number;
   autoDetect?: boolean;
+  // USB Bridge configuration
+  bridgeHost?: string; // localhost for bridge apps
+  bridgePort?: number; // typically 8888
 }
 
 // Transaction Request
@@ -292,7 +307,7 @@ export const getIntermediateStatusMessage = (status: POSIntermediateStatus): str
 
 /**
  * Initialize the POS connection with configuration
- * PRIORITY: Ethernet (TCP/IP) > USB
+ * PRIORITY: USB Bridge > Ethernet (TCP/IP) > USB Native
  */
 export const initializePOS = async (config: POSConfig): Promise<boolean> => {
   try {
@@ -302,34 +317,95 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
     console.log('Initializing POS with config:', config);
     console.log('Connection type:', config.connectionType);
     
-    // ETHERNET is the PRIMARY connection method
+    // USB BRIDGE is now the RECOMMENDED method for Android
+    if (config.connectionType === 'usbbridge') {
+      console.log('Using USB Bridge connection (recommended for Android)');
+      return await initializeUSBBridgeConnection(
+        config.bridgeHost || '127.0.0.1',
+        config.bridgePort || 8888
+      );
+    }
+    
+    // ETHERNET for direct TCP/IP connection
     if (config.connectionType === 'ethernet') {
       return await initializeEthernetConnection(config.ipAddress!, config.port!);
-    } else if (config.connectionType === 'webserial') {
-      // WEB SERIAL for Chrome/PWA - uses browser's Web Serial API
-      console.log('Using Web Serial connection (Chrome/PWA)');
+    }
+    
+    // WEB SERIAL for Chrome/PWA - uses browser's Web Serial API (desktop only)
+    if (config.connectionType === 'webserial') {
+      console.log('Using Web Serial connection (Chrome desktop only)');
       return await initializeWebSerialConnection();
-    } else if (config.connectionType === 'usb') {
-      // USB is secondary/fallback (requires Capacitor native plugin)
+    }
+    
+    // USB NATIVE (requires Capacitor native plugin)
+    if (config.connectionType === 'usb') {
       console.log('Using USB connection (native method)');
       return await initializeUSBConnection();
     }
     
-    // Default: Try Web Serial first (for Chrome/PWA), then Ethernet
-    const webSerialSupport = isWebSerialSupported();
-    if (webSerialSupport.supported) {
-      console.log('Defaulting to Web Serial connection');
-      return await initializeWebSerialConnection();
+    // Default: Try USB Bridge first (for Android), then Ethernet
+    console.log('Auto-detecting best connection method...');
+    
+    // Try USB Bridge (most compatible with Android + USB bridge apps)
+    const bridgeConnected = await initializeUSBBridgeConnection(
+      config.bridgeHost || '127.0.0.1',
+      config.bridgePort || 8888
+    );
+    if (bridgeConnected) {
+      return true;
     }
     
+    // Try Ethernet if configured
     if (config.ipAddress && config.port) {
-      console.log('Defaulting to Ethernet connection');
+      console.log('Trying Ethernet connection');
       return await initializeEthernetConnection(config.ipAddress, config.port);
     }
     
+    setConnectionStatus('disconnected');
+    lastErrorMessage = 'No connection method available. Please configure USB Bridge or Ethernet.';
     return false;
   } catch (error) {
     console.error('POS initialization error:', error);
+    setConnectionStatus('error');
+    return false;
+  }
+};
+
+/**
+ * Initialize USB Bridge connection
+ * Uses a USB-to-TCP bridge app (like Serial USB Terminal) on Android
+ */
+const initializeUSBBridgeConnection = async (host: string, port: number): Promise<boolean> => {
+  console.log(`[USBBridge] Initializing connection to ${host}:${port}...`);
+  
+  try {
+    // Subscribe to state changes
+    onBridgeStateChange((state) => {
+      console.log('[USBBridge] State changed:', state);
+      if (state === 'connected') {
+        setConnectionStatus('connected');
+      } else if (state === 'disconnected' || state === 'error') {
+        setConnectionStatus(state === 'error' ? 'error' : 'disconnected');
+      }
+    });
+    
+    // Subscribe to incoming data
+    onBridgeData((data) => {
+      handleIncomingPOSData(data);
+    });
+    
+    const connected = await initializeBridge({ host, port, timeout: currentConfig?.timeout || 120000 });
+    
+    if (connected) {
+      setConnectionStatus('connected');
+      startConnectionMonitoring();
+      return true;
+    }
+    
+    return false;
+  } catch (error: any) {
+    console.error('[USBBridge] Connection error:', error);
+    lastErrorMessage = error.message || 'USB Bridge connection failed';
     setConnectionStatus('error');
     return false;
   }
