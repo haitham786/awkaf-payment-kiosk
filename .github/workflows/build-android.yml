@@ -32,7 +32,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Create .env file
         run: |
@@ -106,26 +106,55 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Install required Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+
       - name: Build Debug APK (USB enabled)
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace --info
+        continue-on-error: true
+        run: ./gradlew assembleDebug --stacktrace --info --no-daemon
 
-      - name: Rename APK
+      - name: Upload Gradle reports (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-gradle-reports
+          path: |
+            android/app/build/reports/**
+            android/app/build/outputs/logs/**
+            android/build/reports/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: List Android build outputs (always)
+        if: always()
+        run: |
+          echo "Android build outputs:"
+          find android/app/build/outputs -maxdepth 6 -type f || true
+
+      - name: Collect APK
+        if: always()
         run: |
           mkdir -p release-apks
-          cp android/app/build/outputs/apk/debug/app-debug.apk \
-            release-apks/awkaf-kiosk-usb.apk
+          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk release-apks/awkaf-kiosk-usb.apk
+          else
+            echo "ERROR: APK not found at android/app/build/outputs/apk/debug/app-debug.apk"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: awkaf-kiosk-usb-apk
           path: release-apks/awkaf-kiosk-usb.apk
+          if-no-files-found: error
           retention-days: 30
 
       - name: Create Release (on main branch)
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
