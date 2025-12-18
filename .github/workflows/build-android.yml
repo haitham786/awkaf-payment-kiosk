@@ -92,28 +92,89 @@ jobs:
           </resources>
           EOF
 
-      - name: Update AndroidManifest.xml with USB permissions
+      - name: Patch AndroidManifest.xml for USB (idempotent)
+        shell: bash
         run: |
-          # Add USB host feature
-          sed -i 's|<application|<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application|' android/app/src/main/AndroidManifest.xml
-          
-          # Add USB intent filter and meta-data to MainActivity
-          sed -i 's|</activity>|    <intent-filter>\n                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n            </intent-filter>\n            <meta-data\n                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n                android:resource="@xml/device_filter" />\n        </activity>|' android/app/src/main/AndroidManifest.xml
+          set -euxo pipefail
+          python - << 'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          xml = p.read_text(encoding="utf-8")
+
+          # Ensure USB host feature (only once)
+          if "android.hardware.usb.host" not in xml:
+              xml = xml.replace(
+                  "<application",
+                  '<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application',
+                  1,
+              )
+
+          # Attach USB_DEVICE_ATTACHED intent filter + metadata to MainActivity (only once)
+          if "android.hardware.usb.action.USB_DEVICE_ATTACHED" not in xml:
+              pattern = r'(<activity\\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)</activity>'
+              m = re.search(pattern, xml, flags=re.S)
+              if not m:
+                  raise SystemExit(
+                      "MainActivity not found in AndroidManifest.xml; cannot attach USB intent filter"
+                  )
+
+              head, body = m.group(1), m.group(2)
+              inject = """
+                      <intent-filter>
+                          <action android:name=\"android.hardware.usb.action.USB_DEVICE_ATTACHED\" />
+                      </intent-filter>
+                      <meta-data
+                          android:name=\"android.hardware.usb.action.USB_DEVICE_ATTACHED\"
+                          android:resource=\"@xml/device_filter\" />
+              """
+              xml = xml[: m.start(0)] + head + body + inject + "</activity>" + xml[m.end(0) :]
+
+          p.write_text(xml, encoding="utf-8")
+          print("AndroidManifest.xml patched successfully")
+          PY
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install required Android SDK packages
+      - name: Verify Android SDK tools + accept licenses
+        shell: bash
         run: |
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+          set -euxo pipefail
+          which sdkmanager
+          sdkmanager --version
+          yes | sdkmanager --licenses
+
+      - name: Install Android SDK packages (try 35, fallback 34)
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # Modern Capacitor templates commonly use compileSdk 35. Install it if available.
+          if sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"; then
+            echo "Installed Android SDK 35"
+          else
+            echo "Android SDK 35 not available; falling back to 34"
+            sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+            # Force project to use 34 to avoid compileSdk mismatch
+            if [ -f android/variables.gradle ]; then
+              perl -pi -e 's/(compileSdkVersion\\s*=\\s*)\\d+/${1}34/g; s/(targetSdkVersion\\s*=\\s*)\\d+/${1}34/g' android/variables.gradle || true
+              echo "Updated android/variables.gradle to SDK 34:" 
+              cat android/variables.gradle
+            fi
+          fi
 
       - name: Build Debug APK (USB enabled)
         working-directory: android
         continue-on-error: true
-        run: ./gradlew assembleDebug --stacktrace --info --no-daemon
+        shell: bash
+        run: |
+          set +e
+          ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+          echo "Gradle exit code: ${PIPESTATUS[0]}"
+          exit 0
 
       - name: Upload Gradle reports (always)
         if: always()
@@ -127,6 +188,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Upload Gradle console log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-gradle-log
+          path: android-gradle.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: List Android build outputs (always)
         if: always()
         run: |
@@ -136,13 +206,26 @@ jobs:
       - name: Collect APK
         if: always()
         run: |
+          set -euxo pipefail
           mkdir -p release-apks
-          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp android/app/build/outputs/apk/debug/app-debug.apk release-apks/awkaf-kiosk-usb.apk
+
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1 || true)
+          fi
+
+          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
+            echo "Found APK at: $APK_PATH"
+            cp "$APK_PATH" release-apks/awkaf-kiosk-usb.apk
           else
-            echo "ERROR: APK not found at android/app/build/outputs/apk/debug/app-debug.apk"
+            echo "ERROR: APK not found under android/app/build/outputs/apk"
+            if [ -f android-gradle.log ]; then
+              echo "---- Last 200 lines of android-gradle.log ----"
+              tail -n 200 android-gradle.log || true
+            fi
             exit 1
           fi
+
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
