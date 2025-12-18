@@ -168,7 +168,6 @@ jobs:
 
       - name: Create USB device filter XML
         run: |
-        run: |
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/device_filter.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
