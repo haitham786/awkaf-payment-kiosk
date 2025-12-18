@@ -8,13 +8,49 @@
  * are handled entirely by the OM-A880 POS.
  * 
  * The KIOSK app must NOT process, store, or interpret card data.
+ * 
+ * Supported connection modes:
+ * - USB (Auto-detect): Uses Android USB Host / Serial APIs
+ * - Ethernet (TCP/IP): Uses TCP socket with timeout and retry
+ * 
+ * Compatible devices:
+ * - Samsung Galaxy A13/A33 (trial phase)
+ * - Sunmi Flex 3 (production)
  */
+
+import {
+  initializeUSBHost,
+  isUSBHostAvailable,
+  scanForDevices,
+  connectToDevice,
+  sendData as sendUSBData,
+  disconnect as disconnectUSB,
+  getConnectionState as getUSBConnectionState,
+  getConnectedDevice,
+  onConnectionStateChange as onUSBStateChange,
+  onDataReceived as onUSBDataReceived,
+  setKeepScreenAwake,
+  USBDeviceInfo,
+  DEFAULT_POS_IDENTIFIERS,
+} from './usbHostService';
+
+import {
+  ECR_COMMANDS,
+  INTERMEDIATE_MESSAGES,
+  ERROR_CODES,
+  parseXMLResponse,
+  getErrorInfo,
+  getIntermediateMessageInfo,
+  isSuccessResponse,
+  formatAmountForECR,
+  ECRResponse,
+} from './ecrProtocol';
 
 // Connection types
 export type ConnectionType = 'usb' | 'ethernet';
 
 // POS Connection Status
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'ready' | 'error';
 
 // Transaction Status (final states)
 export type TransactionStatus = 'idle' | 'pending' | 'processing' | 'approved' | 'declined' | 'cancelled' | 'timeout' | 'error' | 'reversal_required';
@@ -26,11 +62,17 @@ export type POSIntermediateStatus =
   | 'TAP_CARD'
   | 'SWIPE_CARD'
   | 'ENTER_PIN'
+  | 'PIN_ENTERED'
   | 'PROCESSING'
   | 'COMMUNICATING_WITH_BANK'
+  | 'RESPONSE_RECEIVED'
   | 'REMOVE_CARD'
+  | 'CARD_REMOVED'
   | 'PRINTING_RECEIPT'
-  | 'TRANSACTION_COMPLETE';
+  | 'TRANSACTION_COMPLETE'
+  | 'TRANSACTION_FAILED'
+  | 'REVERSAL_IN_PROGRESS'
+  | 'FALLBACK';
 
 // POS Configuration
 export interface POSConfig {
@@ -39,13 +81,17 @@ export interface POSConfig {
   port?: string;
   timeout?: number; // milliseconds
   retryAttempts?: number;
+  // USB specific configuration
+  vendorId?: number;
+  productId?: number;
+  autoDetect?: boolean;
 }
 
 // Transaction Request
 export interface TransactionRequest {
   transactionId: string;
   amount: number; // in baisas - will be formatted as integer without decimals
-  merchantReference?: string; // optional donation ID
+  merchantReference?: string; // optional donation ID (max 22 chars)
   currency?: string;
 }
 
@@ -63,6 +109,11 @@ export interface POSXMLResponse {
   cardType?: string;
   receiptData?: string; // Raw receipt data for printing
   rawXML?: string; // Original XML for debugging
+  batchNo?: string;
+  invoiceNo?: string;
+  sequenceNo?: string;
+  entryMode?: string;
+  txnStatus?: string;
 }
 
 // Transaction Response (unified format for app)
@@ -91,11 +142,16 @@ export interface TransactionResponse {
 // ECR Command Types
 export type ECRCommand = 
   | 'PURCHASE'
+  | 'REFUND'
+  | 'VOID'
   | 'CANCEL'
   | 'GET_STATUS'
   | 'RECONCILIATION'
   | 'GET_TOTALS'
-  | 'LAST_TRANSACTION_STATUS';
+  | 'GET_TERMINAL_INFO'
+  | 'LAST_TRANSACTION_STATUS'
+  | 'DELETE_BATCH'
+  | 'DELETE_REVERSAL';
 
 // POS Message Protocol
 export interface POSMessage {
@@ -104,6 +160,7 @@ export interface POSMessage {
     amount?: string; // Integer string without decimals: 2.000 OMR → "2000"
     transactionId?: string;
     merchantReference?: string;
+    invoiceNumber?: string;
   };
 }
 
@@ -111,10 +168,13 @@ export interface POSMessage {
 export interface POSStatusResponse {
   ready: boolean;
   printerStatus: 'ok' | 'paper_out' | 'error';
-  readerStatus: 'ok' | 'error';
+  readerStatus: 'ok' | 'card_present' | 'error';
   connectivity: 'online' | 'offline';
   terminalId?: string;
   merchantId?: string;
+  appVersion?: string;
+  serialNo?: string;
+  batchNo?: string;
 }
 
 // Reconciliation Response
@@ -124,6 +184,7 @@ export interface ReconciliationResponse {
   totalAmount: number;
   batchNumber: string;
   timestamp: string;
+  result: 'failed' | 'rejected' | 'accepted' | 'accepted_with_upload';
 }
 
 // Event callbacks
@@ -140,41 +201,34 @@ let statusListeners: StatusCallback[] = [];
 let transactionListeners: TransactionCallback[] = [];
 let intermediateStatusListeners: IntermediateStatusCallback[] = [];
 let connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
+let lastHandshakeTime: number | null = null;
+let lastErrorMessage: string | null = null;
 
 // Default configuration
 const DEFAULT_CONFIG: Partial<POSConfig> = {
   timeout: 120000, // 2 minutes for POS transactions
   retryAttempts: 3,
+  autoDetect: true,
 };
 
-// Error codes mapping
-const ERROR_CODES: Record<string, string> = {
-  'POS_NOT_CONNECTED': 'جهاز الدفع غير متصل. يرجى التأكد من توصيل الجهاز بشكل صحيح.',
-  'POS_TIMEOUT': 'انتهت مهلة الاتصال بجهاز الدفع. يرجى المحاولة مرة أخرى.',
-  'COMMUNICATION_FAILURE': 'فشل الاتصال بجهاز الدفع. يرجى التحقق من الاتصال.',
-  'CUSTOMER_CANCELLED': 'تم إلغاء العملية من قبل المستخدم.',
-  'CARD_READER_TIMEOUT': 'انتهت مهلة قارئ البطاقة. يرجى المحاولة مرة أخرى.',
-  'DECLINED': 'تم رفض البطاقة. يرجى المحاولة ببطاقة أخرى.',
-  'INSUFFICIENT_FUNDS': 'رصيد غير كافي.',
-  'INVALID_CARD': 'بطاقة غير صالحة.',
-  'EXPIRED_CARD': 'بطاقة منتهية الصلاحية.',
-  'REVERSAL_REQUIRED': 'يتطلب إلغاء العملية السابقة.',
-  'POS_NOT_AVAILABLE': 'جهاز الدفع غير متوفر حالياً.',
-  'UNKNOWN_ERROR': 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
-};
-
-// Intermediate status messages (Arabic)
+// Intermediate status messages (Arabic) - mapped from ECR protocol codes
 const INTERMEDIATE_STATUS_MESSAGES: Record<POSIntermediateStatus, string> = {
   'INITIALIZING': 'جاري التهيئة...',
   'INSERT_CARD': 'الرجاء إدخال البطاقة',
   'TAP_CARD': 'الرجاء تقريب البطاقة',
   'SWIPE_CARD': 'الرجاء تمرير البطاقة',
   'ENTER_PIN': 'الرجاء إدخال الرقم السري',
+  'PIN_ENTERED': 'تم إدخال الرقم السري',
   'PROCESSING': 'جاري معالجة العملية...',
   'COMMUNICATING_WITH_BANK': 'جاري الاتصال بالبنك...',
+  'RESPONSE_RECEIVED': 'تم استلام الرد من البنك',
   'REMOVE_CARD': 'الرجاء إزالة البطاقة',
+  'CARD_REMOVED': 'تم إزالة البطاقة',
   'PRINTING_RECEIPT': 'جاري طباعة الإيصال...',
   'TRANSACTION_COMPLETE': 'تمت العملية',
+  'TRANSACTION_FAILED': 'فشلت العملية',
+  'REVERSAL_IN_PROGRESS': 'جاري إلغاء العملية...',
+  'FALLBACK': 'جاري التبديل لقراءة أخرى',
 };
 
 /**

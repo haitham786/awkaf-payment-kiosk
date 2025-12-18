@@ -18,17 +18,23 @@ import { CreditCard, Smartphone, Keyboard, Loader2, CheckCircle, XCircle, AlertT
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
 // Icons for different intermediate statuses
-const StatusIcons: Record<POSIntermediateStatus, React.ReactNode> = {
+const StatusIcons: Partial<Record<POSIntermediateStatus, React.ReactNode>> = {
   'INITIALIZING': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
   'INSERT_CARD': <CreditCard className="w-16 h-16 text-blue-600 animate-pulse" />,
   'TAP_CARD': <Smartphone className="w-16 h-16 text-blue-600 animate-bounce" />,
   'SWIPE_CARD': <CreditCard className="w-16 h-16 text-blue-600 animate-pulse" />,
   'ENTER_PIN': <Keyboard className="w-16 h-16 text-amber-600 animate-pulse" />,
+  'PIN_ENTERED': <Keyboard className="w-16 h-16 text-green-600" />,
   'PROCESSING': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
   'COMMUNICATING_WITH_BANK': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
+  'RESPONSE_RECEIVED': <CheckCircle className="w-16 h-16 text-blue-600" />,
   'REMOVE_CARD': <CreditCard className="w-16 h-16 text-green-600" />,
+  'CARD_REMOVED': <CreditCard className="w-16 h-16 text-green-600" />,
   'PRINTING_RECEIPT': <Loader2 className="w-16 h-16 text-emerald-600 animate-spin" />,
   'TRANSACTION_COMPLETE': <CheckCircle className="w-16 h-16 text-green-600" />,
+  'TRANSACTION_FAILED': <XCircle className="w-16 h-16 text-red-600" />,
+  'REVERSAL_IN_PROGRESS': <Loader2 className="w-16 h-16 text-amber-600 animate-spin" />,
+  'FALLBACK': <CreditCard className="w-16 h-16 text-amber-600 animate-pulse" />,
 };
 
 const PaymentProcessingPage = () => {
@@ -52,17 +58,23 @@ const PaymentProcessingPage = () => {
       setIntermediateMessage(message);
       
       // Update progress based on status
-      const progressMap: Record<POSIntermediateStatus, number> = {
+      const progressMap: Partial<Record<POSIntermediateStatus, number>> = {
         'INITIALIZING': 10,
         'INSERT_CARD': 20,
         'TAP_CARD': 20,
         'SWIPE_CARD': 20,
         'ENTER_PIN': 40,
+        'PIN_ENTERED': 50,
         'PROCESSING': 60,
         'COMMUNICATING_WITH_BANK': 75,
+        'RESPONSE_RECEIVED': 80,
         'REMOVE_CARD': 85,
+        'CARD_REMOVED': 88,
         'PRINTING_RECEIPT': 95,
         'TRANSACTION_COMPLETE': 100,
+        'TRANSACTION_FAILED': 100,
+        'REVERSAL_IN_PROGRESS': 90,
+        'FALLBACK': 25,
       };
       setProgress(progressMap[status] || progress);
     });
