@@ -28,8 +28,11 @@ export interface USBDeviceInfo {
 }
 
 // Known OM-A880 POS identifiers (configurable)
-// Updated with more comprehensive list including common USB-Serial adapters
+// CRITICAL: User's POS detected as Vendor 05C6, Product 903B (CDC ACM)
 export const DEFAULT_POS_IDENTIFIERS: USBDeviceInfo[] = [
+  // OM-A880 POS - CONFIRMED WORKING (User's device)
+  { vendorId: 0x05C6, productId: 0x903B }, // OM-A880 CDC ACM - PRIMARY
+  
   // OMA Emirates OM-A880 variants
   { vendorId: 0x0D46, productId: 0x4001 }, // OMA Emirates OM-A880 (common)
   { vendorId: 0x0D46, productId: 0x4002 }, // OMA Emirates OM-A880 variant
@@ -39,20 +42,15 @@ export const DEFAULT_POS_IDENTIFIERS: USBDeviceInfo[] = [
   { vendorId: 0x1D90, productId: 0x201A }, // Newland N900
   { vendorId: 0x1D90, productId: 0x2015 }, // Newland generic
   
-  // PAX Technology (common in similar POS)
-  { vendorId: 0x2FB8, productId: 0x0001 }, // PAX Technology
-  { vendorId: 0x2FB8, productId: 0x0002 }, // PAX variant
+  // Qualcomm CDC (same vendor as user's device)
+  { vendorId: 0x05C6, productId: 0x9091 }, // Qualcomm variant
+  { vendorId: 0x05C6, productId: 0x9092 }, // Qualcomm variant
   
   // USB-Serial Adapters (commonly used with POS)
   { vendorId: 0x1A86, productId: 0x7523 }, // CH340 USB-Serial
-  { vendorId: 0x1A86, productId: 0x5523 }, // CH341 USB-Serial
   { vendorId: 0x067B, productId: 0x2303 }, // Prolific PL2303
-  { vendorId: 0x067B, productId: 0x23A3 }, // Prolific PL2303HXA
   { vendorId: 0x0403, productId: 0x6001 }, // FTDI FT232R
-  { vendorId: 0x0403, productId: 0x6010 }, // FTDI FT2232
-  { vendorId: 0x0403, productId: 0x6015 }, // FTDI FT231X
   { vendorId: 0x10C4, productId: 0xEA60 }, // CP210x
-  { vendorId: 0x10C4, productId: 0xEA70 }, // CP2105
   
   // CDC ACM (standard USB serial class)
   { vendorId: 0x0000, productId: 0x0000, deviceClass: 0x02 }, // CDC class
