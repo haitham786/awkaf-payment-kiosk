@@ -16,10 +16,10 @@ interface POSConfig {
   softPos: {
     merchantId: string;
     terminalId: string;
-    apiKey: string;
     sdkEndpoint: string;
     callbackUrl: string;
     providerName: string;
+    // Note: apiKey is NOT stored here for security - managed via SOFT_POS_API_KEY secret
   };
 }
 
@@ -209,15 +209,12 @@ const POSConfigSection: React.FC<POSConfigSectionProps> = ({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="apiKey">API Key / Secret Token</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={config.softPos.apiKey}
-              onChange={(e) => handleSoftPosChange('apiKey', e.target.value)}
-              placeholder="Enter API Key"
-            />
+          {/* Secure API Key Status */}
+          <div className="p-3 rounded-lg border bg-amber-50 border-amber-200">
+            <p className="text-xs text-amber-700">
+              <strong>API Key / Secret Token:</strong> For security, API keys are stored as environment secrets (SOFT_POS_API_KEY) 
+              and not in the database. Contact your administrator to configure this secret.
+            </p>
           </div>
 
           <div>

@@ -68,10 +68,10 @@ const NFCPaymentPage = () => {
 
       if (settings?.soft_pos_config) {
         const config = settings.soft_pos_config as any;
+        // Note: apiKey is not stored in database - accessed via edge function secrets
         await initializeSoftPOS({
           merchantId: config.merchant_id || '',
           terminalId: config.terminal_id || '',
-          apiKey: config.api_key || '',
           sdkEndpoint: config.sdk_endpoint || '',
           callbackUrl: config.callback_url || '',
           providerName: config.provider_name || '',

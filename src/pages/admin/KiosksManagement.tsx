@@ -33,11 +33,11 @@ const KiosksManagement = () => {
   const [softPosConfig, setSoftPosConfig] = useState({
     merchantId: '',
     terminalId: '',
-    apiKey: '',
     sdkEndpoint: '',
     callbackUrl: '',
     providerName: '',
   });
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   const loadSoftPosConfig = async () => {
     const { data } = await supabase.from('kiosk_settings').select('soft_pos_config').limit(1).maybeSingle();
@@ -46,26 +46,45 @@ const KiosksManagement = () => {
       setSoftPosConfig({
         merchantId: config.merchant_id || '',
         terminalId: config.terminal_id || '',
-        apiKey: config.api_key || '',
         sdkEndpoint: config.sdk_endpoint || '',
         callbackUrl: config.callback_url || '',
         providerName: config.provider_name || '',
       });
     }
+    // Check if API key is configured via edge function
+    checkApiKeyStatus();
+  };
+
+  const checkApiKeyStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-softpos-secret', {
+        body: { action: 'check' }
+      });
+      if (!error && data?.configured) {
+        setApiKeyConfigured(true);
+      } else {
+        setApiKeyConfigured(false);
+      }
+    } catch (err) {
+      console.error('Error checking API key status:', err);
+      setApiKeyConfigured(false);
+    }
   };
 
   const saveSoftPosConfig = async () => {
+    // Save only non-sensitive configuration to database
+    // API key should be managed via Supabase secrets (SOFT_POS_API_KEY)
     const { error } = await supabase.from('kiosk_settings').update({
       soft_pos_config: {
         merchant_id: softPosConfig.merchantId,
         terminal_id: softPosConfig.terminalId,
-        api_key: softPosConfig.apiKey,
         sdk_endpoint: softPosConfig.sdkEndpoint,
         callback_url: softPosConfig.callbackUrl,
         provider_name: softPosConfig.providerName,
+        // Note: api_key is NOT stored here - use SOFT_POS_API_KEY secret instead
       },
     } as any).eq('id', '00000000-0000-0000-0000-000000000001');
-    if (!error) toast.success('Soft POS configuration saved');
+    if (!error) toast.success('Soft POS configuration saved (API key managed via secrets)');
     else toast.error('Failed to save Soft POS configuration');
   };
 
@@ -572,6 +591,7 @@ const KiosksManagement = () => {
             config={softPosConfig}
             onChange={setSoftPosConfig}
             showTitle={false}
+            apiKeyConfigured={apiKeyConfigured}
           />
         </Card>
 

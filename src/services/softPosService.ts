@@ -11,10 +11,12 @@
 export interface SoftPOSConfig {
   merchantId: string;
   terminalId: string;
-  apiKey: string;
   sdkEndpoint: string;
   callbackUrl: string;
   providerName: string;
+  // Note: apiKey is NOT stored here for security reasons
+  // API key should be managed via SOFT_POS_API_KEY environment secret
+  // and accessed only through the manage-softpos-secret edge function
 }
 
 export interface SoftPOSTransactionResult {
