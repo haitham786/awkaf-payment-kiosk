@@ -20,6 +20,7 @@ import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
 import MobileNumberPage from "./pages/kiosk/MobileNumberPage";
 import ErrorPage from "./pages/kiosk/ErrorPage";
+import POSDiagnosticsPage from "./pages/kiosk/POSDiagnosticsPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
 import KiosksManagement from "./pages/admin/KiosksManagement";
@@ -76,6 +77,7 @@ const AppContent = () => {
             <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
             <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
             <Route path="/kiosk/error" element={<ErrorPage />} />
+            <Route path="/kiosk/diagnostics" element={<POSDiagnosticsPage />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
