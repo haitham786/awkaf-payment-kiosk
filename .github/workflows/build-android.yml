@@ -36,12 +36,19 @@ jobs:
           echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}" 
           echo "ANDROID_HOME=${ANDROID_HOME:-}"
 
-      - name: Install Java 17 (APT) - avoid action download timeouts
+      - name: Install Java 21 (APT) - avoid action download timeouts
         shell: bash
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y openjdk-17-jdk
+          sudo apt-get install -y openjdk-21-jdk
+
+          # Force Java 21 as the active toolchain (otherwise the runner may keep Java 17 as default)
+          if [ -x /usr/lib/jvm/java-21-openjdk-amd64/bin/java ]; then
+            sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac
+          fi
+
           java -version
           javac -version
 
