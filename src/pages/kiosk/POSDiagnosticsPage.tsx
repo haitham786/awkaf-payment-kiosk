@@ -4,9 +4,7 @@
  * Use this page to test and diagnose POS connection issues with the OM-A880
  * Access via: /kiosk/diagnostics
  * 
- * Supports:
- * - Web Serial API (Chrome/PWA - no native plugins required!)
- * - Native USB (requires Capacitor plugin)
+ * RECOMMENDED: USB Bridge App method for Android
  */
 
 import { useState, useEffect } from 'react';
@@ -14,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   RefreshCw, 
   CheckCircle, 
@@ -24,20 +24,22 @@ import {
   Unplug,
   Terminal,
   Wifi,
-  Globe
+  Globe,
+  ExternalLink,
+  Cable,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  isWebSerialSupported, 
-  autoConnectToPOS, 
-  disconnect as webSerialDisconnect,
-  getConnectionStatus,
-  getPortInfo,
-  sendCommand,
-  onConnectionChange,
-} from '@/services/webSerialService';
 import { buildTerminalInfoRequest } from '@/services/ethernetEcrService';
 import { parseXMLResponse } from '@/services/ecrProtocol';
+import {
+  initializeBridge,
+  disconnectBridge,
+  sendBridgeCommand,
+  getBridgeState,
+  testBridgeConnection,
+  getRecommendedApps,
+  onBridgeStateChange,
+} from '@/services/usbBridgeService';
 
 interface DiagnosticResult {
   test: string;
@@ -54,19 +56,19 @@ const POSDiagnosticsPage = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMethod, setConnectionMethod] = useState<string>('none');
   const [lastData, setLastData] = useState<string | null>(null);
-  const [portInfo, setPortInfo] = useState<any>(null);
+  
+  // Bridge configuration
+  const [bridgeHost, setBridgeHost] = useState('127.0.0.1');
+  const [bridgePort, setBridgePort] = useState('8888');
+  const [showSetup, setShowSetup] = useState(true);
 
   // Check connection status on mount
   useEffect(() => {
-    setIsConnected(getConnectionStatus());
-    const info = getPortInfo();
-    if (info) setPortInfo(info);
-
-    // Subscribe to connection changes
-    const unsubscribe = onConnectionChange((connected) => {
-      setIsConnected(connected);
-      if (!connected) {
-        setPortInfo(null);
+    setIsConnected(getBridgeState() === 'connected');
+    
+    const unsubscribe = onBridgeStateChange((state) => {
+      setIsConnected(state === 'connected');
+      if (state !== 'connected') {
         setConnectionMethod('none');
       }
     });
@@ -85,109 +87,82 @@ const POSDiagnosticsPage = () => {
     try {
       // Test 1: Check environment
       addResult({
-        test: 'Environment Check',
+        test: 'Environment',
         status: 'info',
-        message: `Running in: ${typeof (window as any).Capacitor !== 'undefined' ? 'Capacitor Native App' : 'Web Browser'}`,
+        message: `Running on: ${/Android/i.test(navigator.userAgent) ? 'Android' : 'Other'} | ${typeof (window as any).Capacitor !== 'undefined' ? 'Native App' : 'Browser'}`,
       });
 
-      // Test 2: Check Web Serial support
-      const webSerialSupport = isWebSerialSupported();
+      // Test 2: Test USB Bridge connection
       addResult({
-        test: 'Web Serial API',
-        status: webSerialSupport.supported ? 'pass' : 'warning',
-        message: webSerialSupport.supported 
-          ? 'Web Serial API is available! You can connect to POS via USB from Chrome.'
-          : webSerialSupport.reason || 'Web Serial not available',
-        details: webSerialSupport,
+        test: 'USB Bridge',
+        status: 'info',
+        message: `Testing connection to ${bridgeHost}:${bridgePort}...`,
       });
 
-      // Test 3: Try to connect if Web Serial is available
-      if (webSerialSupport.supported) {
+      const bridgeResult = await testBridgeConnection();
+      
+      if (bridgeResult.connected) {
+        setIsConnected(true);
+        setConnectionMethod('usbbridge');
+        
         addResult({
-          test: 'POS Connection',
-          status: 'info',
-          message: 'Attempting to connect to POS via Web Serial... (Select your device in the popup)',
+          test: 'USB Bridge',
+          status: 'pass',
+          message: `Connected via ${bridgeResult.method}!`,
+          details: bridgeResult,
         });
 
-        const connectResult = await autoConnectToPOS();
-        
-        if (connectResult.connected) {
-          setIsConnected(true);
-          setConnectionMethod('webserial');
-          const info = getPortInfo();
-          setPortInfo(info);
+        // Test 3: Try to communicate with POS
+        addResult({
+          test: 'POS Communication',
+          status: 'info',
+          message: 'Sending terminal info request...',
+        });
+
+        try {
+          const infoRequest = buildTerminalInfoRequest();
+          const response = await sendBridgeCommand(infoRequest, 10000);
           
-          addResult({
-            test: 'POS Connection',
-            status: 'pass',
-            message: 'Successfully connected to POS device!',
-            details: info,
-          });
-
-          // Test 4: Send terminal info request
-          addResult({
-            test: 'Terminal Communication',
-            status: 'info',
-            message: 'Sending terminal info request...',
-          });
-
-          try {
-            const infoRequest = buildTerminalInfoRequest();
-            const response = await sendCommand(infoRequest, 10000);
+          if (response) {
+            setLastData(response);
+            const parsed = parseXMLResponse(response);
             
-            if (response) {
-              setLastData(response);
-              const parsed = parseXMLResponse(response);
-              
-              addResult({
-                test: 'Terminal Communication',
-                status: 'pass',
-                message: 'Received response from POS terminal!',
-                details: parsed,
-              });
-            } else {
-              addResult({
-                test: 'Terminal Communication',
-                status: 'warning',
-                message: 'No response from terminal (may need to wake up the POS)',
-              });
-            }
-          } catch (err: any) {
             addResult({
-              test: 'Terminal Communication',
+              test: 'POS Communication',
+              status: 'pass',
+              message: 'POS responded successfully!',
+              details: parsed,
+            });
+          } else {
+            addResult({
+              test: 'POS Communication',
               status: 'warning',
-              message: `Communication test: ${err.message}`,
+              message: 'No response from POS (make sure POS is ready)',
             });
           }
-        } else {
+        } catch (err: any) {
           addResult({
-            test: 'POS Connection',
-            status: 'fail',
-            message: connectResult.error || 'Failed to connect to POS',
+            test: 'POS Communication',
+            status: 'warning',
+            message: `Communication: ${err.message}`,
           });
         }
+      } else {
+        addResult({
+          test: 'USB Bridge',
+          status: 'fail',
+          message: bridgeResult.error || 'Cannot connect to bridge app',
+          details: {
+            tip: 'Make sure the USB bridge app is running and TCP server is enabled',
+          },
+        });
       }
-
-      // Check for native bridges
-      const hasOMA880Bridge = typeof (window as any).OMA880Bridge !== 'undefined';
-      const hasAndroidUSB = typeof (window as any).AndroidUSB !== 'undefined';
-      
-      addResult({
-        test: 'Native Bridges',
-        status: hasOMA880Bridge || hasAndroidUSB ? 'pass' : 'info',
-        message: hasOMA880Bridge 
-          ? 'OMA880Bridge detected (native)' 
-          : hasAndroidUSB 
-            ? 'AndroidUSB bridge detected (native)'
-            : 'No native bridges (normal for Chrome/PWA)',
-        details: { hasOMA880Bridge, hasAndroidUSB },
-      });
 
     } catch (error: any) {
       addResult({
-        test: 'Diagnostics Error',
+        test: 'Error',
         status: 'fail',
-        message: error.message || 'Unknown error during diagnostics',
+        message: error.message || 'Unknown error',
       });
     } finally {
       setIsRunning(false);
@@ -195,16 +170,14 @@ const POSDiagnosticsPage = () => {
   };
 
   const disconnectPOS = async () => {
-    await webSerialDisconnect();
+    await disconnectBridge();
     setIsConnected(false);
-    setPortInfo(null);
     setConnectionMethod('none');
     addResult({
       test: 'Disconnect',
       status: 'info',
       message: 'Disconnected from POS',
-      timestamp: new Date(),
-    } as DiagnosticResult);
+    });
   };
 
   const clearResults = () => {
@@ -238,6 +211,8 @@ const POSDiagnosticsPage = () => {
     }
   };
 
+  const recommendedApps = getRecommendedApps();
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -246,82 +221,67 @@ const POSDiagnosticsPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2">
               <Terminal className="h-5 w-5" />
-              POS Diagnostics
+              POS Diagnostics (USB Bridge)
             </CardTitle>
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>
-              Back to Home
+              Back
             </Button>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Test and diagnose connection with the OM-A880 POS terminal.
-              <br />
-              <strong className="text-foreground">Web Serial</strong> works directly in Chrome - no app installation needed!
+              Connect to OM-A880 POS using a <strong>USB Bridge App</strong> on your Android device.
             </p>
             
-            {/* Status Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-              <Card className="bg-muted/50">
-                <CardContent className="p-3">
-                  <div className="text-xs text-muted-foreground">Method</div>
-                  <div className="flex items-center gap-1">
-                    {connectionMethod === 'webserial' ? (
-                      <>
-                        <Globe className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">Web Serial</span>
-                      </>
-                    ) : connectionMethod === 'native' ? (
-                      <>
-                        <Usb className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">Native USB</span>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">None</span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-muted/50">
-                <CardContent className="p-3">
-                  <div className="text-xs text-muted-foreground">Connection</div>
-                  <div className="flex items-center gap-1">
-                    {isConnected ? (
-                      <>
-                        <Wifi className="h-4 w-4 text-green-500" />
-                        <span className="text-green-500">Connected</span>
-                      </>
-                    ) : (
-                      <>
-                        <Unplug className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Disconnected</span>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              {portInfo && (
-                <Card className="bg-muted/50">
-                  <CardContent className="p-3">
-                    <div className="text-xs text-muted-foreground">Device</div>
-                    <div className="font-mono text-xs">
-                      {portInfo.usbVendorId 
-                        ? `VID:0x${portInfo.usbVendorId.toString(16).toUpperCase()}` 
-                        : 'Unknown'}
-                    </div>
-                  </CardContent>
-                </Card>
+            {/* Bridge Configuration */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <Label className="text-xs">Bridge Host</Label>
+                <Input
+                  value={bridgeHost}
+                  onChange={(e) => setBridgeHost(e.target.value)}
+                  placeholder="127.0.0.1"
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Bridge Port</Label>
+                <Input
+                  value={bridgePort}
+                  onChange={(e) => setBridgePort(e.target.value)}
+                  placeholder="8888"
+                  className="h-9"
+                />
+              </div>
+            </div>
+            
+            {/* Status */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                {isConnected ? (
+                  <>
+                    <Cable className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-500">Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <Unplug className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Disconnected</span>
+                  </>
+                )}
+              </div>
+              {connectionMethod !== 'none' && (
+                <Badge variant="secondary">{connectionMethod}</Badge>
               )}
             </div>
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="flex gap-2 flex-wrap">
               <Button 
                 onClick={runDiagnostics} 
                 disabled={isRunning}
-                className="flex items-center gap-2"
               >
-                <RefreshCw className={`h-4 w-4 ${isRunning ? 'animate-spin' : ''}`} />
-                {isRunning ? 'Running...' : 'Connect & Test POS'}
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
+                {isRunning ? 'Testing...' : 'Test Connection'}
               </Button>
               {isConnected && (
                 <Button variant="outline" onClick={disconnectPOS}>
@@ -329,28 +289,79 @@ const POSDiagnosticsPage = () => {
                   Disconnect
                 </Button>
               )}
-              {results.length > 0 && (
-                <Button variant="ghost" onClick={clearResults}>
-                  Clear
-                </Button>
-              )}
+              <Button variant="ghost" onClick={() => setShowSetup(!showSetup)}>
+                {showSetup ? 'Hide' : 'Show'} Setup Guide
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Results Log */}
+        {/* Setup Guide */}
+        {showSetup && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                Setup Guide - USB Bridge App
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm">
+                <p className="mb-3 text-muted-foreground">
+                  This method uses a free Android app to bridge USB serial data to TCP, which our kiosk can connect to.
+                </p>
+                
+                {recommendedApps.map((app, idx) => (
+                  <div key={idx} className="p-3 bg-background rounded-lg mb-3 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <strong>{app.name}</strong>
+                      <a 
+                        href={app.playStoreUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary text-xs flex items-center gap-1 hover:underline"
+                      >
+                        Play Store <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">by {app.developer}</p>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {app.features.map((f, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>
+                      ))}
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-xs font-medium mb-1">Setup Steps:</p>
+                      <ol className="text-xs text-muted-foreground space-y-1">
+                        {app.setup.map((step, i) => (
+                          <li key={i}>{i + 1}. {step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Results */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Diagnostic Results</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Test Results</CardTitle>
+              {results.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearResults}>Clear</Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[300px]">
               {results.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
-                  <p>Click "Connect & Test POS" to start</p>
-                  <p className="text-xs mt-2">
-                    A device picker will appear - select your POS terminal
-                  </p>
+                  <Cable className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Click "Test Connection" to start</p>
+                  <p className="text-xs mt-1">Make sure the bridge app is running first</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -370,7 +381,7 @@ const POSDiagnosticsPage = () => {
                           </div>
                           <p className="text-sm mt-1">{result.message}</p>
                           {result.details && (
-                            <pre className="mt-2 p-2 bg-black/10 rounded text-xs overflow-auto max-h-32">
+                            <pre className="mt-2 p-2 bg-black/10 rounded text-xs overflow-auto max-h-24">
                               {JSON.stringify(result.details, null, 2)}
                             </pre>
                           )}
@@ -384,52 +395,19 @@ const POSDiagnosticsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Last Data Received */}
+        {/* Last Response */}
         {lastData && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Last Response from POS</CardTitle>
+              <CardTitle className="text-base">Last POS Response</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="p-3 bg-muted rounded text-xs overflow-auto max-h-48">
+              <pre className="p-3 bg-muted rounded text-xs overflow-auto max-h-40">
                 {lastData}
               </pre>
             </CardContent>
           </Card>
         )}
-
-        {/* How It Works */}
-        <Card className="bg-muted/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">How Web Serial Works</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-3">
-            <div className="flex items-start gap-3">
-              <Badge className="bg-green-500">✓</Badge>
-              <p className="text-muted-foreground">
-                <strong className="text-foreground">No app installation needed</strong> - Works directly in Chrome browser on Android
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Badge className="bg-green-500">✓</Badge>
-              <p className="text-muted-foreground">
-                <strong className="text-foreground">No Android Studio required</strong> - Just connect your POS via USB OTG adapter
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Badge className="bg-green-500">✓</Badge>
-              <p className="text-muted-foreground">
-                <strong className="text-foreground">Works with PWA</strong> - Install this site to home screen for app-like experience
-              </p>
-            </div>
-            
-            <div className="border-t pt-3 mt-3">
-              <p className="text-muted-foreground text-xs">
-                <strong>Requirements:</strong> Chrome 89+ on Android, USB OTG adapter, HTTPS connection
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
