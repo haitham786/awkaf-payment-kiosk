@@ -159,6 +159,9 @@ jobs:
           import re
 
           p = Path("android/app/src/main/AndroidManifest.xml")
+          if not p.exists():
+              raise SystemExit(f"AndroidManifest.xml not found at {p}. Did 'npx cap add/sync android' run?")
+
           xml = p.read_text(encoding="utf-8")
 
           # Ensure USB host feature (only once)
@@ -169,16 +172,8 @@ jobs:
                   1,
               )
 
-          # Attach USB_DEVICE_ATTACHED intent filter + metadata to MainActivity (only once)
+          # Attach USB_DEVICE_ATTACHED intent filter + metadata (only once)
           if "android.hardware.usb.action.USB_DEVICE_ATTACHED" not in xml:
-              pattern = r'(<activity\\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)</activity>'
-              m = re.search(pattern, xml, flags=re.S)
-              if not m:
-                  raise SystemExit(
-                      "MainActivity not found in AndroidManifest.xml; cannot attach USB intent filter"
-                  )
-
-              head, body = m.group(1), m.group(2)
               inject = """
                       <intent-filter>
                           <action android:name=\"android.hardware.usb.action.USB_DEVICE_ATTACHED\" />
@@ -187,7 +182,30 @@ jobs:
                           android:name=\"android.hardware.usb.action.USB_DEVICE_ATTACHED\"
                           android:resource=\"@xml/device_filter\" />
               """
-              xml = xml[: m.start(0)] + head + body + inject + "</activity>" + xml[m.end(0) :]
+
+              # 1) Prefer MainActivity if present
+              pattern_main = r'(<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)(</activity>)'
+              m = re.search(pattern_main, xml, flags=re.S)
+
+              # 2) Fallback: inject into launcher activity (MAIN + LAUNCHER)
+              if not m:
+                  pattern_any = r'(<activity\b[^>]*>)(.*?)(</activity>)'
+                  for mi in re.finditer(pattern_any, xml, flags=re.S):
+                      block = mi.group(0)
+                      if (
+                          "android.intent.action.MAIN" in block
+                          and "android.intent.category.LAUNCHER" in block
+                      ):
+                          m = mi
+                          break
+
+              if not m:
+                  raise SystemExit(
+                      "No suitable <activity> found to attach USB intent filter (MainActivity or launcher activity not found)."
+                  )
+
+              head, body, tail = m.group(1), m.group(2), m.group(3)
+              xml = xml[: m.start(0)] + head + body + inject + tail + xml[m.end(0) :]
 
           p.write_text(xml, encoding="utf-8")
           print("AndroidManifest.xml patched successfully")
