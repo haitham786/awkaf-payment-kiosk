@@ -166,15 +166,20 @@ jobs:
             fi
           fi
 
-      - name: Build Debug APK (USB enabled)
-        working-directory: android
-        continue-on-error: true
+      - name: Ensure Android SDK path (local.properties)
         shell: bash
         run: |
-          set +e
+          set -euxo pipefail
+          test -d android || (echo "ERROR: android/ platform folder missing" && exit 1)
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
+          cat android/local.properties
+
+      - name: Build Debug APK (USB enabled)
+        working-directory: android
+        shell: bash
+        run: |
+          set -euxo pipefail
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
-          echo "Gradle exit code: ${PIPESTATUS[0]}"
-          exit 0
 
       - name: Upload Gradle reports (always)
         if: always()
@@ -201,33 +206,30 @@ jobs:
         if: always()
         run: |
           echo "Android build outputs:"
-          find android/app/build/outputs -maxdepth 6 -type f || true
+          find android -maxdepth 5 -type f -name "*.apk" -o -name "*.aab" -o -name "*.log" -o -name "*.txt" 2>/dev/null || true
+          find android/app/build/outputs -maxdepth 8 -type f 2>/dev/null || true
 
       - name: Collect APK
-        if: always()
+        if: success()
         run: |
           set -euxo pipefail
           mkdir -p release-apks
 
           APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
-            APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1 || true)
+            APK_PATH=$(find android/app/build/outputs -type f -name "*.apk" 2>/dev/null | head -n 1 || true)
           fi
 
           if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
             echo "Found APK at: $APK_PATH"
             cp "$APK_PATH" release-apks/awkaf-kiosk-usb.apk
           else
-            echo "ERROR: APK not found under android/app/build/outputs/apk"
-            if [ -f android-gradle.log ]; then
-              echo "---- Last 200 lines of android-gradle.log ----"
-              tail -n 200 android-gradle.log || true
-            fi
+            echo "ERROR: APK not found under android/app/build/outputs"
             exit 1
           fi
 
-
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: awkaf-kiosk-usb-apk
@@ -236,7 +238,7 @@ jobs:
           retention-days: 30
 
       - name: Create Release (on main branch)
-        if: github.ref == 'refs/heads/main'
+        if: success() && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
