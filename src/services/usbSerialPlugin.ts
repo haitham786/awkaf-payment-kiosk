@@ -79,18 +79,25 @@ const tryCapacitorUSBSerial = async (): Promise<boolean> => {
   try {
     // Check for the plugin in Capacitor context
     if (typeof (window as any).Capacitor === 'undefined') {
+      console.log('[USBSerial] Not running in Capacitor environment');
       return false;
     }
 
     const Capacitor = (window as any).Capacitor;
     
+    // Check if native platform
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[USBSerial] Not running on native platform (browser mode)');
+      return false;
+    }
+    
     // Check if plugin is registered
     const plugins = Capacitor.Plugins;
     
-    // Try different plugin names
+    // Try different plugin names (capacitor-plugin-usb-serial registers as UsbSerial)
     const possiblePluginNames = [
-      'USBSerial',
-      'UsbSerial', 
+      'UsbSerial',        // capacitor-plugin-usb-serial
+      'USBSerial',        // alternative casing
       'CapacitorUsbSerial',
       'capacitorUsbSerial',
     ];
@@ -102,13 +109,17 @@ const tryCapacitorUSBSerial = async (): Promise<boolean> => {
         // Register data listener
         try {
           await plugins[pluginName].addListener('data', (event: { data: string }) => {
-            console.log('[USBSerial] Data received:', event.data);
+            console.log('[USBSerial] Data received:', event.data?.substring(0, 100));
             dataCallbacks.forEach(cb => cb(event.data));
           });
 
           await plugins[pluginName].addListener('connectionChange', (event: { connected: boolean }) => {
             console.log('[USBSerial] Connection changed:', event.connected);
             connectionCallbacks.forEach(cb => cb(event.connected));
+          });
+          
+          await plugins[pluginName].addListener('error', (event: { error: string }) => {
+            console.error('[USBSerial] Plugin error:', event.error);
           });
         } catch (e) {
           console.warn('[USBSerial] Could not register listeners:', e);
@@ -118,10 +129,8 @@ const tryCapacitorUSBSerial = async (): Promise<boolean> => {
       }
     }
 
-    // Dynamic import not available at build time - plugin must be registered
-    // If you need dynamic import, install the plugin:
-    // npm install capacitor-plugin-usb-serial
-
+    console.log('[USBSerial] No USB Serial plugin found in Capacitor.Plugins');
+    console.log('[USBSerial] Available plugins:', Object.keys(plugins || {}));
     return false;
   } catch (error) {
     console.error('[USBSerial] Error initializing Capacitor plugin:', error);
