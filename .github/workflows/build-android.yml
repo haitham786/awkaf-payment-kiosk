@@ -220,7 +220,12 @@ jobs:
           set -euxo pipefail
           which sdkmanager
           sdkmanager --version
-          yes | sdkmanager --licenses
+
+          # sdkmanager often closes stdin early; with pipefail this makes `yes` exit with SIGPIPE ("Broken pipe")
+          # and fails the step even though licenses were accepted.
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
 
       - name: Install Android SDK packages (try 35, fallback 34)
         shell: bash
