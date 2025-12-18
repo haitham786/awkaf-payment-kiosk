@@ -113,7 +113,61 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Ensure JitPack repository (required for USB serial dependency)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - << 'PY'
+          from pathlib import Path
+          import re
+
+          def patch_repositories_block(text: str, snippet: str) -> str:
+              if "jitpack.io" in text:
+                  return text
+              # Insert into every "repositories {" block (settings.gradle often has both pluginManagement + dependencyResolutionManagement)
+              return re.sub(r"(repositories\s*\{\s*\n)", r"\1        " + snippet + "\n", text)
+
+          def patch_file(path: Path, snippet: str) -> None:
+              if not path.exists():
+                  return
+              original = path.read_text(encoding="utf-8")
+              patched = patch_repositories_block(original, snippet)
+              if patched != original:
+                  path.write_text(patched, encoding="utf-8")
+                  print(f"Added JitPack to {path}")
+
+          # Groovy Gradle files
+          groovy_snippet = 'maven { url "https://jitpack.io" }'
+          patch_file(Path("android/settings.gradle"), groovy_snippet)
+          patch_file(Path("android/build.gradle"), groovy_snippet)
+          patch_file(Path("android/app/build.gradle"), groovy_snippet)
+
+          # Kotlin DSL (if present)
+          kts_snippet = 'maven { url = uri("https://jitpack.io") }'
+          patch_file(Path("android/settings.gradle.kts"), kts_snippet)
+          patch_file(Path("android/build.gradle.kts"), kts_snippet)
+          patch_file(Path("android/app/build.gradle.kts"), kts_snippet)
+
+          # Sanity check
+          found = []
+          for p in [
+              Path("android/settings.gradle"),
+              Path("android/build.gradle"),
+              Path("android/app/build.gradle"),
+              Path("android/settings.gradle.kts"),
+              Path("android/build.gradle.kts"),
+              Path("android/app/build.gradle.kts"),
+          ]:
+              if p.exists() and "jitpack.io" in p.read_text(encoding="utf-8"):
+                  found.append(str(p))
+
+          if not found:
+              raise SystemExit("Failed to patch Gradle repositories with JitPack; no target Gradle files found.")
+          print("JitPack enabled in:", ", ".join(found))
+          PY
+
       - name: Create USB device filter XML
+        run: |
         run: |
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/device_filter.xml << 'EOF'
