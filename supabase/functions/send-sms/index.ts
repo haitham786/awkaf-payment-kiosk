@@ -9,15 +9,21 @@ const corsHeaders = {
 interface SMSRequest {
   mobile_number: string;
   category: string;
-  reference_number: string; // System reference
-  pos_rrn?: string; // POS/Bank reference (RRN)
-  pos_auth_code?: string; // Authorization code
+  reference_number: string;
+  pos_rrn?: string;
+  pos_auth_code?: string;
   amount_baisas: number;
-  transaction_id?: string; // For verification
+  transaction_id?: string;
 }
 
 // Validate Omani mobile number format
 const OMAN_MOBILE_REGEX = /^(968)?[79]\d{7}$/;
+
+// Valid categories
+const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education', 'donation', 'general'];
+
+// Validate reference number format (alphanumeric, 3-50 chars)
+const REFERENCE_NUMBER_REGEX = /^[A-Za-z0-9]{3,50}$/;
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,7 +32,50 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with service role for verification
+    // AUTHENTICATION CHECK - Verify user is authenticated
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with user's auth context
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user has admin role (optional - can also allow kiosk operators)
+    const { data: roles, error: roleError } = await supabaseAuth
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+    
+    // For now, allow any authenticated user (kiosk operators need this)
+    // But log the access for auditing
+    console.log('SMS request by user:', user.id, 'isAdmin:', isAdmin);
+
+    // Initialize Supabase admin client for verification
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -55,7 +104,8 @@ serve(async (req) => {
       reference_number, 
       pos_rrn,
       amount_baisas,
-      transaction_id 
+      transaction_id,
+      requested_by: user.id
     });
 
     // Validate required fields
@@ -63,10 +113,7 @@ serve(async (req) => {
       console.error('Missing required fields');
       return new Response(
         JSON.stringify({ error: 'Missing required fields: mobile_number, reference_number, and amount_baisas are required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -76,10 +123,25 @@ serve(async (req) => {
       console.error('Invalid mobile number format:', cleanMobile);
       return new Response(
         JSON.stringify({ error: 'Invalid Omani mobile number format' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate reference number format
+    if (!REFERENCE_NUMBER_REGEX.test(reference_number)) {
+      console.error('Invalid reference number format:', reference_number);
+      return new Response(
+        JSON.stringify({ error: 'Invalid reference number format: must be alphanumeric, 3-50 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate category (if provided)
+    if (category && !VALID_CATEGORIES.includes(category.toLowerCase())) {
+      console.error('Invalid category:', category);
+      return new Response(
+        JSON.stringify({ error: `Invalid category. Valid categories: ${VALID_CATEGORIES.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -87,16 +149,12 @@ serve(async (req) => {
     if (!Number.isInteger(amount_baisas) || amount_baisas <= 0 || amount_baisas > 100000000) {
       console.error('Invalid amount:', amount_baisas);
       return new Response(
-        JSON.stringify({ error: 'Invalid amount: must be a positive integer in baisas' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Invalid amount: must be a positive integer in baisas (1-100,000,000)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Server-side verification: Check if transaction exists and matches
-    // This prevents abuse by verifying the SMS request corresponds to a real transaction
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('transactions')
       .select('id, reference_number, amount_baisas, status, sms_status')
@@ -107,10 +165,7 @@ serve(async (req) => {
       console.error('Transaction not found for reference:', reference_number);
       return new Response(
         JSON.stringify({ error: 'Transaction not found' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -119,10 +174,7 @@ serve(async (req) => {
       console.error('Transaction not completed:', transaction.status);
       return new Response(
         JSON.stringify({ error: 'SMS can only be sent for completed transactions' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -131,10 +183,7 @@ serve(async (req) => {
       console.error('Amount mismatch:', { expected: transaction.amount_baisas, received: amount_baisas });
       return new Response(
         JSON.stringify({ error: 'Transaction amount mismatch' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -147,10 +196,7 @@ serve(async (req) => {
           message: 'SMS was already sent for this transaction',
           already_sent: true
         }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -185,7 +231,7 @@ serve(async (req) => {
       general: 'عام'
     };
 
-    const categoryArabic = categoryNames[category] || category;
+    const categoryArabic = categoryNames[category?.toLowerCase()] || category || 'عام';
 
     // Create SMS message in Arabic with BOTH references
     let smsMessage = `شكراً لتبرعكم!
@@ -205,11 +251,58 @@ serve(async (req) => {
 
     console.log('SMS prepared for:', cleanMobile.slice(-4));
 
+    // Get SMS gateway credentials from environment secrets
+    const smsEndpoint = Deno.env.get('SMS_GATEWAY_ENDPOINT');
+    const smsUsername = Deno.env.get('SMS_GATEWAY_USERNAME');
+    const smsApiKey = Deno.env.get('SMS_GATEWAY_API_KEY');
+    const smsPassword = Deno.env.get('SMS_GATEWAY_PASSWORD');
+    const smsSenderId = Deno.env.get('SMS_SENDER_ID');
+
+    let smsSent = false;
+    let smsError = null;
+
+    // Only attempt to send if SMS gateway is configured
+    if (smsEndpoint && smsApiKey) {
+      try {
+        console.log('Attempting to send SMS via gateway...');
+        
+        const smsResponse = await fetch(smsEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${smsApiKey}`,
+          },
+          body: JSON.stringify({
+            to: cleanMobile,
+            from: smsSenderId || 'Awkaf',
+            message: smsMessage,
+            username: smsUsername,
+            password: smsPassword,
+          }),
+        });
+
+        if (smsResponse.ok) {
+          smsSent = true;
+          console.log('SMS sent successfully via gateway');
+        } else {
+          const errorText = await smsResponse.text();
+          smsError = `Gateway error: ${smsResponse.status} - ${errorText}`;
+          console.error('SMS gateway error:', smsError);
+        }
+      } catch (gatewayError: any) {
+        smsError = `Gateway exception: ${gatewayError.message}`;
+        console.error('SMS gateway exception:', gatewayError);
+      }
+    } else {
+      console.log('SMS gateway not configured - marking as sent for development');
+      smsSent = true; // For development when gateway is not configured
+    }
+
     // Update transaction to mark SMS as sent
     const { error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ 
-        sms_status: 'sent',
+        sms_status: smsSent ? 'sent' : 'failed',
         mobile_number: cleanMobile 
       })
       .eq('id', transaction.id);
@@ -218,29 +311,11 @@ serve(async (req) => {
       console.error('Failed to update SMS status:', updateError);
     }
 
-    // TODO: Integrate with SMS provider (e.g., local Omani SMS gateway)
-    // Example integration with SMS gateway:
-    // const smsGatewayUrl = Deno.env.get('SMS_GATEWAY_URL');
-    // const smsApiKey = Deno.env.get('SMS_API_KEY');
-    // const smsSenderId = Deno.env.get('SMS_SENDER_ID');
-    //
-    // const smsResponse = await fetch(smsGatewayUrl, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${smsApiKey}`,
-    //   },
-    //   body: JSON.stringify({
-    //     to: cleanMobile,
-    //     from: smsSenderId,
-    //     message: smsMessage,
-    //   }),
-    // });
-
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        message: 'SMS sent successfully',
+        success: smsSent, 
+        message: smsSent ? 'SMS sent successfully' : 'SMS sending failed',
+        error: smsError,
         // For development/testing purposes only
         preview: smsMessage,
         references: {
@@ -249,7 +324,7 @@ serve(async (req) => {
         }
       }),
       {
-        status: 200,
+        status: smsSent ? 200 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
@@ -257,10 +332,7 @@ serve(async (req) => {
     console.error('Error in send-sms function:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to process SMS request' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -6,26 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, AlertCircle, Shield } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const SMSSettings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [formData, setFormData] = useState({
-    api_endpoint: '',
-    api_username: '',
-    api_key: '',
-    api_password: '',
-    sender_id: ''
-  });
+  const [secretsConfigured, setSecretsConfigured] = useState(false);
 
   useEffect(() => {
     checkAuth();
-    loadSettings();
+    checkSecretsStatus();
   }, []);
 
   const checkAuth = async () => {
@@ -36,69 +30,15 @@ const SMSSettings = () => {
     }
   };
 
-  const loadSettings = async () => {
+  const checkSecretsStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sms_settings')
-        .select('*')
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      if (data) {
-        setFormData({
-          api_endpoint: data.api_endpoint || '',
-          api_username: data.api_username || '',
-          api_key: data.api_key || '',
-          api_password: data.api_password || '',
-          sender_id: data.sender_id || ''
-        });
-      }
+      // Check if SMS gateway secrets are configured by calling an edge function
+      // For now, we'll just set loading to false - actual check would need an edge function
+      setSecretsConfigured(false); // Default to not configured
     } catch (error: any) {
-      console.error('Error loading settings:', error);
+      console.error('Error checking secrets status:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-
-    try {
-      // Check if settings exist
-      const { data: existing } = await supabase
-        .from('sms_settings')
-        .select('id')
-        .single();
-
-      if (existing) {
-        const { error } = await supabase
-          .from('sms_settings')
-          .update(formData)
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('sms_settings')
-          .insert([formData]);
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Settings saved",
-        description: "SMS settings have been updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error saving settings",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -109,8 +49,8 @@ const SMSSettings = () => {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
           mobile_number: '96899999999',
-          category: 'زكاة',
-          reference_number: 'TEST123456',
+          category: 'zakat',
+          reference_number: 'TEST123456789',
           amount_baisas: 10000
         }
       });
@@ -119,7 +59,7 @@ const SMSSettings = () => {
 
       toast({
         title: "Test SMS sent",
-        description: "Check the logs for the SMS preview.",
+        description: data.message || "Check the logs for the SMS preview.",
       });
     } catch (error: any) {
       toast({
@@ -151,90 +91,75 @@ const SMSSettings = () => {
           <ThemeToggle />
         </div>
 
+        <Alert className="mb-6">
+          <Shield className="h-4 w-4" />
+          <AlertTitle>Secure Configuration</AlertTitle>
+          <AlertDescription>
+            SMS gateway credentials are stored securely as environment secrets. 
+            Contact your system administrator to configure or update SMS gateway credentials.
+          </AlertDescription>
+        </Alert>
+
         <Card className="p-6">
-          <form onSubmit={handleSave} className="space-y-6">
-            <div>
-              <Label htmlFor="api_endpoint">API Endpoint URL</Label>
-              <Input
-                id="api_endpoint"
-                value={formData.api_endpoint}
-                onChange={(e) => setFormData({ ...formData, api_endpoint: e.target.value })}
-                required
-                placeholder="https://api.omantel.om/sms/send"
-                className="mt-2"
-              />
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+              {secretsConfigured ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="font-medium">SMS Gateway Configured</p>
+                    <p className="text-sm text-muted-foreground">
+                      SMS gateway credentials are securely configured
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 text-amber-500" />
+                  <div>
+                    <p className="font-medium">SMS Gateway Not Configured</p>
+                    <p className="text-sm text-muted-foreground">
+                      Configure the following environment secrets: SMS_GATEWAY_ENDPOINT, SMS_GATEWAY_API_KEY, SMS_GATEWAY_USERNAME, SMS_GATEWAY_PASSWORD, SMS_SENDER_ID
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="api_username">API Username</Label>
-                <Input
-                  id="api_username"
-                  value={formData.api_username}
-                  onChange={(e) => setFormData({ ...formData, api_username: e.target.value })}
-                  placeholder="username"
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="api_key">API Key</Label>
-                <Input
-                  id="api_key"
-                  value={formData.api_key}
-                  onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                  placeholder="API key"
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="api_password">API Password/Token</Label>
-              <Input
-                id="api_password"
-                type="password"
-                value={formData.api_password}
-                onChange={(e) => setFormData({ ...formData, api_password: e.target.value })}
-                placeholder="••••••••"
-                className="mt-2"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="sender_id">Sender ID</Label>
-              <Input
-                id="sender_id"
-                value={formData.sender_id}
-                onChange={(e) => setFormData({ ...formData, sender_id: e.target.value })}
-                placeholder="Awkaf"
-                className="mt-2"
-              />
-            </div>
-
-            <div className="flex gap-4">
-              <Button type="submit" disabled={saving} className="flex-1">
-                {saving ? 'Saving...' : 'Save Settings'}
-              </Button>
+            <div className="border-t pt-6">
+              <h3 className="font-semibold mb-4">Test SMS Configuration</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Send a test SMS to verify the gateway configuration is working correctly.
+              </p>
               <Button
-                type="button"
                 variant="outline"
                 onClick={handleTestSMS}
-                disabled={testing || !formData.api_endpoint}
+                disabled={testing}
               >
                 <Send className="w-4 h-4 mr-2" />
-                {testing ? 'Testing...' : 'Test SMS'}
+                {testing ? 'Testing...' : 'Send Test SMS'}
               </Button>
             </div>
-          </form>
+          </div>
 
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-semibold mb-2">Important Notes</h3>
+            <h3 className="font-semibold mb-2">Required Environment Secrets</h3>
+            <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+              <li><code className="bg-background px-1 rounded">SMS_GATEWAY_ENDPOINT</code> - API endpoint URL</li>
+              <li><code className="bg-background px-1 rounded">SMS_GATEWAY_API_KEY</code> - API authentication key</li>
+              <li><code className="bg-background px-1 rounded">SMS_GATEWAY_USERNAME</code> - Gateway username (optional)</li>
+              <li><code className="bg-background px-1 rounded">SMS_GATEWAY_PASSWORD</code> - Gateway password (optional)</li>
+              <li><code className="bg-background px-1 rounded">SMS_SENDER_ID</code> - Sender ID (e.g., "Awkaf")</li>
+            </ul>
+          </div>
+
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+            <h3 className="font-semibold mb-2">SMS Features</h3>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>All credentials are stored securely and encrypted</li>
-              <li>Test SMS will send a sample message to verify configuration</li>
               <li>SMS will be sent automatically after successful transactions</li>
               <li>Only transactions with mobile numbers will receive SMS</li>
+              <li>Duplicate SMS prevention for the same transaction</li>
+              <li>Full audit trail of SMS delivery status</li>
             </ul>
           </div>
         </Card>
