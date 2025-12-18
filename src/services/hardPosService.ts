@@ -65,8 +65,20 @@ import {
   TCPConnectionState,
 } from './ethernetEcrService';
 
-// Connection types
-export type ConnectionType = 'usb' | 'ethernet';
+// Import Web Serial Service (for Chrome/PWA USB communication)
+import {
+  isWebSerialAvailable,
+  isWebSerialSupported,
+  autoConnectToPOS as webSerialConnect,
+  disconnect as webSerialDisconnect,
+  sendCommand as webSerialSendCommand,
+  getConnectionStatus as webSerialGetStatus,
+  onConnectionChange as webSerialOnConnectionChange,
+  onDataReceived as webSerialOnDataReceived,
+} from './webSerialService';
+
+// Connection types - added 'webserial' for Chrome/PWA
+export type ConnectionType = 'usb' | 'ethernet' | 'webserial';
 
 // POS Connection Status
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'ready' | 'error';
@@ -293,13 +305,23 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
     // ETHERNET is the PRIMARY connection method
     if (config.connectionType === 'ethernet') {
       return await initializeEthernetConnection(config.ipAddress!, config.port!);
+    } else if (config.connectionType === 'webserial') {
+      // WEB SERIAL for Chrome/PWA - uses browser's Web Serial API
+      console.log('Using Web Serial connection (Chrome/PWA)');
+      return await initializeWebSerialConnection();
     } else if (config.connectionType === 'usb') {
-      // USB is secondary/fallback
-      console.log('Using USB connection (secondary method)');
+      // USB is secondary/fallback (requires Capacitor native plugin)
+      console.log('Using USB connection (native method)');
       return await initializeUSBConnection();
     }
     
-    // Default to Ethernet if available
+    // Default: Try Web Serial first (for Chrome/PWA), then Ethernet
+    const webSerialSupport = isWebSerialSupported();
+    if (webSerialSupport.supported) {
+      console.log('Defaulting to Web Serial connection');
+      return await initializeWebSerialConnection();
+    }
+    
     if (config.ipAddress && config.port) {
       console.log('Defaulting to Ethernet connection');
       return await initializeEthernetConnection(config.ipAddress, config.port);
@@ -314,11 +336,58 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
 };
 
 /**
- * Initialize USB connection (SECONDARY method)
- * Uses Android USB Host / Serial APIs
+ * Initialize Web Serial connection (Chrome/PWA)
+ * Uses browser's Web Serial API - no native plugins required
+ */
+const initializeWebSerialConnection = async (): Promise<boolean> => {
+  console.log('Initializing Web Serial connection (Chrome/PWA)...');
+  
+  const support = isWebSerialSupported();
+  if (!support.supported) {
+    console.error('Web Serial not supported:', support.reason);
+    lastErrorMessage = support.reason || 'Web Serial not supported';
+    setConnectionStatus('error');
+    return false;
+  }
+  
+  try {
+    // Subscribe to connection changes
+    webSerialOnConnectionChange((connected) => {
+      console.log('Web Serial connection changed:', connected);
+      setConnectionStatus(connected ? 'connected' : 'disconnected');
+    });
+    
+    // Subscribe to incoming data for intermediate status
+    webSerialOnDataReceived((data) => {
+      handleIncomingPOSData(data);
+    });
+    
+    // Connect to POS via Web Serial (will prompt user to select device)
+    const result = await webSerialConnect();
+    
+    if (result.connected) {
+      setConnectionStatus('connected');
+      startConnectionMonitoring();
+      return true;
+    } else {
+      lastErrorMessage = result.error || 'Failed to connect via Web Serial';
+      setConnectionStatus('disconnected');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('Web Serial connection error:', error);
+    lastErrorMessage = error.message || 'Web Serial connection failed';
+    setConnectionStatus('error');
+    return false;
+  }
+};
+
+/**
+ * Initialize USB connection (native Capacitor method)
+ * Uses Android USB Host / Serial APIs - requires native plugin
  */
 const initializeUSBConnection = async (): Promise<boolean> => {
-  console.log('Initializing USB connection (secondary method)...');
+  console.log('Initializing USB connection (native method)...');
   
   try {
     const deviceDetected = await detectUSBDevice();
@@ -836,12 +905,18 @@ export const getLastTransactionStatus = async (transactionId: string): Promise<T
 
 /**
  * Send ECR Command to POS and receive response
- * PRIORITY: Ethernet (TCP/IP) > Native Bridge > USB
+ * PRIORITY: Web Serial (Chrome/PWA) > Ethernet (TCP/IP) > Native Bridge > USB
  */
 const sendECRCommand = async (message: POSMessage): Promise<TransactionResponse> => {
   const timeout = currentConfig?.timeout || 120000;
   
-  // ETHERNET is the PRIMARY method
+  // WEB SERIAL for Chrome/PWA (no native plugins required)
+  if (currentConfig?.connectionType === 'webserial' && webSerialGetStatus()) {
+    console.log('Sending ECR command via Web Serial:', message.command);
+    return await sendECRViaWebSerial(message, timeout);
+  }
+  
+  // ETHERNET is the PRIMARY method for native apps
   if (currentConfig?.connectionType === 'ethernet' && getEthernetState() === 'connected') {
     console.log('Sending ECR command via Ethernet:', message.command);
     return await sendECRViaEthernet(message, timeout);
@@ -853,7 +928,7 @@ const sendECRCommand = async (message: POSMessage): Promise<TransactionResponse>
     return await sendECRViaNativeBridge(message, timeout);
   }
   
-  // Fall back to USB if configured
+  // Fall back to USB if configured (requires native plugin)
   if (currentConfig?.connectionType === 'usb') {
     console.log('Sending ECR command via USB:', message.command);
     return await sendECRViaUSB(message, timeout);
@@ -864,6 +939,57 @@ const sendECRCommand = async (message: POSMessage): Promise<TransactionResponse>
   return new Promise((resolve) => {
     simulatePOSTransaction(message, resolve);
   });
+};
+
+/**
+ * Send ECR command via Web Serial (Chrome/PWA) - NO NATIVE PLUGINS REQUIRED
+ */
+const sendECRViaWebSerial = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
+  let xmlRequest: string;
+  
+  switch (message.command) {
+    case 'PURCHASE':
+      xmlRequest = buildPurchaseRequest(
+        parseInt(message.payload?.amount || '0'),
+        message.payload?.invoiceNumber,
+        message.payload?.merchantReference
+      );
+      break;
+    case 'GET_STATUS':
+      xmlRequest = buildStatusRequest();
+      break;
+    case 'GET_TERMINAL_INFO':
+      xmlRequest = buildTerminalInfoRequest();
+      break;
+    case 'RECONCILIATION':
+      xmlRequest = buildReconciliationRequest();
+      break;
+    case 'LAST_TRANSACTION_STATUS':
+      xmlRequest = buildLastTransactionRequest();
+      break;
+    case 'GET_TOTALS':
+      xmlRequest = buildTotalsRequest();
+      break;
+    default:
+      xmlRequest = `<?xml version="1.0" encoding="UTF-8"?><ECRMessage><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></ECRMessage>`;
+  }
+  
+  try {
+    const responseXml = await webSerialSendCommand(xmlRequest, timeout);
+    
+    if (!responseXml) {
+      throw new Error('No response from POS');
+    }
+    
+    // Parse the XML response
+    const ecrResponse = parseECRXMLResponse(responseXml);
+    
+    // Convert ECRResponse to TransactionResponse
+    return convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
+  } catch (error: any) {
+    console.error('Web Serial ECR command failed:', error);
+    throw error;
+  }
 };
 
 /**
