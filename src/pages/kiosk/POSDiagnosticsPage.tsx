@@ -4,7 +4,7 @@
  * Use this page to test and diagnose POS connection issues with the OM-A880
  * Access via: /kiosk/diagnostics
  * 
- * RECOMMENDED: USB Bridge App method for Android
+ * RECOMMENDED: TCPUART app method for Android
  */
 
 import { useState, useEffect } from 'react';
@@ -221,7 +221,7 @@ const POSDiagnosticsPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2">
               <Terminal className="h-5 w-5" />
-              POS Diagnostics (USB Bridge)
+              POS Diagnostics (TCPUART)
             </CardTitle>
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>
               Back
@@ -229,7 +229,7 @@ const POSDiagnosticsPage = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Connect to OM-A880 POS using a <strong>USB Bridge App</strong> on your Android device.
+              Connect to OM-A880 POS using <strong>TCPUART</strong> app on your Android device.
             </p>
             
             {/* Bridge Configuration */}
@@ -302,13 +302,13 @@ const POSDiagnosticsPage = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Info className="h-4 w-4" />
-                Setup Guide - USB Bridge App
+                Setup Guide - TCPUART App
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm">
                 <p className="mb-3 text-muted-foreground">
-                  This method uses a free Android app to bridge USB serial data to TCP, which our kiosk can connect to.
+                  TCPUART is a simple app that bridges USB serial to TCP. Our kiosk connects to it on port 8888.
                 </p>
                 
                 {recommendedApps.map((app, idx) => (
