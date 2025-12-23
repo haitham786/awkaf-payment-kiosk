@@ -7,10 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Wifi, WifiOff, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Wifi, WifiOff, Loader2, CheckCircle, XCircle, CreditCard, HardDrive, Info } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
-import SoftPOSConfigSection from "@/components/admin/SoftPOSConfigSection";
 import { testConnection, POSConfig } from "@/services/hardPosService";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+interface KioskConfiguration {
+  payment_mode: 'hardware_pos' | 'soft_pos';
+  pos: {
+    connectionType: string;
+    ipAddress: string;
+    port: string;
+  };
+  soft_pos?: {
+    tajer_token: string;
+    environment: 'trial' | 'live';
+  };
+  sound_enabled?: boolean;
+}
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -24,76 +38,24 @@ const KiosksManagement = () => {
     reference_number: '',
     location: '',
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'pending_approval',
-    configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
+    configuration: {
+      payment_mode: 'hardware_pos' as 'hardware_pos' | 'soft_pos',
+      pos: { connectionType: 'usb', ipAddress: '', port: '' },
+      soft_pos: { tajer_token: '', environment: 'trial' as 'trial' | 'live' },
+      sound_enabled: true,
+    } as KioskConfiguration
   });
   const [backgroundImage, setBackgroundImage] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [softPosConfig, setSoftPosConfig] = useState({
-    merchantId: '',
-    terminalId: '',
-    sdkEndpoint: '',
-    callbackUrl: '',
-    providerName: '',
-  });
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-
-  const loadSoftPosConfig = async () => {
-    const { data } = await supabase.from('kiosk_settings').select('soft_pos_config').limit(1).maybeSingle();
-    if (data?.soft_pos_config) {
-      const config = data.soft_pos_config as any;
-      setSoftPosConfig({
-        merchantId: config.merchant_id || '',
-        terminalId: config.terminal_id || '',
-        sdkEndpoint: config.sdk_endpoint || '',
-        callbackUrl: config.callback_url || '',
-        providerName: config.provider_name || '',
-      });
-    }
-    // Check if API key is configured via edge function
-    checkApiKeyStatus();
-  };
-
-  const checkApiKeyStatus = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('manage-softpos-secret', {
-        body: { action: 'check' }
-      });
-      if (!error && data?.configured) {
-        setApiKeyConfigured(true);
-      } else {
-        setApiKeyConfigured(false);
-      }
-    } catch (err) {
-      console.error('Error checking API key status:', err);
-      setApiKeyConfigured(false);
-    }
-  };
-
-  const saveSoftPosConfig = async () => {
-    // Save only non-sensitive configuration to database
-    // API key should be managed via Supabase secrets (SOFT_POS_API_KEY)
-    const { error } = await supabase.from('kiosk_settings').update({
-      soft_pos_config: {
-        merchant_id: softPosConfig.merchantId,
-        terminal_id: softPosConfig.terminalId,
-        sdk_endpoint: softPosConfig.sdkEndpoint,
-        callback_url: softPosConfig.callbackUrl,
-        provider_name: softPosConfig.providerName,
-        // Note: api_key is NOT stored here - use SOFT_POS_API_KEY secret instead
-      },
-    } as any).eq('id', '00000000-0000-0000-0000-000000000001');
-    if (!error) toast.success('Soft POS configuration saved (API key managed via secrets)');
-    else toast.error('Failed to save Soft POS configuration');
-  };
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuth();
     loadKiosks();
     loadBackgroundImage();
     loadLogoImage();
-    loadSoftPosConfig();
 
     // Subscribe to real-time changes in kiosks table
     const channel = supabase
@@ -176,14 +138,38 @@ const KiosksManagement = () => {
     }
   };
 
+  const validateForm = (): boolean => {
+    setValidationError(null);
+    
+    // If Soft POS is selected, Tajer Token is required
+    if (formData.configuration.payment_mode === 'soft_pos') {
+      if (!formData.configuration.soft_pos?.tajer_token?.trim()) {
+        setValidationError('Tajer Token is required for Thawani Soft POS (Trial Mode)');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       if (editingId) {
         const { error } = await supabase
           .from('kiosks')
-          .update(formData)
+          .update({
+            name: formData.name,
+            reference_number: formData.reference_number,
+            location: formData.location,
+            status: formData.status,
+            configuration: formData.configuration
+          } as any)
           .eq('id', editingId);
 
         if (error) throw error;
@@ -191,7 +177,13 @@ const KiosksManagement = () => {
       } else {
         const { error } = await supabase
           .from('kiosks')
-          .insert([formData]);
+          .insert([{
+            name: formData.name,
+            reference_number: formData.reference_number,
+            location: formData.location,
+            status: formData.status,
+            configuration: formData.configuration
+          } as any]);
 
         if (error) throw error;
         toast.success("Kiosk added successfully");
@@ -206,13 +198,20 @@ const KiosksManagement = () => {
 
   const handleEdit = (kiosk: any) => {
     setEditingId(kiosk.id);
+    const config = kiosk.configuration || {};
     setFormData({
       name: kiosk.name,
       reference_number: kiosk.reference_number || '',
       location: kiosk.location,
       status: kiosk.status,
-      configuration: kiosk.configuration || { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
+      configuration: {
+        payment_mode: config.payment_mode || 'hardware_pos',
+        pos: config.pos || { connectionType: 'usb', ipAddress: '', port: '' },
+        soft_pos: config.soft_pos || { tajer_token: '', environment: 'trial' },
+        sound_enabled: config.sound_enabled !== false,
+      }
     });
+    setValidationError(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -239,8 +238,14 @@ const KiosksManagement = () => {
       reference_number: '',
       location: '',
       status: 'active',
-      configuration: { pos: { connectionType: 'usb', ipAddress: '', port: '' } }
+      configuration: {
+        payment_mode: 'hardware_pos',
+        pos: { connectionType: 'usb', ipAddress: '', port: '' },
+        soft_pos: { tajer_token: '', environment: 'trial' },
+        sound_enabled: true,
+      }
     });
+    setValidationError(null);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,6 +447,15 @@ const KiosksManagement = () => {
     }
   };
 
+  const getPaymentModeLabel = (kiosk: any) => {
+    const paymentMode = kiosk.configuration?.payment_mode;
+    if (paymentMode === 'soft_pos') {
+      return 'Soft POS (Thawani)';
+    }
+    const connectionType = kiosk.configuration?.pos?.connectionType?.toUpperCase() || 'USB';
+    return `Hardware POS (${connectionType})`;
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
@@ -573,28 +587,6 @@ const KiosksManagement = () => {
           </Card>
         </div>
 
-        {/* Soft POS Configuration */}
-        <Card className="p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Smartphone className="w-5 h-5" />
-              Soft POS Configuration
-            </h2>
-            <Button onClick={saveSoftPosConfig} size="sm">
-              Save Soft POS Settings
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Configure Soft POS (NFC contactless) settings for all kiosks. Hard POS (USB/Ethernet) is configured per-kiosk in the Edit Kiosk dialog.
-          </p>
-          <SoftPOSConfigSection
-            config={softPosConfig}
-            onChange={setSoftPosConfig}
-            showTitle={false}
-            apiKeyConfigured={apiKeyConfigured}
-          />
-        </Card>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Form */}
           <Card className="p-6">
@@ -652,81 +644,208 @@ const KiosksManagement = () => {
                 </Select>
               </div>
 
-              {/* Hardware POS Configuration Section */}
+              {/* Payment Method Configuration */}
               <div className="space-y-4 border-t pt-4">
-                <h3 className="font-semibold text-sm">Hardware POS Configuration (OM-A880)</h3>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Payment Method Configuration (Per KIOSK)
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  Configure per-kiosk POS connection settings. Each kiosk can have its own USB or Ethernet configuration.
+                  Select one payment method for this kiosk. Hardware POS and Soft POS cannot be active at the same time.
                 </p>
-                
-                <div>
-                  <Label>Connection Type</Label>
-                  <Select
-                    value={formData.configuration.pos.connectionType}
-                    onValueChange={(value) => setFormData({ 
-                      ...formData, 
-                      configuration: { 
-                        ...formData.configuration, 
-                        pos: { ...formData.configuration.pos, connectionType: value }
-                      }
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usb">USB (Auto-detect)</SelectItem>
-                      <SelectItem value="ethernet">Ethernet (TCP/IP)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                {formData.configuration.pos.connectionType === 'usb' && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">
-                      USB mode will automatically detect the connected OM-A880 POS device. No manual configuration required.
+                <RadioGroup
+                  value={formData.configuration.payment_mode}
+                  onValueChange={(value: 'hardware_pos' | 'soft_pos') => {
+                    setFormData({
+                      ...formData,
+                      configuration: {
+                        ...formData.configuration,
+                        payment_mode: value
+                      }
+                    });
+                    setValidationError(null);
+                  }}
+                  className="space-y-3"
+                >
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="hardware_pos" id="hardware_pos" />
+                    <Label htmlFor="hardware_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <HardDrive className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Hardware POS</p>
+                        <p className="text-xs text-muted-foreground">USB or Ethernet connected POS terminal (OM-A880)</p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="soft_pos" id="soft_pos" />
+                    <Label htmlFor="soft_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <Smartphone className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Soft POS (Powered by Thawani)</p>
+                        <p className="text-xs text-muted-foreground">NFC contactless payments on device screen</p>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Hardware POS Configuration - shown when hardware_pos selected */}
+              {formData.configuration.payment_mode === 'hardware_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <HardDrive className="w-4 h-4" />
+                    Hardware POS Configuration
+                  </h4>
+                  
+                  <div>
+                    <Label>Connection Type</Label>
+                    <Select
+                      value={formData.configuration.pos.connectionType}
+                      onValueChange={(value) => setFormData({ 
+                        ...formData, 
+                        configuration: { 
+                          ...formData.configuration, 
+                          pos: { ...formData.configuration.pos, connectionType: value }
+                        }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="usb">USB (Auto-detect)</SelectItem>
+                        <SelectItem value="ethernet">Ethernet (TCP/IP)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.configuration.pos.connectionType === 'usb' && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        USB mode will automatically detect the connected OM-A880 POS device. No manual configuration required.
+                      </p>
+                    </div>
+                  )}
+
+                  {formData.configuration.pos.connectionType === 'ethernet' && (
+                    <>
+                      <div>
+                        <Label htmlFor="ip">IP Address</Label>
+                        <Input
+                          id="ip"
+                          value={formData.configuration.pos.ipAddress}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            configuration: { 
+                              ...formData.configuration, 
+                              pos: { ...formData.configuration.pos, ipAddress: e.target.value }
+                            }
+                          })}
+                          placeholder="192.168.1.100"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="port">Port</Label>
+                        <Input
+                          id="port"
+                          value={formData.configuration.pos.port}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            configuration: { 
+                              ...formData.configuration, 
+                              pos: { ...formData.configuration.pos, port: e.target.value }
+                            }
+                          })}
+                          placeholder="8080"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Test POS Connection Button */}
+                  <TestPOSConnectionButton config={formData.configuration.pos} />
+                </div>
+              )}
+
+              {/* Soft POS (Thawani) Configuration - shown when soft_pos selected */}
+              {formData.configuration.payment_mode === 'soft_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Smartphone className="w-4 h-4" />
+                    Soft POS Configuration (Thawani – Trial Mode)
+                  </h4>
+                  
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Thawani trial mode uses a single Tajer Token for authentication. Live credentials will be available after production setup.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="tajer_token">Tajer Token (Required)</Label>
+                    <Input
+                      id="tajer_token"
+                      value={formData.configuration.soft_pos?.tajer_token || ''}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        configuration: { 
+                          ...formData.configuration, 
+                          soft_pos: { 
+                            ...formData.configuration.soft_pos!,
+                            tajer_token: e.target.value 
+                          }
+                        }
+                      })}
+                      placeholder="Enter Thawani Tajer Token"
+                      className={validationError ? 'border-destructive' : ''}
+                    />
+                    {validationError && (
+                      <p className="text-xs text-destructive mt-1">{validationError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Environment</Label>
+                    <RadioGroup
+                      value={formData.configuration.soft_pos?.environment || 'trial'}
+                      onValueChange={(value: 'trial' | 'live') => setFormData({ 
+                        ...formData, 
+                        configuration: { 
+                          ...formData.configuration, 
+                          soft_pos: { 
+                            ...formData.configuration.soft_pos!,
+                            environment: value 
+                          }
+                        }
+                      })}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="trial" id="env_trial" />
+                        <Label htmlFor="env_trial" className="cursor-pointer">Trial / Sandbox</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 opacity-50">
+                        <RadioGroupItem value="live" id="env_live" disabled />
+                        <Label htmlFor="env_live" className="cursor-not-allowed text-muted-foreground">
+                          Live (Coming Soon)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <strong>SUNMI Flex 3 Ready:</strong> NFC payments will be processed directly on the device screen. Card data is handled securely by Thawani's SDK.
                     </p>
                   </div>
-                )}
-
-                {formData.configuration.pos.connectionType === 'ethernet' && (
-                  <>
-                    <div>
-                      <Label htmlFor="ip">IP Address</Label>
-                      <Input
-                        id="ip"
-                        value={formData.configuration.pos.ipAddress}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          configuration: { 
-                            ...formData.configuration, 
-                            pos: { ...formData.configuration.pos, ipAddress: e.target.value }
-                          }
-                        })}
-                        placeholder="192.168.1.100"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="port">Port</Label>
-                      <Input
-                        id="port"
-                        value={formData.configuration.pos.port}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          configuration: { 
-                            ...formData.configuration, 
-                            pos: { ...formData.configuration.pos, port: e.target.value }
-                          }
-                        })}
-                        placeholder="8080"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* Test POS Connection Button */}
-                <TestPOSConnectionButton config={formData.configuration.pos} />
-              </div>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">
@@ -789,14 +908,25 @@ const KiosksManagement = () => {
                           </span>
                         </p>
                       </div>
-                      {kiosk.configuration?.pos && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          POS: {kiosk.configuration.pos.connectionType?.toUpperCase() || 'Not configured'}
-                          {kiosk.configuration.pos.connectionType === 'ethernet' && kiosk.configuration.pos.ipAddress && (
+                      {/* Payment Mode Display */}
+                      <div className="mt-2 flex items-center gap-2">
+                        {kiosk.configuration?.payment_mode === 'soft_pos' ? (
+                          <Smartphone className="w-3 h-3 text-blue-600" />
+                        ) : (
+                          <HardDrive className="w-3 h-3 text-gray-600" />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {getPaymentModeLabel(kiosk)}
+                          {kiosk.configuration?.payment_mode === 'hardware_pos' && 
+                           kiosk.configuration.pos?.connectionType === 'ethernet' && 
+                           kiosk.configuration.pos?.ipAddress && (
                             <> ({kiosk.configuration.pos.ipAddress}:{kiosk.configuration.pos.port})</>
                           )}
+                          {kiosk.configuration?.payment_mode === 'soft_pos' && (
+                            <span className="ml-1 text-amber-600">(Trial Mode)</span>
+                          )}
                         </p>
-                      )}
+                      </div>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs text-muted-foreground">Sound Effects:</span>
                         <Button

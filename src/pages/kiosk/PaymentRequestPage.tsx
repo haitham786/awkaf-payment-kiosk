@@ -12,21 +12,28 @@ const PaymentRequestPage = () => {
   const [posType, setPosType] = useState<'hard_pos' | 'soft_pos'>('hard_pos');
 
   useEffect(() => {
-    // Check POS type from settings
+    // Check POS type from kiosk configuration (per-kiosk setting)
     const checkPosType = async () => {
-      const { data } = await supabase
-        .from('kiosk_settings')
-        .select('pos_type')
-        .limit(1)
-        .maybeSingle();
+      const kioskId = localStorage.getItem('kiosk_id');
       
-      if (data?.pos_type === 'soft_pos') {
-        // Route directly to NFC payment page for Soft POS
-        navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
-        return;
+      if (kioskId) {
+        // Read payment_mode from kiosk's own configuration
+        const { data: kioskData } = await supabase
+          .from('kiosks')
+          .select('configuration')
+          .eq('id', kioskId)
+          .single();
+        
+        const paymentMode = (kioskData?.configuration as any)?.payment_mode;
+        
+        if (paymentMode === 'soft_pos') {
+          // Route directly to NFC payment page for Soft POS (Thawani)
+          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+          return;
+        }
       }
       
-      // For Hard POS, continue to payment processing after 3 seconds
+      // For Hard POS (default), continue to payment processing after 3 seconds
       const timer = setTimeout(() => {
         navigate(`/kiosk/payment-processing?category=${category}&amount=${amount}`);
       }, 3000);
