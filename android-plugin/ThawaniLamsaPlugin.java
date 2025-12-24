@@ -28,7 +28,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import om.thawani.lamsa.sdk.LamsaSDK;
 import om.thawani.lamsa.sdk.models.InitOptionsModel;
-import om.thawani.lamsa.sdk.models.PaymentOption;
+import om.thawani.lamsa.sdk.models.PaymentOptions;
+import om.thawani.lamsa.sdk.models.PaymentResultModel;
 
 @CapacitorPlugin(name = "ThawaniLamsa")
 public class ThawaniLamsaPlugin extends Plugin {
@@ -144,25 +145,26 @@ public class ThawaniLamsaPlugin extends Plugin {
         bridge.saveCall(call);
         
         try {
-            // Build Lamsa SDK initialization options
-            InitOptionsModel options = new InitOptionsModel.Builder()
-                .amount(amount)
-                .authKey(tajerToken)
-                .isProduction(isProduction)
-                .paymentOption(PaymentOption.CARD_ACCEPT)
-                .remarks(remarks + " | Ref: " + transactionId)
-                // Note: autoCloseInMillis disabled for testing
-                .build();
-            
+            // Build Lamsa SDK initialization options (per official docs)
+            // NOTE: autoCloseInMillis is set to 0 to effectively disable auto-close during testing.
+            InitOptionsModel options = new InitOptionsModel(
+                amount,
+                tajerToken,
+                remarks + " | Ref: " + transactionId,
+                isProduction,
+                PaymentOptions.CARD_ACCEPT,
+                0
+            );
+
             // Create intent to launch Lamsa SDK
-            Intent intent = new Intent(getContext(), LamsaSDK.class);
-            intent.putExtra("init_options", options);
-            
+            Intent intent = new Intent(getActivity(), LamsaSDK.class);
+            intent.putExtra("SDKInitOptions", options);
+
             // Start activity for result
             startActivityForResult(call, intent, "handlePaymentResult");
-            
+
             Log.i(TAG, "Lamsa SDK activity launched successfully");
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Failed to start Lamsa SDK: " + e.getMessage(), e);
             

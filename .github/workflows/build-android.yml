@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: read
 
 jobs:
   build:
@@ -123,7 +124,9 @@ jobs:
       - name: Ensure Maven repositories (JitPack + Thawani GitHub Packages)
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          LAMSA_MAVEN_USERNAME: ${{ secrets.LAMSA_MAVEN_USERNAME || github.actor }}
+          LAMSA_MAVEN_TOKEN: ${{ secrets.LAMSA_MAVEN_TOKEN || secrets.THAWANI_GITHUB_PACKAGES_TOKEN || secrets.GH_PACKAGES_TOKEN || github.token }}
         run: |
           set -euxo pipefail
           python - << 'PY'
@@ -149,7 +152,10 @@ jobs:
           # Groovy Gradle files
           groovy_snippets = [
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
-              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"; credentials { username = "token"; password = System.getenv("GITHUB_TOKEN") ?: "" } }'},
+              {
+                  "check": "maven.pkg.github.com/ThawaniMobile",
+                  "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"; credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: System.getenv("GITHUB_ACTOR") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: System.getenv("GITHUB_TOKEN") ?: "" } }',
+              },
           ]
           patch_file(Path("android/settings.gradle"), groovy_snippets)
           patch_file(Path("android/build.gradle"), groovy_snippets)
@@ -158,7 +164,10 @@ jobs:
           # Kotlin DSL (if present)
           kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
-              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"); credentials { username = "token"; password = System.getenv("GITHUB_TOKEN") ?: "" } }'},
+              {
+                  "check": "maven.pkg.github.com/ThawaniMobile",
+                  "code": 'maven { url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"); credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: System.getenv("GITHUB_ACTOR") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: System.getenv("GITHUB_TOKEN") ?: "" } }',
+              },
           ]
           patch_file(Path("android/settings.gradle.kts"), kts_snippets)
           patch_file(Path("android/build.gradle.kts"), kts_snippets)
@@ -172,10 +181,32 @@ jobs:
         run: |
           set -euxo pipefail
           GRADLE_FILE="android/app/build.gradle"
+
           if [ -f "$GRADLE_FILE" ] && ! grep -q "om.thawani:lamsa.sdk" "$GRADLE_FILE"; then
             sed -i '/dependencies {/a\    implementation "om.thawani:lamsa.sdk:0.0.22"' "$GRADLE_FILE"
             echo "Added Thawani Lamsa SDK dependency"
           fi
+
+          # Ensure dataBinding is enabled (required by Lamsa SDK docs)
+          python - << 'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/app/build.gradle")
+          if not p.exists():
+              raise SystemExit("android/app/build.gradle not found")
+
+          t = p.read_text(encoding="utf-8")
+          if "dataBinding true" in t:
+              print("dataBinding already enabled")
+          else:
+              if re.search(r"buildFeatures\s*\{", t):
+                  t = re.sub(r"(buildFeatures\s*\{\s*\n)", r"\1        dataBinding true\n", t, count=1)
+              else:
+                  t = re.sub(r"(android\s*\{\s*\n)", r"\1    buildFeatures {\n        dataBinding true\n    }\n", t, count=1)
+              p.write_text(t, encoding="utf-8")
+              print("Enabled dataBinding")
+          PY
 
       - name: Add Thawani plugin and manifest entries
         shell: bash
@@ -195,7 +226,7 @@ jobs:
           # Patch AndroidManifest for Thawani SDK activity
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ] && ! grep -q "om.thawani.lamsa.sdk.LamsaSDK" "$MANIFEST"; then
-            sed -i '/<\/application>/i\        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />' "$MANIFEST"
+            sed -i '/<\/application>/i\        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:parentActivityName=".MainActivity" android:theme="@style/Theme.LamsaSDK" />' "$MANIFEST"
             echo "Added Thawani LamsaSDK activity to manifest"
           fi
 
