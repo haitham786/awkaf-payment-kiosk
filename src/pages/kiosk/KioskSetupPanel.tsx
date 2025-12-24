@@ -69,33 +69,81 @@ const KioskSetupPanel = () => {
   const loadKioskSoftPosConfig = async () => {
     const kioskId = localStorage.getItem('kiosk_id');
     if (!kioskId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('kiosks')
         .select('configuration')
         .eq('id', kioskId)
         .single();
-      
+
       if (error) throw error;
-      
-      const config = data?.configuration as any;
-      
-      // Set payment mode
-      setKioskPaymentMode(config?.payment_mode || 'hardware_pos');
-      
-      // Set Soft POS config if available
-      if (config?.soft_pos) {
-        setSoftPosConfig({
-          tajerToken: config.soft_pos.tajer_token || '',
-          environment: config.soft_pos.environment || 'trial',
-          mode: config.soft_pos.mode || 'mock',
-        });
-      }
+
+      applyKioskConfig(data?.configuration);
     } catch (error) {
       console.error('Error loading kiosk Soft POS settings:', error);
     }
   };
+
+  // Helper to apply config to state
+  const applyKioskConfig = (configRaw: unknown) => {
+    const config = configRaw as Record<string, unknown> | null | undefined;
+    if (!config) return;
+
+    // Set payment mode
+    setKioskPaymentMode((config.payment_mode as 'hardware_pos' | 'soft_pos') || 'hardware_pos');
+
+    // Set POS config if available
+    if (config.pos && typeof config.pos === 'object') {
+      const posConf = config.pos as { connectionType?: string; ipAddress?: string; port?: string };
+      setPosConfig({
+        connectionType: (posConf.connectionType as 'usb' | 'ethernet') || 'usb',
+        ipAddress: posConf.ipAddress || '',
+        port: posConf.port || '',
+      });
+    }
+
+    // Set Soft POS config if available
+    if (config.soft_pos && typeof config.soft_pos === 'object') {
+      const sp = config.soft_pos as { tajer_token?: string; environment?: string; mode?: string };
+      setSoftPosConfig({
+        tajerToken: sp.tajer_token || '',
+        environment: (sp.environment as 'trial' | 'live') || 'trial',
+        mode: (sp.mode as SoftPosMode) || 'mock',
+      });
+    }
+  };
+
+  // Subscribe to realtime config updates from admin panel
+  useEffect(() => {
+    const kioskId = localStorage.getItem('kiosk_id');
+    if (!kioskId) return;
+
+    const channel = supabase
+      .channel('kiosk-config-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'kiosks',
+          filter: `id=eq.${kioskId}`,
+        },
+        (payload) => {
+          console.log('[KioskSetup] Received realtime config update:', payload);
+          applyKioskConfig((payload.new as any)?.configuration);
+          toast({
+            title: 'Configuration Updated',
+            description: 'Settings synced from admin panel.',
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [toast]);
 
   const checkAuth = async () => {
     try {
