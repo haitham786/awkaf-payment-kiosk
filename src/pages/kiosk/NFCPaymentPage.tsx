@@ -20,6 +20,7 @@ import {
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { Wifi, WifiOff, CreditCard, AlertTriangle, Smartphone, Loader2 } from "lucide-react";
+import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 
 type PaymentStage = 'initializing' | 'nfc_check' | 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -301,6 +302,21 @@ const NFCPaymentPage = () => {
     const baisas = totalBaisas % 1000;
     return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
   };
+
+  // Use Thawani branded full-screen UI for waiting/processing in trial/mock mode
+  const status = getSoftPOSStatus();
+  const useThawaniBrandedUI = status.mode === 'mock' && ['waiting', 'processing', 'success', 'declined'].includes(stage);
+
+  if (useThawaniBrandedUI) {
+    return (
+      <ThawaniTapCardScreen
+        amount={amount}
+        stage={stage as 'waiting' | 'processing' | 'success' | 'declined'}
+        isTrialMode={true}
+        onCancel={handleCancel}
+      />
+    );
+  }
 
   return (
     <KioskLayout showHomeButton={false}>
