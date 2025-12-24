@@ -12,7 +12,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    
+    env:
+      # Thawani GitHub Packages credentials MUST be available at Gradle build time
+      # (Gradle reads these via System.getenv() in the injected maven { credentials { ... } } blocks)
+      LAMSA_MAVEN_USERNAME: ${{ secrets.LAMSA_MAVEN_USERNAME || github.actor }}
+      LAMSA_MAVEN_TOKEN: ${{ secrets.LAMSA_MAVEN_TOKEN || secrets.THAWANI_GITHUB_PACKAGES_TOKEN || secrets.GH_PACKAGES_TOKEN || github.token }}
+
     steps:
       - name: Checkout code (git clone - avoids action download timeouts)
         shell: bash
