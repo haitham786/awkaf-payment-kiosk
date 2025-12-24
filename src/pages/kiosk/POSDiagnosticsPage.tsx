@@ -26,9 +26,10 @@ import {
   Smartphone,
   Globe,
   Download,
+  Send,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { buildTerminalInfoRequest } from '@/services/ethernetEcrService';
+import { buildTerminalInfoRequest, buildStatusRequest } from '@/services/ethernetEcrService';
 import { parseXMLResponse } from '@/services/ecrProtocol';
 import {
   initializeUSBSerial,
@@ -38,8 +39,10 @@ import {
   isUSBSerialAvailable,
   getActivePlugin,
   writeUSBData,
+  readUSBData,
   onDataReceived,
   onConnectionChange,
+  sendCommandAndWaitForResponse,
 } from '@/services/usbSerialPlugin';
 
 interface DiagnosticResult {
@@ -53,6 +56,7 @@ interface DiagnosticResult {
 const POSDiagnosticsPage = () => {
   const navigate = useNavigate();
   const [isRunning, setIsRunning] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastData, setLastData] = useState<string | null>(null);
@@ -82,6 +86,12 @@ const POSDiagnosticsPage = () => {
     // Subscribe to data
     const unsubData = onDataReceived((data) => {
       setLastData(data);
+      addResult({
+        test: 'Data Received',
+        status: 'info',
+        message: `Received ${data.length} bytes from POS`,
+        details: data.substring(0, 500),
+      });
     });
 
     return () => {
@@ -128,6 +138,12 @@ const POSDiagnosticsPage = () => {
       }
 
       // Test 2: Check USB Serial plugin
+      addResult({
+        test: 'USB Plugin',
+        status: 'info',
+        message: 'Initializing USB Serial plugin...',
+      });
+
       const pluginAvail = await initializeUSBSerial();
       const activePlugin = getActivePlugin();
       
@@ -148,7 +164,11 @@ const POSDiagnosticsPage = () => {
         addResult({
           test: 'USB Plugin',
           status: 'fail',
-          message: 'capacitor-plugin-usb-serial not installed. Rebuild APK required.',
+          message: 'capacitor-plugin-usb-serial not found. Rebuild APK required.',
+          details: {
+            availablePlugins: Object.keys(Capacitor?.Plugins || {}),
+            hint: 'Make sure the APK was built with the USB serial plugin installed.',
+          }
         });
         setIsRunning(false);
         return;
@@ -158,7 +178,7 @@ const POSDiagnosticsPage = () => {
       addResult({
         test: 'USB Scan',
         status: 'info',
-        message: 'Scanning for USB devices...',
+        message: 'Calling connectedDevices()...',
       });
 
       const devices = await listUSBDevices();
@@ -170,13 +190,28 @@ const POSDiagnosticsPage = () => {
           ? `Found ${devices.length} USB device(s)`
           : 'No USB devices found. Connect POS via OTG cable.',
         details: devices.map(d => ({
-          vendorId: `0x${d.vendorId.toString(16).toUpperCase()}`,
-          productId: `0x${d.productId.toString(16).toUpperCase()}`,
-          name: d.deviceName,
+          vendorId: `0x${(d.vendorId || 0).toString(16).toUpperCase().padStart(4, '0')}`,
+          productId: `0x${(d.productId || 0).toString(16).toUpperCase().padStart(4, '0')}`,
+          deviceId: d.deviceId,
+          name: d.deviceName || 'Unknown',
         })),
       });
 
       if (devices.length === 0) {
+        addResult({
+          test: 'Troubleshooting',
+          status: 'warning',
+          message: 'USB device not detected',
+          details: {
+            steps: [
+              '1. Check USB OTG cable is connected properly',
+              '2. Ensure POS is powered on',
+              '3. Try a different USB cable',
+              '4. Check if permission dialog appeared',
+              '5. Restart the app after connecting POS',
+            ]
+          }
+        });
         setIsRunning(false);
         return;
       }
@@ -185,7 +220,7 @@ const POSDiagnosticsPage = () => {
       addResult({
         test: 'POS Connection',
         status: 'info',
-        message: 'Connecting to POS...',
+        message: 'Calling openSerial()...',
       });
 
       const connectResult = await findAndConnectPOS();
@@ -195,7 +230,7 @@ const POSDiagnosticsPage = () => {
         addResult({
           test: 'POS Connection',
           status: 'pass',
-          message: 'Connected to POS!',
+          message: 'Connected to POS successfully!',
           details: connectResult.device,
         });
 
@@ -203,7 +238,7 @@ const POSDiagnosticsPage = () => {
         addResult({
           test: 'POS Communication',
           status: 'info',
-          message: 'Sending terminal info request...',
+          message: 'Sending GET_TERMINAL_INFO command...',
         });
 
         try {
@@ -214,13 +249,57 @@ const POSDiagnosticsPage = () => {
             addResult({
               test: 'POS Communication',
               status: 'pass',
-              message: 'Command sent successfully. Waiting for response...',
+              message: 'Command sent via writeSerial(). Waiting for response...',
+              details: { sentBytes: infoRequest.length },
             });
+
+            // Wait a bit for response
+            const response = await readUSBData(10000);
+            if (response) {
+              addResult({
+                test: 'POS Response',
+                status: 'pass',
+                message: 'Received response from POS!',
+                details: response.substring(0, 500),
+              });
+
+              // Try to parse
+              try {
+                const parsed = parseXMLResponse(response);
+                if (parsed) {
+                  addResult({
+                    test: 'POS Response Parsed',
+                    status: 'pass',
+                    message: `Terminal: ${parsed.tid || 'Unknown'}`,
+                    details: {
+                      tid: parsed.tid,
+                      mid: parsed.mid,
+                      errorCode: parsed.errorCode,
+                    }
+                  });
+                }
+              } catch (parseErr) {
+                addResult({
+                  test: 'POS Response',
+                  status: 'warning',
+                  message: 'Response received but parse failed',
+                });
+              }
+            } else {
+              addResult({
+                test: 'POS Response',
+                status: 'warning',
+                message: 'No response received within 10 seconds',
+                details: {
+                  hint: 'POS may need to be in ECR mode. Check POS configuration.',
+                }
+              });
+            }
           } else {
             addResult({
               test: 'POS Communication',
               status: 'warning',
-              message: 'Failed to send command',
+              message: 'writeSerial() returned false',
             });
           }
         } catch (err: any) {
@@ -235,6 +314,9 @@ const POSDiagnosticsPage = () => {
           test: 'POS Connection',
           status: 'fail',
           message: connectResult.error || 'Failed to connect to POS',
+          details: {
+            hint: 'Check if USB permission was granted when the dialog appeared.',
+          }
         });
       }
 
@@ -243,9 +325,56 @@ const POSDiagnosticsPage = () => {
         test: 'Error',
         status: 'fail',
         message: error.message || 'Unknown error',
+        details: error.stack?.substring(0, 200),
       });
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const sendTestCommand = async () => {
+    if (!isConnected) {
+      addResult({
+        test: 'Send Command',
+        status: 'fail',
+        message: 'Not connected to POS',
+      });
+      return;
+    }
+
+    setIsSending(true);
+    addResult({
+      test: 'Send Command',
+      status: 'info',
+      message: 'Sending GET_STATUS command...',
+    });
+
+    try {
+      const statusRequest = buildStatusRequest();
+      const result = await sendCommandAndWaitForResponse(statusRequest, 15000);
+      
+      if (result.success && result.response) {
+        addResult({
+          test: 'Send Command',
+          status: 'pass',
+          message: 'Command successful!',
+          details: result.response.substring(0, 500),
+        });
+      } else {
+        addResult({
+          test: 'Send Command',
+          status: 'warning',
+          message: result.error || 'No response',
+        });
+      }
+    } catch (err: any) {
+      addResult({
+        test: 'Send Command',
+        status: 'fail',
+        message: err.message,
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -298,7 +427,7 @@ const POSDiagnosticsPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2">
               <Terminal className="h-5 w-5" />
-              POS USB Diagnostics
+              POS USB Diagnostics (OM-A880)
             </CardTitle>
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>
               Back
@@ -306,7 +435,7 @@ const POSDiagnosticsPage = () => {
           </CardHeader>
           <CardContent>
             {/* Environment Status */}
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-4 flex-wrap">
               <div className="flex items-center gap-2">
                 {isNativeApp ? (
                   <>
@@ -356,10 +485,20 @@ const POSDiagnosticsPage = () => {
                 {isRunning ? 'Testing...' : 'Test USB Connection'}
               </Button>
               {isConnected && (
-                <Button variant="outline" onClick={disconnectPOS}>
-                  <Unplug className="h-4 w-4 mr-2" />
-                  Disconnect
-                </Button>
+                <>
+                  <Button 
+                    variant="secondary" 
+                    onClick={sendTestCommand}
+                    disabled={isSending}
+                  >
+                    <Send className={`h-4 w-4 mr-2 ${isSending ? 'animate-pulse' : ''}`} />
+                    {isSending ? 'Sending...' : 'Send Test Command'}
+                  </Button>
+                  <Button variant="outline" onClick={disconnectPOS}>
+                    <Unplug className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </>
               )}
               {results.length > 0 && (
                 <Button variant="ghost" onClick={clearResults}>
@@ -398,7 +537,7 @@ const POSDiagnosticsPage = () => {
             <CardTitle className="text-base">Test Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[400px]">
               {results.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Usb className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -422,8 +561,10 @@ const POSDiagnosticsPage = () => {
                           </div>
                           <p className="text-sm mt-1">{result.message}</p>
                           {result.details && (
-                            <pre className="mt-2 p-2 bg-black/10 rounded text-xs overflow-auto max-h-24">
-                              {JSON.stringify(result.details, null, 2)}
+                            <pre className="mt-2 p-2 bg-black/10 rounded text-xs overflow-auto max-h-32 whitespace-pre-wrap">
+                              {typeof result.details === 'string' 
+                                ? result.details 
+                                : JSON.stringify(result.details, null, 2)}
                             </pre>
                           )}
                         </div>
@@ -443,7 +584,7 @@ const POSDiagnosticsPage = () => {
               <CardTitle className="text-base">Last POS Response</CardTitle>
             </CardHeader>
             <CardContent>
-              <pre className="p-3 bg-muted rounded text-xs overflow-auto max-h-40">
+              <pre className="p-3 bg-muted rounded text-xs overflow-auto max-h-60 whitespace-pre-wrap">
                 {lastData}
               </pre>
             </CardContent>
