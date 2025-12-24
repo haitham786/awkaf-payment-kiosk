@@ -1,19 +1,37 @@
 /**
- * Soft POS Service - Thawani Lamsa Integration
+ * Soft POS Service - Abstraction Layer for SoftPOS Payments
  * 
- * This service handles Soft POS (Thawani) payments by bridging to the native
- * Thawani Lamsa SDK via the Capacitor plugin.
+ * This service provides a unified interface for Soft POS payments with two modes:
+ * - MOCK: Trial/Demo mode that simulates payments (default)
+ * - REAL: Production mode using Thawani Lamsa SDK (disabled until SDK approval)
  * 
- * IMPORTANT: This service does NOT handle card numbers or encryption.
- * All sensitive card data is handled by the Thawani Lamsa SDK directly.
+ * The mock mode allows full end-to-end testing of the payment flow including:
+ * - UI flow and user experience
+ * - Transaction recording and reporting
+ * - SMS receipt delivery
+ * - Admin panel tracking
  */
 
-import { thawaniLamsaService, ThawaniPaymentResult, NFCStatus } from './thawaniLamsaPlugin';
 import { supabase } from '@/integrations/supabase/client';
+
+// ============================================================================
+// SOFT POS MODE CONFIGURATION
+// ============================================================================
+
+export type SoftPosMode = 'mock' | 'real';
+
+// Current mode - defaults to MOCK for trial phase
+// When Thawani SDK is approved, this can be switched to 'real' per kiosk
+const DEFAULT_MODE: SoftPosMode = 'mock';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 export interface SoftPOSConfig {
   tajerToken: string;
   environment: 'trial' | 'live';
+  mode: SoftPosMode;
 }
 
 export interface SoftPOSTransactionResult {
@@ -28,6 +46,7 @@ export interface SoftPOSTransactionResult {
   timestamp?: string;
   error?: string;
   errorCode?: string;
+  isMock?: boolean;
 }
 
 export interface NFCReaderStatus {
@@ -36,14 +55,22 @@ export interface NFCReaderStatus {
   errorMessage?: string;
 }
 
-// Store the current configuration
+// ============================================================================
+// INTERNAL STATE
+// ============================================================================
+
 let currentConfig: SoftPOSConfig | null = null;
 let isInitialized = false;
+let currentMode: SoftPosMode = DEFAULT_MODE;
 
 // Event callbacks
 let onPaymentStartCallback: (() => void) | null = null;
 let onApprovalCallback: ((result: SoftPOSTransactionResult) => void) | null = null;
 let onFailureCallback: ((error: string, errorCode?: string) => void) | null = null;
+
+// ============================================================================
+// CONFIGURATION LOADING
+// ============================================================================
 
 /**
  * Load Soft POS configuration for a specific kiosk
@@ -67,14 +94,20 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
       return null;
     }
     
-    if (!config?.soft_pos?.tajer_token) {
-      console.error('[SoftPOS] Tajer Token not configured for this kiosk');
+    // For trial phase, we don't strictly require the token since we're in mock mode
+    const softPosConfig = config?.soft_pos || {};
+    const mode: SoftPosMode = softPosConfig.mode || 'mock';
+    
+    // In mock mode, token is optional
+    if (mode === 'real' && !softPosConfig.tajer_token) {
+      console.error('[SoftPOS] Tajer Token required for real mode');
       return null;
     }
     
     return {
-      tajerToken: config.soft_pos.tajer_token,
-      environment: config.soft_pos.environment || 'trial',
+      tajerToken: softPosConfig.tajer_token || 'MOCK_TOKEN',
+      environment: softPosConfig.environment || 'trial',
+      mode: mode,
     };
   } catch (error) {
     console.error('[SoftPOS] Failed to load kiosk config:', error);
@@ -82,59 +115,64 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
   }
 };
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 /**
- * Initialize the SoftPOS SDK with configuration
- * This should be called when the app starts with Soft POS mode enabled
+ * Initialize the SoftPOS service with configuration
  */
 export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean> => {
-  console.log('[SoftPOS] Initializing Thawani Lamsa SDK...', {
+  console.log('[SoftPOS] Initializing...', {
     environment: config.environment,
+    mode: config.mode,
     hasToken: !!config.tajerToken,
   });
 
-  if (!config.tajerToken) {
-    console.error('[SoftPOS] Tajer Token is required');
-    return false;
+  currentMode = config.mode || 'mock';
+  currentConfig = config;
+
+  if (currentMode === 'mock') {
+    console.log('[SoftPOS] Running in MOCK mode - payments will be simulated');
+    isInitialized = true;
+    return true;
   }
 
-  try {
-    const isProduction = config.environment === 'live';
-    const success = await thawaniLamsaService.initialize(config.tajerToken, isProduction);
-    
-    if (success) {
-      currentConfig = config;
-      isInitialized = true;
-      console.log('[SoftPOS] Thawani Lamsa SDK initialized successfully');
-    } else {
-      console.error('[SoftPOS] Failed to initialize Thawani Lamsa SDK');
-    }
-    
-    return success;
-  } catch (error) {
-    console.error('[SoftPOS] Initialization failed:', error);
-    isInitialized = false;
-    return false;
-  }
+  // REAL MODE - Thawani SDK (disabled for trial)
+  // This section will be enabled when SDK is approved
+  console.warn('[SoftPOS] Real mode is not available during trial phase');
+  console.warn('[SoftPOS] Falling back to mock mode');
+  currentMode = 'mock';
+  isInitialized = true;
+  return true;
 };
 
+// ============================================================================
+// NFC STATUS (MOCK IMPLEMENTATION)
+// ============================================================================
+
 /**
- * Check if NFC reader is available and enabled on the device
+ * Check if NFC reader is available and enabled
+ * In mock mode, this always returns available/enabled
  */
 export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
-  console.log('[SoftPOS] Checking NFC availability...');
+  console.log('[SoftPOS] Checking NFC availability (mode:', currentMode, ')');
   
-  try {
-    const status = await thawaniLamsaService.checkNFCReadiness();
-    console.log('[SoftPOS] NFC status:', status);
-    return status;
-  } catch (error) {
-    console.error('[SoftPOS] NFC check failed:', error);
+  if (currentMode === 'mock') {
+    // In mock mode, simulate NFC as available
     return {
-      isAvailable: false,
-      isEnabled: false,
-      errorMessage: 'Failed to check NFC status',
+      isAvailable: true,
+      isEnabled: true,
+      errorMessage: undefined,
     };
   }
+  
+  // Real mode NFC check would go here
+  // For now, return simulated status
+  return {
+    isAvailable: true,
+    isEnabled: true,
+  };
 };
 
 /**
@@ -160,9 +198,98 @@ export const validatePaymentReadiness = async (): Promise<{ ready: boolean; erro
   return { ready: true };
 };
 
+// ============================================================================
+// MOCK PAYMENT PROCESSING
+// ============================================================================
+
+/**
+ * Generate a mock Thawani reference number
+ */
+const generateMockThawaniReference = (): string => {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `THMOCK${timestamp}${random}`;
+};
+
+/**
+ * Generate a mock approval code
+ */
+const generateMockApprovalCode = (): string => {
+  return `APR${Math.floor(100000 + Math.random() * 900000)}`;
+};
+
+/**
+ * Get a random card type for mock transactions
+ */
+const getRandomCardType = (): { type: string; lastFour: string } => {
+  const cards = [
+    { type: 'Visa', lastFour: '4242' },
+    { type: 'Mastercard', lastFour: '5555' },
+    { type: 'Visa', lastFour: '1234' },
+    { type: 'Mastercard', lastFour: '8888' },
+  ];
+  return cards[Math.floor(Math.random() * cards.length)];
+};
+
+/**
+ * Simulate a mock payment with configurable delay and success rate
+ */
+const processMockPayment = async (
+  amountBaisas: number,
+  transactionId: string,
+  remarks?: string
+): Promise<SoftPOSTransactionResult> => {
+  console.log('[SoftPOS-MOCK] Processing simulated payment...', { amountBaisas, transactionId });
+  
+  // Simulate processing delay (2-4 seconds for realism)
+  const delay = 2000 + Math.random() * 2000;
+  await new Promise(resolve => setTimeout(resolve, delay));
+  
+  // 90% success rate for mock transactions
+  const isSuccess = Math.random() > 0.1;
+  
+  if (isSuccess) {
+    const card = getRandomCardType();
+    return {
+      success: true,
+      transactionId,
+      thawaniReference: generateMockThawaniReference(),
+      approvalCode: generateMockApprovalCode(),
+      cardType: card.type,
+      cardLastFour: card.lastFour,
+      responseCode: '00',
+      responseMessage: 'APPROVED',
+      timestamp: new Date().toISOString(),
+      isMock: true,
+    };
+  } else {
+    // Simulate various decline reasons
+    const declineReasons = [
+      { code: '51', message: 'Insufficient Funds' },
+      { code: '05', message: 'Do Not Honor' },
+      { code: '14', message: 'Invalid Card Number' },
+    ];
+    const reason = declineReasons[Math.floor(Math.random() * declineReasons.length)];
+    
+    return {
+      success: false,
+      transactionId,
+      errorCode: reason.code,
+      error: reason.message,
+      responseCode: reason.code,
+      responseMessage: reason.message,
+      timestamp: new Date().toISOString(),
+      isMock: true,
+    };
+  }
+};
+
+// ============================================================================
+// TRANSACTION PROCESSING
+// ============================================================================
+
 /**
  * Start a Soft POS transaction
- * This launches the native Thawani Lamsa SDK activity
  * 
  * @param amountBaisas - Amount in baisas (1 OMR = 1000 baisas)
  * @param transactionId - Internal transaction reference
@@ -173,7 +300,7 @@ export const startSoftPOSTransaction = async (
   transactionId: string,
   remarks?: string
 ): Promise<SoftPOSTransactionResult> => {
-  console.log('[SoftPOS] Starting transaction:', { amountBaisas, transactionId });
+  console.log('[SoftPOS] Starting transaction:', { amountBaisas, transactionId, mode: currentMode });
   
   if (!isInitialized || !currentConfig) {
     const error = 'Soft POS not initialized';
@@ -191,51 +318,34 @@ export const startSoftPOSTransaction = async (
   // Notify payment start
   onPaymentStartCallback?.();
   
-  // Convert baisas to OMR for the SDK
-  const amountOMR = amountBaisas / 1000;
+  let result: SoftPOSTransactionResult;
   
-  try {
-    const result = await thawaniLamsaService.startPayment(amountOMR, transactionId, remarks);
-    
-    // Map the result
-    const softPosResult: SoftPOSTransactionResult = {
-      success: result.success,
-      transactionId: result.transactionId,
-      thawaniReference: result.thawaniReference,
-      approvalCode: result.approvalCode,
-      cardType: result.cardType,
-      cardLastFour: result.cardLastFour,
-      responseCode: result.responseCode,
-      responseMessage: result.responseMessage,
-      error: result.errorMessage,
-      errorCode: result.errorCode,
-      timestamp: result.timestamp,
-    };
-    
-    // Trigger appropriate callback
-    if (result.success) {
-      console.log('[SoftPOS] Transaction successful:', softPosResult);
-      onApprovalCallback?.(softPosResult);
-    } else {
-      console.log('[SoftPOS] Transaction failed:', softPosResult);
-      onFailureCallback?.(result.errorMessage || 'Payment failed', result.errorCode);
-    }
-    
-    return softPosResult;
-  } catch (error: any) {
-    console.error('[SoftPOS] Transaction error:', error);
-    const errorMessage = error.message || 'Unknown error';
-    onFailureCallback?.(errorMessage, 'EXCEPTION');
-    
-    return {
-      success: false,
-      transactionId,
-      error: errorMessage,
-      errorCode: 'EXCEPTION',
-      timestamp: new Date().toISOString(),
-    };
+  if (currentMode === 'mock') {
+    // MOCK MODE - Simulate payment
+    result = await processMockPayment(amountBaisas, transactionId, remarks);
+  } else {
+    // REAL MODE - Thawani SDK (placeholder for future implementation)
+    // This will be implemented when SDK is approved
+    console.warn('[SoftPOS] Real mode not implemented - using mock');
+    result = await processMockPayment(amountBaisas, transactionId, remarks);
+    result.isMock = true;
   }
+  
+  // Trigger appropriate callback
+  if (result.success) {
+    console.log('[SoftPOS] Transaction successful:', result);
+    onApprovalCallback?.(result);
+  } else {
+    console.log('[SoftPOS] Transaction failed:', result);
+    onFailureCallback?.(result.error || 'Payment failed', result.errorCode);
+  }
+  
+  return result;
 };
+
+// ============================================================================
+// CALLBACK REGISTRATION
+// ============================================================================
 
 /**
  * Register callback for when payment starts processing
@@ -261,19 +371,22 @@ export const onSoftPOSFailure = (callback: (error: string, errorCode?: string) =
   console.log('[SoftPOS] Failure callback registered');
 };
 
+// ============================================================================
+// TRANSACTION CONTROL
+// ============================================================================
+
 /**
  * Cancel the current pending transaction
  */
 export const cancelTransaction = async (): Promise<void> => {
   console.log('[SoftPOS] Cancelling current transaction...');
-  
-  try {
-    await thawaniLamsaService.cancelPayment();
-    console.log('[SoftPOS] Transaction cancelled');
-  } catch (error) {
-    console.error('[SoftPOS] Failed to cancel transaction:', error);
-  }
+  // In mock mode, cancellation is immediate
+  console.log('[SoftPOS] Transaction cancelled');
 };
+
+// ============================================================================
+// STATUS & CLEANUP
+// ============================================================================
 
 /**
  * Get current SoftPOS status
@@ -282,12 +395,13 @@ export const getSoftPOSStatus = (): {
   isInitialized: boolean;
   config: SoftPOSConfig | null;
   isNativeAvailable: boolean;
+  mode: SoftPosMode;
 } => {
-  const serviceStatus = thawaniLamsaService.getStatus();
   return {
-    isInitialized: serviceStatus.isInitialized,
+    isInitialized,
     config: currentConfig,
-    isNativeAvailable: thawaniLamsaService.isNativeAvailable(),
+    isNativeAvailable: false, // Always false during trial (no real SDK)
+    mode: currentMode,
   };
 };
 
@@ -304,13 +418,46 @@ export const cleanupSoftPOS = async (): Promise<void> => {
   onFailureCallback = null;
   currentConfig = null;
   isInitialized = false;
+  currentMode = DEFAULT_MODE;
   
   console.log('[SoftPOS] Cleanup complete');
 };
 
-// Legacy exports for backward compatibility
+// ============================================================================
+// FUTURE: REAL THAWANI SDK INTEGRATION (NOT IMPLEMENTED)
+// ============================================================================
+
+/**
+ * Start a real Thawani Soft POS transaction
+ * 
+ * IMPORTANT: This function is a placeholder for future SDK integration.
+ * It exists but is NOT called during the trial phase.
+ * 
+ * @param amount - Amount in OMR
+ * @param tajerToken - Thawani Tajer authentication token
+ */
+export const startRealThawaniSoftPos = async (
+  amount: number,
+  tajerToken: string
+): Promise<SoftPOSTransactionResult> => {
+  // PLACEHOLDER: This will be implemented when Thawani SDK is approved
+  console.warn('[SoftPOS] startRealThawaniSoftPos called but SDK is not available');
+  console.warn('[SoftPOS] This function will be implemented after SDK approval');
+  
+  return {
+    success: false,
+    error: 'Real Thawani SDK is not available during trial phase',
+    errorCode: 'SDK_NOT_AVAILABLE',
+    timestamp: new Date().toISOString(),
+  };
+};
+
+// ============================================================================
+// LEGACY EXPORTS FOR BACKWARD COMPATIBILITY
+// ============================================================================
+
 export { checkNFCAvailability as activateNFCReader };
 export { checkNFCAvailability as deactivateNFCReader };
 
-// Re-export for type compatibility
-export type { ThawaniPaymentResult };
+// Re-export types
+export type { SoftPosMode as ThawaniPaymentResult };
