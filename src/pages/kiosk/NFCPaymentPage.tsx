@@ -39,6 +39,7 @@ const NFCPaymentPage = () => {
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
+  const autoStartRef = React.useRef(false);
 
   const addLog = (message: string) => {
     console.log(`[NFCPayment] ${message}`);
@@ -232,17 +233,17 @@ const NFCPaymentPage = () => {
     }
   };
 
-  const handleStartPayment = async () => {
+  const handleStartPayment = useCallback(async () => {
     addLog('User initiated payment - launching Thawani SDK...');
     setStage('processing');
-    
+
     try {
       const result = await startSoftPOSTransaction(
         amount,
         transactionId,
         `Donation - ${category}`
       );
-      
+
       if (result.success) {
         // Success is handled by callback
         addLog('Payment completed successfully');
@@ -258,9 +259,27 @@ const NFCPaymentPage = () => {
       setStage('declined');
       setTransactionResult({ success: false, error: error.message });
     }
-  };
+  }, [addLog, amount, category, transactionId]);
+
+  // In trial/mock mode, auto-launch the Tap Card flow (no button required)
+  useEffect(() => {
+    if (stage !== 'waiting') return;
+
+    const status = getSoftPOSStatus();
+    if (status.mode !== 'mock') return;
+
+    if (autoStartRef.current) return;
+    autoStartRef.current = true;
+
+    const t = window.setTimeout(() => {
+      void handleStartPayment();
+    }, 900);
+
+    return () => window.clearTimeout(t);
+  }, [handleStartPayment, stage]);
 
   const handleTryAgain = () => {
+    autoStartRef.current = false;
     setStage('waiting');
     setTransactionResult(null);
     setErrorMessage('');
@@ -407,10 +426,10 @@ const NFCPaymentPage = () => {
                   Soft POS (Thawani)
                 </h2>
                 <p className="text-sm text-gray-600">
-                  اضغط للدفع بالبطاقة
+                  ضع بطاقتك على الجهاز
                 </p>
                 <p className="text-xs text-gray-500">
-                  Press to pay with card
+                  Tap your card to pay
                 </p>
               </div>
 
