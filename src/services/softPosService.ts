@@ -1,27 +1,25 @@
 /**
- * Soft POS NFC Payment Service
+ * Soft POS Service - Thawani Lamsa Integration
  * 
- * This service provides placeholder functions for integrating with SoftPOS SDK
- * (e.g., Sunmi Flex 3 NFC reader or similar devices).
+ * This service handles Soft POS (Thawani) payments by bridging to the native
+ * Thawani Lamsa SDK via the Capacitor plugin.
  * 
  * IMPORTANT: This service does NOT handle card numbers or encryption.
- * All sensitive card data is handled by the SoftPOS SDK directly.
+ * All sensitive card data is handled by the Thawani Lamsa SDK directly.
  */
 
+import { thawaniLamsaService, ThawaniPaymentResult, NFCStatus } from './thawaniLamsaPlugin';
+import { supabase } from '@/integrations/supabase/client';
+
 export interface SoftPOSConfig {
-  merchantId: string;
-  terminalId: string;
-  sdkEndpoint: string;
-  callbackUrl: string;
-  providerName: string;
-  // Note: apiKey is NOT stored here for security reasons
-  // API key should be managed via SOFT_POS_API_KEY environment secret
-  // and accessed only through the manage-softpos-secret edge function
+  tajerToken: string;
+  environment: 'trial' | 'live';
 }
 
 export interface SoftPOSTransactionResult {
   success: boolean;
   transactionId?: string;
+  thawaniReference?: string;
   approvalCode?: string;
   cardType?: string;
   cardLastFour?: string;
@@ -29,6 +27,7 @@ export interface SoftPOSTransactionResult {
   responseMessage?: string;
   timestamp?: string;
   error?: string;
+  errorCode?: string;
 }
 
 export interface NFCReaderStatus {
@@ -40,34 +39,77 @@ export interface NFCReaderStatus {
 // Store the current configuration
 let currentConfig: SoftPOSConfig | null = null;
 let isInitialized = false;
-let nfcReaderActive = false;
 
 // Event callbacks
-let onCardTappedCallback: ((cardData: any) => void) | null = null;
+let onPaymentStartCallback: (() => void) | null = null;
 let onApprovalCallback: ((result: SoftPOSTransactionResult) => void) | null = null;
-let onFailureCallback: ((error: string) => void) | null = null;
+let onFailureCallback: ((error: string, errorCode?: string) => void) | null = null;
+
+/**
+ * Load Soft POS configuration for a specific kiosk
+ */
+export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSConfig | null> => {
+  console.log('[SoftPOS] Loading config for kiosk:', kioskId);
+  
+  try {
+    const { data: kioskData, error } = await supabase
+      .from('kiosks')
+      .select('configuration')
+      .eq('id', kioskId)
+      .single();
+    
+    if (error) throw error;
+    
+    const config = kioskData?.configuration as any;
+    
+    if (config?.payment_mode !== 'soft_pos') {
+      console.log('[SoftPOS] Kiosk is not configured for Soft POS');
+      return null;
+    }
+    
+    if (!config?.soft_pos?.tajer_token) {
+      console.error('[SoftPOS] Tajer Token not configured for this kiosk');
+      return null;
+    }
+    
+    return {
+      tajerToken: config.soft_pos.tajer_token,
+      environment: config.soft_pos.environment || 'trial',
+    };
+  } catch (error) {
+    console.error('[SoftPOS] Failed to load kiosk config:', error);
+    return null;
+  }
+};
 
 /**
  * Initialize the SoftPOS SDK with configuration
  * This should be called when the app starts with Soft POS mode enabled
  */
 export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean> => {
-  console.log('[SoftPOS] Initializing with config:', {
-    merchantId: config.merchantId,
-    terminalId: config.terminalId,
-    providerName: config.providerName,
-    sdkEndpoint: config.sdkEndpoint,
+  console.log('[SoftPOS] Initializing Thawani Lamsa SDK...', {
+    environment: config.environment,
+    hasToken: !!config.tajerToken,
   });
 
+  if (!config.tajerToken) {
+    console.error('[SoftPOS] Tajer Token is required');
+    return false;
+  }
+
   try {
-    // Placeholder: In production, this would call the actual SoftPOS SDK
-    // Example: await SunmiSoftPOS.initialize(config);
+    const isProduction = config.environment === 'live';
+    const success = await thawaniLamsaService.initialize(config.tajerToken, isProduction);
     
-    currentConfig = config;
-    isInitialized = true;
+    if (success) {
+      currentConfig = config;
+      isInitialized = true;
+      console.log('[SoftPOS] Thawani Lamsa SDK initialized successfully');
+    } else {
+      console.error('[SoftPOS] Failed to initialize Thawani Lamsa SDK');
+    }
     
-    console.log('[SoftPOS] SDK initialized successfully');
-    return true;
+    return success;
   } catch (error) {
     console.error('[SoftPOS] Initialization failed:', error);
     isInitialized = false;
@@ -76,137 +118,147 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
 };
 
 /**
- * Check if NFC reader is available on the device
+ * Check if NFC reader is available and enabled on the device
  */
 export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
   console.log('[SoftPOS] Checking NFC availability...');
   
-  // Placeholder: In production, check actual NFC hardware
-  // Example: const status = await SunmiNFC.checkAvailability();
-  
-  return {
-    isAvailable: true, // Simulated - would check actual hardware
-    isEnabled: true,   // Simulated - would check if NFC is turned on
-  };
-};
-
-/**
- * Activate NFC reader and start listening for card taps
- */
-export const activateNFCReader = async (): Promise<boolean> => {
-  console.log('[SoftPOS] Activating NFC reader...');
-  
-  if (!isInitialized) {
-    console.error('[SoftPOS] Cannot activate NFC - SDK not initialized');
-    return false;
-  }
-  
   try {
-    // Placeholder: In production, activate the NFC hardware
-    // Example: await SunmiNFC.startReading();
-    
-    nfcReaderActive = true;
-    console.log('[SoftPOS] NFC reader activated, waiting for card tap...');
-    return true;
+    const status = await thawaniLamsaService.checkNFCReadiness();
+    console.log('[SoftPOS] NFC status:', status);
+    return status;
   } catch (error) {
-    console.error('[SoftPOS] Failed to activate NFC reader:', error);
-    return false;
+    console.error('[SoftPOS] NFC check failed:', error);
+    return {
+      isAvailable: false,
+      isEnabled: false,
+      errorMessage: 'Failed to check NFC status',
+    };
   }
 };
 
 /**
- * Deactivate NFC reader
+ * Validate readiness before starting payment
  */
-export const deactivateNFCReader = async (): Promise<void> => {
-  console.log('[SoftPOS] Deactivating NFC reader...');
-  
-  try {
-    // Placeholder: In production, deactivate the NFC hardware
-    // Example: await SunmiNFC.stopReading();
-    
-    nfcReaderActive = false;
-    console.log('[SoftPOS] NFC reader deactivated');
-  } catch (error) {
-    console.error('[SoftPOS] Failed to deactivate NFC reader:', error);
-  }
-};
-
-/**
- * Start an NFC transaction for a specific amount
- * The NFC reader will wait for a card tap
- */
-export const startNFCTransaction = async (
-  amount: number,
-  currency: string = 'OMR',
-  transactionId: string
-): Promise<void> => {
-  console.log('[SoftPOS] Starting NFC transaction:', { amount, currency, transactionId });
+export const validatePaymentReadiness = async (): Promise<{ ready: boolean; error?: string }> => {
+  console.log('[SoftPOS] Validating payment readiness...');
   
   if (!isInitialized || !currentConfig) {
-    throw new Error('SoftPOS not initialized');
+    return { ready: false, error: 'Soft POS is not initialized' };
   }
   
-  if (!nfcReaderActive) {
-    const activated = await activateNFCReader();
-    if (!activated) {
-      throw new Error('Failed to activate NFC reader');
-    }
+  const nfcStatus = await checkNFCAvailability();
+  
+  if (!nfcStatus.isAvailable) {
+    return { ready: false, error: 'NFC hardware is not available on this device' };
   }
   
-  // Placeholder: In production, prepare the transaction with the SDK
-  // Example:
-  // await SunmiSoftPOS.prepareTransaction({
-  //   amount,
-  //   currency,
-  //   transactionId,
-  //   merchantId: currentConfig.merchantId,
-  //   terminalId: currentConfig.terminalId,
-  // });
+  if (!nfcStatus.isEnabled) {
+    return { ready: false, error: 'NFC is disabled. Please enable NFC in device settings.' };
+  }
   
-  console.log('[SoftPOS] Transaction prepared, waiting for card tap...');
+  return { ready: true };
 };
 
 /**
- * Handle when a card is tapped on the NFC reader
- * This is called by the SDK when a card is detected
+ * Start a Soft POS transaction
+ * This launches the native Thawani Lamsa SDK activity
+ * 
+ * @param amountBaisas - Amount in baisas (1 OMR = 1000 baisas)
+ * @param transactionId - Internal transaction reference
+ * @param remarks - Optional remarks for the transaction
  */
-export const onCardTapped = (callback: (cardData: any) => void): void => {
-  onCardTappedCallback = callback;
-  console.log('[SoftPOS] Card tap callback registered');
+export const startSoftPOSTransaction = async (
+  amountBaisas: number,
+  transactionId: string,
+  remarks?: string
+): Promise<SoftPOSTransactionResult> => {
+  console.log('[SoftPOS] Starting transaction:', { amountBaisas, transactionId });
   
-  // Placeholder: In production, register with actual SDK
-  // Example:
-  // SunmiNFC.onCardDetected((cardData) => {
-  //   callback(cardData);
-  // });
+  if (!isInitialized || !currentConfig) {
+    const error = 'Soft POS not initialized';
+    console.error('[SoftPOS]', error);
+    onFailureCallback?.(error, 'NOT_INITIALIZED');
+    return {
+      success: false,
+      transactionId,
+      error,
+      errorCode: 'NOT_INITIALIZED',
+      timestamp: new Date().toISOString(),
+    };
+  }
+  
+  // Notify payment start
+  onPaymentStartCallback?.();
+  
+  // Convert baisas to OMR for the SDK
+  const amountOMR = amountBaisas / 1000;
+  
+  try {
+    const result = await thawaniLamsaService.startPayment(amountOMR, transactionId, remarks);
+    
+    // Map the result
+    const softPosResult: SoftPOSTransactionResult = {
+      success: result.success,
+      transactionId: result.transactionId,
+      thawaniReference: result.thawaniReference,
+      approvalCode: result.approvalCode,
+      cardType: result.cardType,
+      cardLastFour: result.cardLastFour,
+      responseCode: result.responseCode,
+      responseMessage: result.responseMessage,
+      error: result.errorMessage,
+      errorCode: result.errorCode,
+      timestamp: result.timestamp,
+    };
+    
+    // Trigger appropriate callback
+    if (result.success) {
+      console.log('[SoftPOS] Transaction successful:', softPosResult);
+      onApprovalCallback?.(softPosResult);
+    } else {
+      console.log('[SoftPOS] Transaction failed:', softPosResult);
+      onFailureCallback?.(result.errorMessage || 'Payment failed', result.errorCode);
+    }
+    
+    return softPosResult;
+  } catch (error: any) {
+    console.error('[SoftPOS] Transaction error:', error);
+    const errorMessage = error.message || 'Unknown error';
+    onFailureCallback?.(errorMessage, 'EXCEPTION');
+    
+    return {
+      success: false,
+      transactionId,
+      error: errorMessage,
+      errorCode: 'EXCEPTION',
+      timestamp: new Date().toISOString(),
+    };
+  }
 };
 
 /**
- * Handle successful payment approval from the SDK
+ * Register callback for when payment starts processing
+ */
+export const onPaymentStart = (callback: () => void): void => {
+  onPaymentStartCallback = callback;
+  console.log('[SoftPOS] Payment start callback registered');
+};
+
+/**
+ * Register callback for successful payment approval
  */
 export const onSoftPOSApproval = (callback: (result: SoftPOSTransactionResult) => void): void => {
   onApprovalCallback = callback;
   console.log('[SoftPOS] Approval callback registered');
-  
-  // Placeholder: In production, register with actual SDK
-  // Example:
-  // SunmiSoftPOS.onTransactionApproved((result) => {
-  //   callback(result);
-  // });
 };
 
 /**
- * Handle payment failure from the SDK
+ * Register callback for payment failure
  */
-export const onSoftPOSFailure = (callback: (error: string) => void): void => {
+export const onSoftPOSFailure = (callback: (error: string, errorCode?: string) => void): void => {
   onFailureCallback = callback;
   console.log('[SoftPOS] Failure callback registered');
-  
-  // Placeholder: In production, register with actual SDK
-  // Example:
-  // SunmiSoftPOS.onTransactionFailed((error) => {
-  //   callback(error);
-  // });
 };
 
 /**
@@ -216,10 +268,7 @@ export const cancelTransaction = async (): Promise<void> => {
   console.log('[SoftPOS] Cancelling current transaction...');
   
   try {
-    // Placeholder: In production, cancel with SDK
-    // Example: await SunmiSoftPOS.cancelTransaction();
-    
-    await deactivateNFCReader();
+    await thawaniLamsaService.cancelPayment();
     console.log('[SoftPOS] Transaction cancelled');
   } catch (error) {
     console.error('[SoftPOS] Failed to cancel transaction:', error);
@@ -231,66 +280,15 @@ export const cancelTransaction = async (): Promise<void> => {
  */
 export const getSoftPOSStatus = (): {
   isInitialized: boolean;
-  isNFCActive: boolean;
   config: SoftPOSConfig | null;
+  isNativeAvailable: boolean;
 } => {
+  const serviceStatus = thawaniLamsaService.getStatus();
   return {
-    isInitialized,
-    isNFCActive: nfcReaderActive,
+    isInitialized: serviceStatus.isInitialized,
     config: currentConfig,
+    isNativeAvailable: thawaniLamsaService.isNativeAvailable(),
   };
-};
-
-/**
- * Simulate a card tap for testing purposes (development only)
- * This should be removed in production
- */
-export const simulateCardTap = async (
-  amount: number,
-  transactionId: string
-): Promise<SoftPOSTransactionResult> => {
-  console.log('[SoftPOS] SIMULATION: Card tapped');
-  
-  // Simulate processing delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Simulate card data
-  const cardData = {
-    cardType: 'Visa',
-    lastFour: '4242',
-  };
-  
-  // Trigger card tapped callback if registered
-  if (onCardTappedCallback) {
-    onCardTappedCallback(cardData);
-  }
-  
-  // Simulate another delay for approval
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Simulate 90% success rate
-  const isSuccess = Math.random() > 0.1;
-  
-  const result: SoftPOSTransactionResult = {
-    success: isSuccess,
-    transactionId,
-    approvalCode: isSuccess ? `APP${Math.floor(100000 + Math.random() * 900000)}` : undefined,
-    cardType: cardData.cardType,
-    cardLastFour: cardData.lastFour,
-    responseCode: isSuccess ? '00' : '51',
-    responseMessage: isSuccess ? 'Approved' : 'Insufficient Funds',
-    timestamp: new Date().toISOString(),
-    error: isSuccess ? undefined : 'Transaction declined',
-  };
-  
-  // Trigger appropriate callback
-  if (isSuccess && onApprovalCallback) {
-    onApprovalCallback(result);
-  } else if (!isSuccess && onFailureCallback) {
-    onFailureCallback(result.error || 'Unknown error');
-  }
-  
-  return result;
 };
 
 /**
@@ -299,9 +297,9 @@ export const simulateCardTap = async (
 export const cleanupSoftPOS = async (): Promise<void> => {
   console.log('[SoftPOS] Cleaning up...');
   
-  await deactivateNFCReader();
+  await cancelTransaction();
   
-  onCardTappedCallback = null;
+  onPaymentStartCallback = null;
   onApprovalCallback = null;
   onFailureCallback = null;
   currentConfig = null;
@@ -309,3 +307,10 @@ export const cleanupSoftPOS = async (): Promise<void> => {
   
   console.log('[SoftPOS] Cleanup complete');
 };
+
+// Legacy exports for backward compatibility
+export { checkNFCAvailability as activateNFCReader };
+export { checkNFCAvailability as deactivateNFCReader };
+
+// Re-export for type compatibility
+export type { ThawaniPaymentResult };

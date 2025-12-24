@@ -120,58 +120,94 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure JitPack repository (required for USB serial dependency)
+      - name: Ensure Maven repositories (JitPack + Thawani GitHub Packages)
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euxo pipefail
           python - << 'PY'
           from pathlib import Path
           import re
 
-          def patch_repositories_block(text: str, snippet: str) -> str:
-              if "jitpack.io" in text:
-                  return text
-              # Insert into every "repositories {" block (settings.gradle often has both pluginManagement + dependencyResolutionManagement)
-              return re.sub(r"(repositories\s*\{\s*\n)", r"\1        " + snippet + "\n", text)
+          def patch_repositories_block(text: str, snippets: list) -> str:
+              patched = text
+              for snippet in snippets:
+                  if snippet["check"] not in patched:
+                      patched = re.sub(r"(repositories\s*\{\s*\n)", r"\1        " + snippet["code"] + "\n", patched)
+              return patched
 
-          def patch_file(path: Path, snippet: str) -> None:
+          def patch_file(path: Path, snippets: list) -> None:
               if not path.exists():
                   return
               original = path.read_text(encoding="utf-8")
-              patched = patch_repositories_block(original, snippet)
+              patched = patch_repositories_block(original, snippets)
               if patched != original:
                   path.write_text(patched, encoding="utf-8")
-                  print(f"Added JitPack to {path}")
+                  print(f"Patched {path}")
 
           # Groovy Gradle files
-          groovy_snippet = 'maven { url "https://jitpack.io" }'
-          patch_file(Path("android/settings.gradle"), groovy_snippet)
-          patch_file(Path("android/build.gradle"), groovy_snippet)
-          patch_file(Path("android/app/build.gradle"), groovy_snippet)
+          groovy_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"; credentials { username = "token"; password = System.getenv("GITHUB_TOKEN") ?: "" } }'},
+          ]
+          patch_file(Path("android/settings.gradle"), groovy_snippets)
+          patch_file(Path("android/build.gradle"), groovy_snippets)
+          patch_file(Path("android/app/build.gradle"), groovy_snippets)
 
           # Kotlin DSL (if present)
-          kts_snippet = 'maven { url = uri("https://jitpack.io") }'
-          patch_file(Path("android/settings.gradle.kts"), kts_snippet)
-          patch_file(Path("android/build.gradle.kts"), kts_snippet)
-          patch_file(Path("android/app/build.gradle.kts"), kts_snippet)
+          kts_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"); credentials { username = "token"; password = System.getenv("GITHUB_TOKEN") ?: "" } }'},
+          ]
+          patch_file(Path("android/settings.gradle.kts"), kts_snippets)
+          patch_file(Path("android/build.gradle.kts"), kts_snippets)
+          patch_file(Path("android/app/build.gradle.kts"), kts_snippets)
 
-          # Sanity check
-          found = []
-          for p in [
-              Path("android/settings.gradle"),
-              Path("android/build.gradle"),
-              Path("android/app/build.gradle"),
-              Path("android/settings.gradle.kts"),
-              Path("android/build.gradle.kts"),
-              Path("android/app/build.gradle.kts"),
-          ]:
-              if p.exists() and "jitpack.io" in p.read_text(encoding="utf-8"):
-                  found.append(str(p))
-
-          if not found:
-              raise SystemExit("Failed to patch Gradle repositories with JitPack; no target Gradle files found.")
-          print("JitPack enabled in:", ", ".join(found))
+          print("Maven repositories configured")
           PY
+
+      - name: Add Thawani Lamsa SDK dependency
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -f "$GRADLE_FILE" ] && ! grep -q "om.thawani:lamsa.sdk" "$GRADLE_FILE"; then
+            sed -i '/dependencies {/a\    implementation "om.thawani:lamsa.sdk:0.0.22"' "$GRADLE_FILE"
+            echo "Added Thawani Lamsa SDK dependency"
+          fi
+
+      - name: Add Thawani plugin and manifest entries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          
+          # Create Thawani plugin directory
+          PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
+          mkdir -p "$PLUGIN_DIR"
+          
+          # Copy plugin if exists in repo
+          if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
+            cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
+            echo "Copied ThawaniLamsaPlugin.java"
+          fi
+          
+          # Patch AndroidManifest for Thawani SDK activity
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ] && ! grep -q "om.thawani.lamsa.sdk.LamsaSDK" "$MANIFEST"; then
+            sed -i '/<\/application>/i\        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />' "$MANIFEST"
+            echo "Added Thawani LamsaSDK activity to manifest"
+          fi
+
+      - name: Add ProGuard rules for Thawani SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          PROGUARD_FILE="android/app/proguard-rules.pro"
+          if [ -f "$PROGUARD_FILE" ] && ! grep -q "om.thawani.lamsa.sdk" "$PROGUARD_FILE"; then
+            echo "-keep class om.thawani.lamsa.sdk.** { *; }" >> "$PROGUARD_FILE"
+            echo "Added Thawani ProGuard rules"
+          fi
 
       - name: Create USB device filter XML
         run: |
