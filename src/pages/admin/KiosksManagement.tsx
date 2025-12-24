@@ -12,6 +12,8 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { testConnection, POSConfig } from "@/services/hardPosService";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
+type SoftPosMode = 'mock' | 'real';
+
 interface KioskConfiguration {
   payment_mode: 'hardware_pos' | 'soft_pos';
   pos: {
@@ -22,6 +24,7 @@ interface KioskConfiguration {
   soft_pos?: {
     tajer_token: string;
     environment: 'trial' | 'live';
+    mode: SoftPosMode;
   };
   sound_enabled?: boolean;
 }
@@ -41,7 +44,7 @@ const KiosksManagement = () => {
     configuration: {
       payment_mode: 'hardware_pos' as 'hardware_pos' | 'soft_pos',
       pos: { connectionType: 'usb', ipAddress: '', port: '' },
-      soft_pos: { tajer_token: '', environment: 'trial' as 'trial' | 'live' },
+      soft_pos: { tajer_token: '', environment: 'trial' as 'trial' | 'live', mode: 'mock' as SoftPosMode },
       sound_enabled: true,
     } as KioskConfiguration
   });
@@ -207,7 +210,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: config.payment_mode || 'hardware_pos',
         pos: config.pos || { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: config.soft_pos || { tajer_token: '', environment: 'trial' },
+        soft_pos: config.soft_pos || { tajer_token: '', environment: 'trial', mode: 'mock' },
         sound_enabled: config.sound_enabled !== false,
       }
     });
@@ -241,7 +244,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: 'hardware_pos',
         pos: { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: { tajer_token: '', environment: 'trial' },
+        soft_pos: { tajer_token: '', environment: 'trial', mode: 'mock' },
         sound_enabled: true,
       }
     });
@@ -810,6 +813,39 @@ const KiosksManagement = () => {
                     )}
                   </div>
 
+                  {/* Soft POS Mode */}
+                  <div>
+                    <Label>Soft POS Mode</Label>
+                    <RadioGroup
+                      value={formData.configuration.soft_pos?.mode || 'mock'}
+                      onValueChange={(value: SoftPosMode) => setFormData({ 
+                        ...formData, 
+                        configuration: { 
+                          ...formData.configuration, 
+                          soft_pos: { 
+                            ...formData.configuration.soft_pos!,
+                            mode: value 
+                          }
+                        }
+                      })}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="mock" id="mode_mock" />
+                        <Label htmlFor="mode_mock" className="cursor-pointer">Trial / Mock</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 opacity-50">
+                        <RadioGroupItem value="real" id="mode_real" disabled />
+                        <Label htmlFor="mode_real" className="cursor-not-allowed text-muted-foreground">
+                          Live (Disabled – Production only)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Live Soft POS will be enabled after Thawani SDK approval
+                    </p>
+                  </div>
+
                   <div>
                     <Label>Environment</Label>
                     <RadioGroup
@@ -841,7 +877,7 @@ const KiosksManagement = () => {
 
                   <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                      <strong>SUNMI Flex 3 Ready:</strong> NFC payments will be processed directly on the device screen. Card data is handled securely by Thawani's SDK.
+                      <strong>Samsung A33 & SUNMI Flex 3 Ready:</strong> NFC payments will be processed directly on the device screen. In Trial/Mock mode, payments are simulated for testing.
                     </p>
                   </div>
                 </div>

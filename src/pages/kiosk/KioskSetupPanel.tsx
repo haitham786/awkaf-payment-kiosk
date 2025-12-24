@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Wifi, HardDrive, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { testConnection, ConnectionStatus, getConnectionStatus, onConnectionStatusChange, initializePOS } from "@/services/hardPosService";
+import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -41,40 +42,58 @@ const KioskSetupPanel = () => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const [softPosConfig, setSoftPosConfig] = useState({
-    merchantId: "",
-    terminalId: "",
-    apiKey: "",
-    sdkEndpoint: "",
-    callbackUrl: "",
-    providerName: "",
+    tajerToken: "",
+    environment: "trial" as "trial" | "live",
+    mode: "mock" as SoftPosMode,
   });
+  
+  const [softPosNfcStatus, setSoftPosNfcStatus] = useState<{
+    isAvailable: boolean;
+    isEnabled: boolean;
+    checking: boolean;
+    tested: boolean;
+  }>({
+    isAvailable: false,
+    isEnabled: false,
+    checking: false,
+    tested: false,
+  });
+  
+  const [kioskPaymentMode, setKioskPaymentMode] = useState<'hardware_pos' | 'soft_pos'>('hardware_pos');
 
   useEffect(() => {
     checkAuth();
-    loadGlobalSoftPosSettings();
   }, []);
 
-  const loadGlobalSoftPosSettings = async () => {
+  // Load Soft POS config from kiosk's own configuration (synced from admin panel)
+  const loadKioskSoftPosConfig = async () => {
+    const kioskId = localStorage.getItem('kiosk_id');
+    if (!kioskId) return;
+    
     try {
-      const { data } = await supabase
-        .from('kiosk_settings')
-        .select('soft_pos_config')
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase
+        .from('kiosks')
+        .select('configuration')
+        .eq('id', kioskId)
+        .single();
       
-      if (data?.soft_pos_config) {
-        const config = data.soft_pos_config as any;
+      if (error) throw error;
+      
+      const config = data?.configuration as any;
+      
+      // Set payment mode
+      setKioskPaymentMode(config?.payment_mode || 'hardware_pos');
+      
+      // Set Soft POS config if available
+      if (config?.soft_pos) {
         setSoftPosConfig({
-          merchantId: config.merchant_id || '',
-          terminalId: config.terminal_id || '',
-          apiKey: config.api_key || '',
-          sdkEndpoint: config.sdk_endpoint || '',
-          callbackUrl: config.callback_url || '',
-          providerName: config.provider_name || '',
+          tajerToken: config.soft_pos.tajer_token || '',
+          environment: config.soft_pos.environment || 'trial',
+          mode: config.soft_pos.mode || 'mock',
         });
       }
     } catch (error) {
-      console.error('Error loading global Soft POS settings:', error);
+      console.error('Error loading kiosk Soft POS settings:', error);
     }
   };
 
@@ -125,9 +144,68 @@ const KioskSetupPanel = () => {
             setPosConfig(config.pos);
           }
         }
+        
+        // Also load Soft POS config from kiosk configuration
+        await loadKioskSoftPosConfig();
       }
     } catch (error: any) {
       console.error('Error loading kiosk data:', error);
+    }
+  };
+  
+  const handleTestSoftPosNfc = async () => {
+    setSoftPosNfcStatus(prev => ({ ...prev, checking: true }));
+    
+    toast({
+      title: "Testing NFC",
+      description: "Checking NFC availability for Soft POS...",
+    });
+    
+    try {
+      // Initialize Soft POS service with current config
+      await initializeSoftPOS({
+        tajerToken: softPosConfig.tajerToken || 'MOCK_TOKEN',
+        environment: softPosConfig.environment,
+        mode: softPosConfig.mode,
+      });
+      
+      // Check NFC status
+      const nfcStatus = await checkNFCAvailability();
+      
+      setSoftPosNfcStatus({
+        isAvailable: nfcStatus.isAvailable,
+        isEnabled: nfcStatus.isEnabled,
+        checking: false,
+        tested: true,
+      });
+      
+      const status = getSoftPOSStatus();
+      
+      if (nfcStatus.isAvailable && nfcStatus.isEnabled) {
+        toast({
+          title: "NFC Ready",
+          description: `Soft POS is ready for contactless payments. Mode: ${status.mode === 'mock' ? 'Trial/Simulation' : 'Live'}`,
+        });
+      } else if (!nfcStatus.isAvailable) {
+        toast({
+          title: "NFC Not Available",
+          description: "This device does not have NFC hardware. Soft POS will run in simulation mode.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "NFC Disabled",
+          description: "Please enable NFC in device settings to accept contactless payments.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      setSoftPosNfcStatus(prev => ({ ...prev, checking: false }));
+      toast({
+        title: "NFC Test Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -551,71 +629,138 @@ const KioskSetupPanel = () => {
           {/* Soft POS Tab */}
           <TabsContent value="soft-pos" className="space-y-3">
             <Card className="p-4 bg-white border-gray-200">
-              <h2 className="text-lg font-bold mb-3 text-gray-900">Soft POS Configuration</h2>
-              <p className="text-xs text-gray-600 mb-3">NFC contactless payment settings. Configure globally in admin panel.</p>
+              <h2 className="text-lg font-bold mb-3 text-gray-900">Soft POS Configuration (Thawani)</h2>
+              <p className="text-xs text-gray-600 mb-3">NFC contactless payment settings. Managed from admin panel under "Manage KIOSK".</p>
+              
               <div className="space-y-3">
-                <div>
-                  <Label className="text-gray-900 text-sm">Provider</Label>
-                  <Select
-                    value={softPosConfig.providerName}
-                    onValueChange={(value) => setSoftPosConfig({ ...softPosConfig, providerName: value })}
-                  >
-                    <SelectTrigger className="bg-white text-gray-900 border-gray-300 h-9">
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bank_muscat">Bank Muscat</SelectItem>
-                      <SelectItem value="thawani">Thawani</SelectItem>
-                      <SelectItem value="oman_arab_bank">Oman Arab Bank</SelectItem>
-                      <SelectItem value="ahli_bank">Ahli Bank</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                {/* Current Payment Mode */}
+                <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                  kioskPaymentMode === 'soft_pos' 
+                    ? 'bg-emerald-50 border border-emerald-200' 
+                    : 'bg-gray-50 border border-gray-200'
+                }`}>
+                  {kioskPaymentMode === 'soft_pos' ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-gray-400" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    kioskPaymentMode === 'soft_pos' ? 'text-emerald-700' : 'text-gray-600'
+                  }`}>
+                    {kioskPaymentMode === 'soft_pos' 
+                      ? 'Soft POS Active - Thawani NFC Payments' 
+                      : 'Hardware POS Active - Soft POS Disabled'}
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-gray-900 text-sm">Merchant ID</Label>
-                    <Input
-                      value={softPosConfig.merchantId}
-                      onChange={(e) => setSoftPosConfig({ ...softPosConfig, merchantId: e.target.value })}
-                      placeholder="MID"
-                      className="bg-white text-gray-900 border-gray-300 h-9"
-                      readOnly
-                    />
+                
+                {kioskPaymentMode !== 'soft_pos' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-700">
+                        This kiosk is configured for Hardware POS. To enable Soft POS, change the payment mode in the admin panel under "Manage KIOSK".
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-gray-900 text-sm">Terminal ID</Label>
-                    <Input
-                      value={softPosConfig.terminalId}
-                      onChange={(e) => setSoftPosConfig({ ...softPosConfig, terminalId: e.target.value })}
-                      placeholder="TID"
-                      className="bg-white text-gray-900 border-gray-300 h-9"
-                      readOnly
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div>
-                  <Label className="text-gray-900 text-sm">SDK Endpoint URL</Label>
-                  <Input
-                    value={softPosConfig.sdkEndpoint}
-                    placeholder="https://api.provider.com/v1"
-                    className="bg-white text-gray-900 border-gray-300 h-9"
-                    readOnly
-                  />
-                </div>
+                {kioskPaymentMode === 'soft_pos' && (
+                  <>
+                    {/* Mode Display */}
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Smartphone className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-blue-900">
+                            Mode: {softPosConfig.mode === 'mock' ? 'Trial / Simulation' : 'Live (Production)'}
+                          </p>
+                          <p className="text-[10px] text-blue-700 mt-1">
+                            {softPosConfig.mode === 'mock' 
+                              ? 'Payments are simulated for testing. Card taps will generate mock transactions.'
+                              : 'Live Thawani SDK active. Real card transactions.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Environment */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-gray-900 text-sm">Environment</Label>
+                        <Input
+                          value={softPosConfig.environment === 'trial' ? 'Trial / Sandbox' : 'Live'}
+                          className="bg-gray-50 text-gray-700 border-gray-300 h-9"
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-900 text-sm">Tajer Token</Label>
+                        <Input
+                          value={softPosConfig.tajerToken ? '••••••••' : 'Not configured'}
+                          className="bg-gray-50 text-gray-700 border-gray-300 h-9"
+                          readOnly
+                        />
+                      </div>
+                    </div>
 
-                <div className="space-y-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-[10px] text-blue-700">
-                    <strong>Sunmi Flex 3 Ready:</strong> Supports NFC contactless payments via SoftPOS SDK. 
-                    Card data is handled securely by the SDK. Configure settings in admin panel.
-                  </p>
-                </div>
+                    {/* NFC Status */}
+                    <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                      softPosNfcStatus.tested
+                        ? softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled
+                          ? 'bg-emerald-50 border border-emerald-200' 
+                          : 'bg-red-50 border border-red-200'
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      {softPosNfcStatus.checking ? (
+                        <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                      ) : softPosNfcStatus.tested ? (
+                        softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-600" />
+                        )
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-gray-400" />
+                      )}
+                      <span className={`text-sm font-medium ${
+                        softPosNfcStatus.tested
+                          ? softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled
+                            ? 'text-emerald-700' 
+                            : 'text-red-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {softPosNfcStatus.checking 
+                          ? 'Checking NFC...' 
+                          : softPosNfcStatus.tested 
+                            ? softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled
+                              ? 'NFC Ready for Payments'
+                              : softPosNfcStatus.isAvailable 
+                                ? 'NFC Disabled - Enable in Settings'
+                                : 'NFC Not Available (Simulation Mode)'
+                            : 'NFC Status Unknown'}
+                      </span>
+                    </div>
 
-                <Button onClick={handleTestPosConnection} className="w-full h-9 text-sm">
-                  <Smartphone className="w-3 h-3 mr-1" />
-                  Test NFC Reader
+                    <div className="space-y-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-[10px] text-blue-700">
+                        <strong>Compatible Devices:</strong> Samsung A33, Sunmi Flex 3, and other NFC-enabled Android devices.
+                        In trial mode, payments are simulated even without physical NFC hardware.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <Button 
+                  onClick={handleTestSoftPosNfc} 
+                  className="w-full h-9 text-sm"
+                  disabled={softPosNfcStatus.checking || kioskPaymentMode !== 'soft_pos'}
+                >
+                  {softPosNfcStatus.checking ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Smartphone className="w-3 h-3 mr-1" />
+                  )}
+                  {softPosNfcStatus.checking ? 'Testing...' : 'Test NFC / Soft POS'}
                 </Button>
               </div>
             </Card>
