@@ -254,34 +254,60 @@ const KioskSetupPanel = () => {
         // Create new kiosk registration
         const { data, error } = await supabase
           .from('kiosks')
-          .insert([{
-            name: kioskForm.name,
-            location: kioskForm.location,
-            status: 'pending_approval', // Pending approval
-            configuration: { pos: posConfig }
-          }])
+          .insert([
+            {
+              name: kioskForm.name,
+              location: kioskForm.location,
+              status: 'pending_approval', // Pending approval
+              // IMPORTANT: do not set payment_mode here; admin controls it in "Manage KIOSK"
+              configuration: {
+                payment_mode: 'hardware_pos',
+                pos: posConfig,
+                sound_enabled: true,
+              },
+            },
+          ])
           .select()
           .single();
 
         if (error) throw error;
-        
+
         kioskId = data.id;
         localStorage.setItem('kiosk_id', kioskId);
         setKioskData(data);
-        
+
         toast({
           title: "Registration request sent",
           description: "Waiting for admin approval from the web panel",
         });
       } else {
         // Update existing kiosk
+        // IMPORTANT: Merge config so we NEVER overwrite admin-set payment_mode/soft_pos
+        const { data: existing, error: existingError } = await supabase
+          .from('kiosks')
+          .select('configuration')
+          .eq('id', kioskId)
+          .single();
+
+        if (existingError) throw existingError;
+
+        const existingConfig =
+          existing?.configuration && typeof existing.configuration === 'object'
+            ? (existing.configuration as any)
+            : {};
+
+        const mergedConfig = {
+          ...existingConfig,
+          pos: posConfig,
+        };
+
         const { error } = await supabase
           .from('kiosks')
           .update({
             name: kioskForm.name,
             location: kioskForm.location,
-            configuration: { pos: posConfig },
-            last_heartbeat: new Date().toISOString()
+            configuration: mergedConfig,
+            last_heartbeat: new Date().toISOString(),
           })
           .eq('id', kioskId);
 
