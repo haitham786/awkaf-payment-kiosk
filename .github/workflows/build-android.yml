@@ -13,10 +13,11 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     env:
-      # Thawani GitHub Packages credentials MUST be available at Gradle build time
-      # (Gradle reads these via System.getenv() in the injected maven { credentials { ... } } blocks)
+      # Thawani GitHub Packages credentials (REQUIRED)
+      # NOTE: GitHub will return 404 for private packages when the token is missing/unauthorized,
+      # which shows up in Gradle as "Could not find om.thawani:lamsa.sdk:0.0.22".
       LAMSA_MAVEN_USERNAME: ${{ secrets.LAMSA_MAVEN_USERNAME || github.actor }}
-      LAMSA_MAVEN_TOKEN: ${{ secrets.LAMSA_MAVEN_TOKEN || secrets.THAWANI_GITHUB_PACKAGES_TOKEN || secrets.GH_PACKAGES_TOKEN || github.token }}
+      LAMSA_MAVEN_TOKEN: ${{ secrets.LAMSA_MAVEN_TOKEN || secrets.THAWANI_GITHUB_PACKAGES_TOKEN || secrets.GH_PACKAGES_TOKEN }}
 
     steps:
       - name: Checkout code (git clone - avoids action download timeouts)
@@ -31,6 +32,31 @@ jobs:
           git fetch --depth 1 origin "${GITHUB_REF_NAME}"
           git checkout -q FETCH_HEAD
           git rev-parse --short HEAD
+
+      - name: Validate Thawani Maven credentials (fail fast)
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ -z "${LAMSA_MAVEN_TOKEN:-}" ]; then
+            echo "ERROR: Missing GitHub Packages token for Thawani Lamsa SDK."
+            echo "Add a repository secret named LAMSA_MAVEN_TOKEN (or THAWANI_GITHUB_PACKAGES_TOKEN / GH_PACKAGES_TOKEN)."
+            exit 1
+          fi
+
+          echo "LAMSA_MAVEN_USERNAME=${LAMSA_MAVEN_USERNAME}"
+          echo "LAMSA_MAVEN_TOKEN is set (masked)"
+
+          # GitHub Packages returns 404 when a package is private AND your token is missing/unauthorized.
+          # We test access explicitly here so the workflow fails fast with a clear error.
+          METADATA_URL="https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/maven-metadata.xml"
+          HTTP_CODE=$(curl -sS -u "${LAMSA_MAVEN_USERNAME}:${LAMSA_MAVEN_TOKEN}" -o /dev/null -w "%{http_code}" "$METADATA_URL" || true)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Cannot access Thawani GitHub Packages ($METADATA_URL). HTTP $HTTP_CODE"
+            echo "This build cannot succeed until GitHub Packages credentials with access to ThawaniMobile/Lamsa-SDK are configured."
+            exit 1
+          fi
+
 
       - name: Show toolchain (preinstalled)
         shell: bash
@@ -128,10 +154,6 @@ jobs:
 
       - name: Ensure Maven repositories (JitPack + Thawani GitHub Packages)
         shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          LAMSA_MAVEN_USERNAME: ${{ secrets.LAMSA_MAVEN_USERNAME || github.actor }}
-          LAMSA_MAVEN_TOKEN: ${{ secrets.LAMSA_MAVEN_TOKEN || secrets.THAWANI_GITHUB_PACKAGES_TOKEN || secrets.GH_PACKAGES_TOKEN || github.token }}
         run: |
           set -euxo pipefail
           python - << 'PY'
@@ -159,7 +181,7 @@ jobs:
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
               {
                   "check": "maven.pkg.github.com/ThawaniMobile",
-                  "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"; credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: System.getenv("GITHUB_ACTOR") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: System.getenv("GITHUB_TOKEN") ?: "" } }',
+                  "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"; credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: "" } }',
               },
           ]
           patch_file(Path("android/settings.gradle"), groovy_snippets)
@@ -171,7 +193,7 @@ jobs:
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
               {
                   "check": "maven.pkg.github.com/ThawaniMobile",
-                  "code": 'maven { url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"); credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: System.getenv("GITHUB_ACTOR") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: System.getenv("GITHUB_TOKEN") ?: "" } }',
+                  "code": 'maven { url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"); credentials { username = System.getenv("LAMSA_MAVEN_USERNAME") ?: "ThawaniMobile"; password = System.getenv("LAMSA_MAVEN_TOKEN") ?: "" } }',
               },
           ]
           patch_file(Path("android/settings.gradle.kts"), kts_snippets)
