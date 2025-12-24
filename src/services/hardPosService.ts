@@ -1195,18 +1195,129 @@ const sendECRViaNativeBridge = async (message: POSMessage, timeout: number): Pro
 };
 
 /**
- * Send ECR command via USB (fallback)
+ * Send ECR command via USB Serial (using capacitor-plugin-usb-serial)
  */
 const sendECRViaUSB = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
-  return new Promise((resolve, reject) => {
+  // Import the USB serial plugin functions
+  const { writeUSBData, readUSBData, isUSBConnected, onDataReceived } = await import('./usbSerialPlugin');
+  
+  return new Promise(async (resolve, reject) => {
     const timeoutId = setTimeout(() => {
       reject(new Error('POS_TIMEOUT: Transaction timed out waiting for USB POS response'));
     }, timeout);
-    
-    // USB communication would be implemented here using usbHostService
-    // For now, fall back to simulation
-    clearTimeout(timeoutId);
-    simulatePOSTransaction(message, resolve);
+
+    try {
+      // Check if connected
+      const connected = await isUSBConnected();
+      if (!connected) {
+        clearTimeout(timeoutId);
+        resolve({
+          success: false,
+          transactionId: message.payload?.transactionId || '',
+          errorCode: 'USB_NOT_CONNECTED',
+          errorMessage: 'USB not connected. Please connect POS via OTG cable.',
+        });
+        return;
+      }
+
+      // Build XML request based on command
+      let xmlRequest: string;
+      switch (message.command) {
+        case 'PURCHASE':
+          xmlRequest = buildPurchaseRequest(
+            parseInt(message.payload?.amount || '0'),
+            message.payload?.invoiceNumber,
+            message.payload?.merchantReference
+          );
+          break;
+        case 'GET_STATUS':
+          xmlRequest = buildStatusRequest();
+          break;
+        case 'GET_TERMINAL_INFO':
+          xmlRequest = buildTerminalInfoRequest();
+          break;
+        case 'RECONCILIATION':
+          xmlRequest = buildReconciliationRequest();
+          break;
+        case 'LAST_TRANSACTION_STATUS':
+          xmlRequest = buildLastTransactionRequest();
+          break;
+        case 'GET_TOTALS':
+          xmlRequest = buildTotalsRequest();
+          break;
+        default:
+          xmlRequest = `<?xml version="1.0" encoding="UTF-8"?><ECRMessage><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></ECRMessage>`;
+      }
+
+      console.log('[USB ECR] Sending XML command:', xmlRequest.substring(0, 200));
+
+      // Set up response handler
+      let responseReceived = false;
+      const unsubscribe = onDataReceived((data: string) => {
+        if (responseReceived) return;
+        
+        console.log('[USB ECR] Data received:', data.substring(0, 200));
+        
+        // Check for intermediate status messages
+        if (data.includes('<IntermediateStatus>') || data.includes('<StatusCode>')) {
+          const statusMatch = data.match(/<StatusCode>(\d+)<\/StatusCode>/);
+          if (statusMatch) {
+            const statusCode = statusMatch[1];
+            const mappedStatus = mapIntermediateCode(statusCode);
+            if (mappedStatus) {
+              setIntermediateStatus(mappedStatus);
+            }
+          }
+          return; // Don't resolve for intermediate messages
+        }
+
+        // Check for final response (contains ResponseCode or ErrorCode)
+        if (data.includes('<ResponseCode>') || data.includes('<ErrorCode>') || data.includes('</ECRMessage>')) {
+          responseReceived = true;
+          clearTimeout(timeoutId);
+          unsubscribe();
+          
+          try {
+            const ecrResponse = parseECRXMLResponse(data);
+            const response = convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
+            resolve(response);
+          } catch (parseError) {
+            console.error('[USB ECR] Parse error:', parseError);
+            resolve({
+              success: false,
+              transactionId: message.payload?.transactionId || '',
+              errorCode: 'PARSE_ERROR',
+              errorMessage: 'Failed to parse POS response',
+            });
+          }
+        }
+      });
+
+      // Send the command
+      const sent = await writeUSBData(xmlRequest);
+      
+      if (!sent) {
+        clearTimeout(timeoutId);
+        unsubscribe();
+        resolve({
+          success: false,
+          transactionId: message.payload?.transactionId || '',
+          errorCode: 'USB_WRITE_FAILED',
+          errorMessage: 'Failed to send command to POS via USB',
+        });
+      }
+      
+      console.log('[USB ECR] Command sent, waiting for response...');
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      console.error('[USB ECR] Error:', error);
+      resolve({
+        success: false,
+        transactionId: message.payload?.transactionId || '',
+        errorCode: 'USB_ERROR',
+        errorMessage: error.message || 'USB communication error',
+      });
+    }
   });
 };
 

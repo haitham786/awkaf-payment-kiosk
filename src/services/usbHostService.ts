@@ -20,6 +20,7 @@
 export interface USBDeviceInfo {
   vendorId: number;
   productId: number;
+  deviceId?: number; // Device ID used by capacitor-plugin-usb-serial for openSerial
   deviceName?: string;
   manufacturerName?: string;
   serialNumber?: string;
