@@ -148,18 +148,25 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
 };
 
 // ============================================================================
-// NFC STATUS (MOCK IMPLEMENTATION)
+// NFC STATUS (MOCK/TRIAL IMPLEMENTATION FOR SAMSUNG A33 & SUNMI FLEX 3)
 // ============================================================================
 
 /**
  * Check if NFC reader is available and enabled
- * In mock mode, this always returns available/enabled
+ * In mock/trial mode, this simulates NFC as available for Samsung A33 and Sunmi Flex 3
+ * This allows full testing of the payment flow without actual NFC hardware
  */
 export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
   console.log('[SoftPOS] Checking NFC availability (mode:', currentMode, ')');
   
-  if (currentMode === 'mock') {
-    // In mock mode, simulate NFC as available
+  // Try to detect real NFC first (for native Android)
+  const isNativeAndroid = typeof (window as any).Android !== 'undefined' || 
+                          (navigator.userAgent.includes('Android') && typeof (window as any).ThawaniLamsa !== 'undefined');
+  
+  if (isNativeAndroid && currentMode === 'real') {
+    // In real mode on Android, try to check actual NFC status
+    // This would be implemented when Thawani SDK is available
+    console.log('[SoftPOS] Native Android detected - would check real NFC');
     return {
       isAvailable: true,
       isEnabled: true,
@@ -167,8 +174,19 @@ export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
     };
   }
   
-  // Real mode NFC check would go here
-  // For now, return simulated status
+  // For trial/mock mode, always simulate NFC as available
+  // This allows testing on Samsung A33, Sunmi Flex 3, and any other device
+  if (currentMode === 'mock') {
+    console.log('[SoftPOS] Mock mode - simulating NFC as available for trial');
+    console.log('[SoftPOS] Compatible with: Samsung A33, Sunmi Flex 3, and other NFC devices');
+    return {
+      isAvailable: true,
+      isEnabled: true,
+      errorMessage: undefined,
+    };
+  }
+  
+  // Fallback - in trial phase, always return available for testing
   return {
     isAvailable: true,
     isEnabled: true,
@@ -233,20 +251,29 @@ const getRandomCardType = (): { type: string; lastFour: string } => {
 
 /**
  * Simulate a mock payment with configurable delay and success rate
+ * This simulates the Thawani Soft POS flow for Samsung A33 and Sunmi Flex 3
  */
 const processMockPayment = async (
   amountBaisas: number,
   transactionId: string,
   remarks?: string
 ): Promise<SoftPOSTransactionResult> => {
-  console.log('[SoftPOS-MOCK] Processing simulated payment...', { amountBaisas, transactionId });
+  console.log('[SoftPOS-MOCK] Processing simulated Thawani payment...', { amountBaisas, transactionId });
+  console.log('[SoftPOS-MOCK] Simulating NFC card tap on Samsung A33 / Sunmi Flex 3...');
   
-  // Simulate processing delay (2-4 seconds for realism)
-  const delay = 2000 + Math.random() * 2000;
+  // Simulate NFC activation and card detection (1.5 seconds)
+  console.log('[SoftPOS-MOCK] NFC Reader activated - waiting for card tap...');
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // Simulate card detection
+  console.log('[SoftPOS-MOCK] Card detected! Processing payment...');
+  
+  // Simulate payment processing delay (1-2 seconds for realism)
+  const delay = 1000 + Math.random() * 1000;
   await new Promise(resolve => setTimeout(resolve, delay));
   
-  // 90% success rate for mock transactions
-  const isSuccess = Math.random() > 0.1;
+  // 95% success rate for mock transactions (higher for trial to ensure good testing)
+  const isSuccess = Math.random() > 0.05;
   
   if (isSuccess) {
     const card = getRandomCardType();
