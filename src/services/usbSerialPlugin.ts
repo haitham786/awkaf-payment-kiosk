@@ -1,5 +1,6 @@
 /**
  * USB Serial Plugin - CORRECT Implementation for capacitor-plugin-usb-serial
+ * With ECR Protocol Framing for OM-A880 POS
  * 
  * This module properly integrates with the capacitor-plugin-usb-serial plugin
  * using the EXACT method names from the plugin API:
@@ -18,9 +19,27 @@
  * - 'data' → data received
  * - 'error' → error occurred
  * - 'log' → debug log
+ * 
+ * ECR Protocol Requirements (OM-A880):
+ * - Baud rate: 2400
+ * - Frame: STX (0x02) + XML + ETX (0x03) + LRC
+ * - ACK every message: 0x06
+ * - Initialize with GetTerminalInfo before transactions
  */
 
 import { USBDeviceInfo, DEFAULT_POS_IDENTIFIERS } from './usbHostService';
+import {
+  frameECRCommand,
+  parseFramedResponse,
+  createACK,
+  bytesToHex,
+  frameToDebugString,
+  STX,
+  ETX,
+  ACK,
+  INTERMEDIATE_STATUS_CODES,
+  parseIntermediateStatus,
+} from './ecrFraming';
 
 // Plugin interface matching capacitor-plugin-usb-serial exactly
 interface UsbSerialDevice {
@@ -56,13 +75,24 @@ let usbSerialPlugin: UsbSerialPlugin | null = null;
 let connectedDeviceId: number | null = null;
 
 // Serial configuration for OM-A880 POS
+// CRITICAL: OM-A880 uses 2400 baud rate per ECR specification!
 export const POS_SERIAL_CONFIG = {
+  baudRate: 2400,     // OM-A880 requirement: 2400 baud
+  dataBits: 8,        // 8 data bits
+  stopBits: 1,        // 1 stop bit  
+  parity: 0,          // 0 = none
+  dtr: true,          // Data Terminal Ready
+  rts: true,          // Request To Send
+};
+
+// Alternative config for other POS terminals (if needed)
+export const POS_SERIAL_CONFIG_FAST = {
   baudRate: 115200,
   dataBits: 8,
   stopBits: 1,
-  parity: 0, // 0 = none
-  dtr: true, // Data Terminal Ready
-  rts: true, // Request To Send
+  parity: 0,
+  dtr: true,
+  rts: true,
 };
 
 // Callback types
@@ -295,10 +325,11 @@ export const closeUSBConnection = async (): Promise<boolean> => {
 };
 
 /**
- * Write data to USB serial using writeSerial()
+ * Write raw string data to USB serial using writeSerial()
+ * WARNING: For ECR commands, use writeFramedCommand() instead!
  */
 export const writeUSBData = async (data: string): Promise<boolean> => {
-  console.log('[USBSerial] Writing data:', data.substring(0, 100));
+  console.log('[USBSerial] Writing raw data:', data.substring(0, 100));
 
   if (!usbSerialPlugin) {
     console.error('[USBSerial] Plugin not available for writing');
@@ -318,6 +349,58 @@ export const writeUSBData = async (data: string): Promise<boolean> => {
     console.error('[USBSerial] Error writing data:', error);
     return false;
   }
+};
+
+/**
+ * Write raw bytes to USB serial
+ */
+export const writeUSBBytes = async (bytes: Uint8Array): Promise<boolean> => {
+  console.log('[USBSerial] Writing bytes:', bytesToHex(bytes.slice(0, 20)), '...');
+
+  if (!usbSerialPlugin) {
+    console.error('[USBSerial] Plugin not available for writing');
+    return false;
+  }
+
+  if (connectedDeviceId === null) {
+    console.error('[USBSerial] Not connected to any device');
+    return false;
+  }
+
+  try {
+    // Convert bytes to string (plugin expects string)
+    // Use Latin-1 encoding to preserve byte values
+    const dataStr = Array.from(bytes).map(b => String.fromCharCode(b)).join('');
+    await usbSerialPlugin.writeSerial({ data: dataStr });
+    console.log('[USBSerial] Bytes written successfully');
+    return true;
+  } catch (error) {
+    console.error('[USBSerial] Error writing bytes:', error);
+    return false;
+  }
+};
+
+/**
+ * Write ECR command with proper framing (STX + XML + ETX + LRC)
+ * This is the CORRECT way to send commands to OM-A880!
+ */
+export const writeFramedCommand = async (xmlCommand: string): Promise<boolean> => {
+  console.log('[USBSerial] Framing ECR command:', xmlCommand.substring(0, 80));
+
+  const framedPacket = frameECRCommand(xmlCommand);
+  console.log('[USBSerial] Framed packet:', frameToDebugString(framedPacket.slice(0, 50)), '...');
+  console.log('[USBSerial] Hex:', bytesToHex(framedPacket.slice(0, 30)), '...');
+
+  return await writeUSBBytes(framedPacket);
+};
+
+/**
+ * Send ACK (0x06) to POS
+ * CRITICAL: Must ACK every message from POS!
+ */
+export const sendACK = async (): Promise<boolean> => {
+  console.log('[USBSerial] Sending ACK');
+  return await writeUSBBytes(createACK());
 };
 
 /**
@@ -476,13 +559,14 @@ export const findAndConnectPOS = async (): Promise<{ success: boolean; device?: 
 };
 
 /**
- * Send ECR command to POS and wait for response
+ * Send raw ECR command to POS and wait for response (legacy - no framing)
+ * @deprecated Use sendFramedECRCommand instead
  */
 export const sendCommandAndWaitForResponse = async (
   command: string, 
   timeoutMs: number = 30000
 ): Promise<{ success: boolean; response?: string; error?: string }> => {
-  console.log('[USBSerial] Sending command:', command.substring(0, 100));
+  console.log('[USBSerial] Sending raw command (legacy):', command.substring(0, 100));
 
   if (connectedDeviceId === null) {
     return { success: false, error: 'Not connected to POS' };
@@ -501,4 +585,364 @@ export const sendCommandAndWaitForResponse = async (
   } else {
     return { success: false, error: 'No response from POS (timeout)' };
   }
+};
+
+// Event callback types for framed communication
+export type IntermediateStatusCallback = (statusCode: string, event: string, message: string) => void;
+export type FinalResponseCallback = (xml: string) => void;
+
+// Registered callbacks for ECR events
+let intermediateCallbacks: IntermediateStatusCallback[] = [];
+let posInitialized = false;
+
+/**
+ * Register callback for intermediate status events
+ */
+export const onIntermediateStatus = (callback: IntermediateStatusCallback): (() => void) => {
+  intermediateCallbacks.push(callback);
+  return () => {
+    const index = intermediateCallbacks.indexOf(callback);
+    if (index > -1) intermediateCallbacks.splice(index, 1);
+  };
+};
+
+/**
+ * Check if POS has been initialized
+ */
+export const isPOSInitialized = (): boolean => posInitialized;
+
+/**
+ * Send framed ECR command to POS with proper protocol handling
+ * 
+ * Flow:
+ * 1. Frame command with STX/ETX/LRC
+ * 2. Send framed command
+ * 3. Wait for ACK
+ * 4. Listen for intermediate status messages (ACK each)
+ * 5. Wait for final response (ACK it)
+ * 6. Return parsed response
+ */
+export const sendFramedECRCommand = async (
+  xmlCommand: string,
+  timeoutMs: number = 120000,
+  onStatus?: IntermediateStatusCallback
+): Promise<{ 
+  success: boolean; 
+  response?: string; 
+  ackReceived: boolean;
+  intermediateEvents: string[];
+  error?: string;
+  rawHex?: string;
+}> => {
+  console.log('[USBSerial ECR] Sending framed command...');
+  console.log('[USBSerial ECR] XML:', xmlCommand.substring(0, 150));
+
+  if (connectedDeviceId === null) {
+    return { success: false, ackReceived: false, intermediateEvents: [], error: 'Not connected to POS' };
+  }
+
+  // Send framed command
+  const sent = await writeFramedCommand(xmlCommand);
+  if (!sent) {
+    return { success: false, ackReceived: false, intermediateEvents: [], error: 'Failed to send framed command' };
+  }
+
+  console.log('[USBSerial ECR] Command sent, waiting for response...');
+
+  // Collect events and response
+  const intermediateEvents: string[] = [];
+  let ackReceived = false;
+  let finalResponse: string | null = null;
+  let rawHex: string = '';
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    
+    const timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsubscribe();
+        resolve({
+          success: false,
+          ackReceived,
+          intermediateEvents,
+          error: 'Timeout waiting for POS response',
+        });
+      }
+    }, timeoutMs);
+
+    // Handle incoming data
+    const handleData = async (data: string) => {
+      if (resolved) return;
+
+      console.log('[USBSerial ECR] Raw data received:', data.substring(0, 100));
+      
+      // Convert string to bytes for parsing
+      const bytes = new Uint8Array(data.split('').map(c => c.charCodeAt(0)));
+      const parsed = parseFramedResponse(bytes);
+      
+      rawHex = parsed.rawHex;
+      console.log('[USBSerial ECR] Parsed:', {
+        valid: parsed.valid,
+        isACK: parsed.isACK,
+        isNAK: parsed.isNAK,
+        isIntermediate: parsed.isIntermediate,
+        dataLength: parsed.data?.length,
+      });
+
+      // Handle ACK
+      if (parsed.isACK) {
+        console.log('[USBSerial ECR] ACK received ✓');
+        ackReceived = true;
+        return; // Continue waiting for actual response
+      }
+
+      // Handle NAK
+      if (parsed.isNAK) {
+        console.error('[USBSerial ECR] NAK received - command rejected!');
+        resolved = true;
+        clearTimeout(timeoutId);
+        unsubscribe();
+        resolve({
+          success: false,
+          ackReceived: false,
+          intermediateEvents,
+          error: 'POS rejected command (NAK)',
+          rawHex,
+        });
+        return;
+      }
+
+      // Handle intermediate status
+      if (parsed.isIntermediate && parsed.data) {
+        const statusCode = parseIntermediateStatus(parsed.data);
+        if (statusCode) {
+          const statusInfo = INTERMEDIATE_STATUS_CODES[statusCode];
+          const event = statusInfo?.event || 'UNKNOWN';
+          const message = statusInfo?.arabicMessage || '';
+          
+          console.log('[USBSerial ECR] Intermediate status:', statusCode, event);
+          intermediateEvents.push(`${statusCode}:${event}`);
+          
+          // Notify callbacks
+          if (onStatus) onStatus(statusCode, event, message);
+          intermediateCallbacks.forEach(cb => cb(statusCode, event, message));
+          
+          // ACK the intermediate message
+          await sendACK();
+        }
+        return; // Continue waiting for final response
+      }
+
+      // Handle final response (has ResponseCode or ErrorCode)
+      if (parsed.data && (
+        parsed.data.includes('<ResponseCode>') || 
+        parsed.data.includes('<ErrorCode>') ||
+        parsed.data.includes('</EFTData>')
+      )) {
+        console.log('[USBSerial ECR] Final response received');
+        finalResponse = parsed.data;
+        
+        // ACK the final response
+        await sendACK();
+        
+        resolved = true;
+        clearTimeout(timeoutId);
+        unsubscribe();
+        
+        resolve({
+          success: true,
+          response: finalResponse,
+          ackReceived,
+          intermediateEvents,
+          rawHex,
+        });
+        return;
+      }
+
+      // Unknown data - log but continue
+      console.warn('[USBSerial ECR] Unknown data format:', parsed.data?.substring(0, 100));
+    };
+
+    // Subscribe to data
+    const unsubscribe = onDataReceived(handleData);
+  });
+};
+
+/**
+ * Initialize POS connection with GetTerminalInfo
+ * MANDATORY: Must be called before any transaction!
+ */
+export const initializePOSTerminal = async (): Promise<{
+  success: boolean;
+  terminalId?: string;
+  merchantId?: string;
+  appVersion?: string;
+  serialNo?: string;
+  error?: string;
+}> => {
+  console.log('[USBSerial ECR] Initializing POS terminal...');
+
+  // Import framing module for building command
+  const { buildGetTerminalInfoCommand } = await import('./ecrFraming');
+  const xmlCommand = buildGetTerminalInfoCommand();
+  
+  const result = await sendFramedECRCommand(xmlCommand, 15000);
+  
+  if (!result.success || !result.response) {
+    console.error('[USBSerial ECR] POS initialization failed:', result.error);
+    posInitialized = false;
+    return { 
+      success: false, 
+      error: result.error || 'No response from POS during initialization' 
+    };
+  }
+
+  // Parse terminal info from response
+  try {
+    const tidMatch = result.response.match(/<TID>([^<]+)<\/TID>/);
+    const midMatch = result.response.match(/<MID>([^<]+)<\/MID>/);
+    const versionMatch = result.response.match(/<AppVersion>([^<]+)<\/AppVersion>/);
+    const serialMatch = result.response.match(/<SerialNo>([^<]+)<\/SerialNo>/);
+    const errorMatch = result.response.match(/<ErrorCode>([^<]+)<\/ErrorCode>/);
+    
+    const errorCode = errorMatch?.[1];
+    if (errorCode && errorCode !== 'E000') {
+      console.error('[USBSerial ECR] POS returned error:', errorCode);
+      posInitialized = false;
+      return { 
+        success: false, 
+        error: `POS error: ${errorCode}` 
+      };
+    }
+
+    posInitialized = true;
+    console.log('[USBSerial ECR] POS initialized successfully');
+    console.log('[USBSerial ECR] TID:', tidMatch?.[1], 'MID:', midMatch?.[1]);
+
+    return {
+      success: true,
+      terminalId: tidMatch?.[1],
+      merchantId: midMatch?.[1],
+      appVersion: versionMatch?.[1],
+      serialNo: serialMatch?.[1],
+    };
+  } catch (parseError) {
+    console.error('[USBSerial ECR] Failed to parse terminal info:', parseError);
+    return { 
+      success: false, 
+      error: 'Failed to parse terminal info response' 
+    };
+  }
+};
+
+/**
+ * Send Purchase transaction with proper ECR protocol
+ * 
+ * @param amountInBaisas - Amount without decimals (e.g., 10.50 OMR = 1050)
+ * @param merchantRef - Optional reference (max 22 chars)
+ * @param onStatus - Optional callback for intermediate status updates
+ */
+export const sendPurchaseTransaction = async (
+  amountInBaisas: number,
+  merchantRef?: string,
+  onStatus?: IntermediateStatusCallback
+): Promise<{
+  success: boolean;
+  response?: string;
+  rrn?: string;
+  authCode?: string;
+  tid?: string;
+  mid?: string;
+  error?: string;
+  intermediateEvents: string[];
+}> => {
+  console.log('[USBSerial ECR] Starting Purchase transaction...');
+  console.log('[USBSerial ECR] Amount:', amountInBaisas, 'baisas');
+
+  // Check if POS is initialized
+  if (!posInitialized) {
+    console.log('[USBSerial ECR] POS not initialized, initializing...');
+    const initResult = await initializePOSTerminal();
+    if (!initResult.success) {
+      return {
+        success: false,
+        error: `POS initialization failed: ${initResult.error}`,
+        intermediateEvents: [],
+      };
+    }
+  }
+
+  // Import framing module for building command
+  const { buildPurchaseCommand } = await import('./ecrFraming');
+  const xmlCommand = buildPurchaseCommand(amountInBaisas, merchantRef);
+  
+  // Send with 2 minute timeout for card entry/PIN
+  const result = await sendFramedECRCommand(xmlCommand, 120000, onStatus);
+  
+  if (!result.success || !result.response) {
+    return {
+      success: false,
+      error: result.error || 'No response from POS',
+      intermediateEvents: result.intermediateEvents,
+    };
+  }
+
+  // Parse transaction response
+  try {
+    const rrnMatch = result.response.match(/<RRN>([^<]+)<\/RRN>/);
+    const authMatch = result.response.match(/<AuthCode>([^<]+)<\/AuthCode>/);
+    const tidMatch = result.response.match(/<TID>([^<]+)<\/TID>/);
+    const midMatch = result.response.match(/<MID>([^<]+)<\/MID>/);
+    const errorMatch = result.response.match(/<ErrorCode>([^<]+)<\/ErrorCode>/);
+    const responseMatch = result.response.match(/<ResponseCode>([^<]+)<\/ResponseCode>/);
+    const statusMatch = result.response.match(/<TxnStatus>([^<]+)<\/TxnStatus>/);
+    
+    const errorCode = errorMatch?.[1];
+    const responseCode = responseMatch?.[1];
+    const txnStatus = statusMatch?.[1];
+    
+    // Transaction is successful if error is E000 and status is OK, or response is 00/APPROVED
+    const success = (errorCode === 'E000' && txnStatus === 'OK') || 
+                    responseCode === '00' || 
+                    responseCode === 'APPROVED';
+
+    return {
+      success,
+      response: result.response,
+      rrn: rrnMatch?.[1],
+      authCode: authMatch?.[1],
+      tid: tidMatch?.[1],
+      mid: midMatch?.[1],
+      error: success ? undefined : `${errorCode}: ${responseCode}`,
+      intermediateEvents: result.intermediateEvents,
+    };
+  } catch (parseError) {
+    console.error('[USBSerial ECR] Failed to parse transaction response:', parseError);
+    return {
+      success: false,
+      error: 'Failed to parse transaction response',
+      intermediateEvents: result.intermediateEvents,
+    };
+  }
+};
+
+/**
+ * Get last transaction status (recovery after timeout)
+ */
+export const getLastTransactionStatus = async (): Promise<{
+  success: boolean;
+  response?: string;
+  error?: string;
+}> => {
+  const { buildLastTransactionStatusCommand } = await import('./ecrFraming');
+  const xmlCommand = buildLastTransactionStatusCommand();
+  
+  const result = await sendFramedECRCommand(xmlCommand, 30000);
+  
+  return {
+    success: result.success,
+    response: result.response,
+    error: result.error,
+  };
 };

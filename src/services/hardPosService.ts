@@ -1196,129 +1196,131 @@ const sendECRViaNativeBridge = async (message: POSMessage, timeout: number): Pro
 
 /**
  * Send ECR command via USB Serial (using capacitor-plugin-usb-serial)
+ * NOW WITH PROPER ECR FRAMING (STX/ETX/LRC) AND ACK HANDLING
  */
 const sendECRViaUSB = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
-  // Import the USB serial plugin functions
-  const { writeUSBData, readUSBData, isUSBConnected, onDataReceived } = await import('./usbSerialPlugin');
+  // Import the USB serial plugin functions with proper framing
+  const { 
+    isUSBConnected, 
+    sendPurchaseTransaction,
+    sendFramedECRCommand,
+    initializePOSTerminal,
+    isPOSInitialized,
+  } = await import('./usbSerialPlugin');
   
-  return new Promise(async (resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('POS_TIMEOUT: Transaction timed out waiting for USB POS response'));
-    }, timeout);
+  const { 
+    buildGetTerminalInfoCommand,
+    buildGetStatusCommand,
+    buildReconciliationCommand,
+    buildLastTransactionStatusCommand,
+    buildGetTotalsCommand,
+  } = await import('./ecrFraming');
 
-    try {
-      // Check if connected
-      const connected = await isUSBConnected();
-      if (!connected) {
-        clearTimeout(timeoutId);
-        resolve({
-          success: false,
-          transactionId: message.payload?.transactionId || '',
-          errorCode: 'USB_NOT_CONNECTED',
-          errorMessage: 'USB not connected. Please connect POS via OTG cable.',
-        });
-        return;
-      }
-
-      // Build XML request based on command
-      let xmlRequest: string;
-      switch (message.command) {
-        case 'PURCHASE':
-          xmlRequest = buildPurchaseRequest(
-            parseInt(message.payload?.amount || '0'),
-            message.payload?.invoiceNumber,
-            message.payload?.merchantReference
-          );
-          break;
-        case 'GET_STATUS':
-          xmlRequest = buildStatusRequest();
-          break;
-        case 'GET_TERMINAL_INFO':
-          xmlRequest = buildTerminalInfoRequest();
-          break;
-        case 'RECONCILIATION':
-          xmlRequest = buildReconciliationRequest();
-          break;
-        case 'LAST_TRANSACTION_STATUS':
-          xmlRequest = buildLastTransactionRequest();
-          break;
-        case 'GET_TOTALS':
-          xmlRequest = buildTotalsRequest();
-          break;
-        default:
-          xmlRequest = `<?xml version="1.0" encoding="UTF-8"?><ECRMessage><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></ECRMessage>`;
-      }
-
-      console.log('[USB ECR] Sending XML command:', xmlRequest.substring(0, 200));
-
-      // Set up response handler
-      let responseReceived = false;
-      const unsubscribe = onDataReceived((data: string) => {
-        if (responseReceived) return;
-        
-        console.log('[USB ECR] Data received:', data.substring(0, 200));
-        
-        // Check for intermediate status messages
-        if (data.includes('<IntermediateStatus>') || data.includes('<StatusCode>')) {
-          const statusMatch = data.match(/<StatusCode>(\d+)<\/StatusCode>/);
-          if (statusMatch) {
-            const statusCode = statusMatch[1];
-            const mappedStatus = mapIntermediateCode(statusCode);
-            if (mappedStatus) {
-              setIntermediateStatus(mappedStatus);
-            }
-          }
-          return; // Don't resolve for intermediate messages
-        }
-
-        // Check for final response (contains ResponseCode or ErrorCode)
-        if (data.includes('<ResponseCode>') || data.includes('<ErrorCode>') || data.includes('</ECRMessage>')) {
-          responseReceived = true;
-          clearTimeout(timeoutId);
-          unsubscribe();
-          
-          try {
-            const ecrResponse = parseECRXMLResponse(data);
-            const response = convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
-            resolve(response);
-          } catch (parseError) {
-            console.error('[USB ECR] Parse error:', parseError);
-            resolve({
-              success: false,
-              transactionId: message.payload?.transactionId || '',
-              errorCode: 'PARSE_ERROR',
-              errorMessage: 'Failed to parse POS response',
-            });
-          }
-        }
-      });
-
-      // Send the command
-      const sent = await writeUSBData(xmlRequest);
-      
-      if (!sent) {
-        clearTimeout(timeoutId);
-        unsubscribe();
-        resolve({
-          success: false,
-          transactionId: message.payload?.transactionId || '',
-          errorCode: 'USB_WRITE_FAILED',
-          errorMessage: 'Failed to send command to POS via USB',
-        });
-      }
-      
-      console.log('[USB ECR] Command sent, waiting for response...');
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error('[USB ECR] Error:', error);
-      resolve({
+  try {
+    // Check if connected
+    const connected = await isUSBConnected();
+    if (!connected) {
+      return {
         success: false,
         transactionId: message.payload?.transactionId || '',
-        errorCode: 'USB_ERROR',
-        errorMessage: error.message || 'USB communication error',
-      });
+        errorCode: 'USB_NOT_CONNECTED',
+        errorMessage: 'USB not connected. Please connect POS via OTG cable.',
+      };
     }
-  });
+
+    // PURCHASE command - use the dedicated function with proper flow
+    if (message.command === 'PURCHASE') {
+      console.log('[USB ECR] Processing PURCHASE command with proper framing...');
+      
+      const amount = parseInt(message.payload?.amount || '0');
+      const merchantRef = message.payload?.merchantReference;
+      
+      // Status callback for intermediate events
+      const statusCallback = (code: string, event: string, _arabicMessage: string) => {
+        const mappedStatus = mapIntermediateCode(code);
+        if (mappedStatus) {
+          setIntermediateStatus(mappedStatus);
+        }
+      };
+      
+      const result = await sendPurchaseTransaction(amount, merchantRef, statusCallback);
+      
+      console.log('[USB ECR] Transaction result:', {
+        success: result.success,
+        rrn: result.rrn,
+        authCode: result.authCode,
+        events: result.intermediateEvents,
+      });
+      
+      if (result.success) {
+        setIntermediateStatus('TRANSACTION_COMPLETE');
+        return {
+          success: true,
+          transactionId: message.payload?.transactionId || '',
+          posRRN: result.rrn,
+          posAuthCode: result.authCode,
+          posTID: result.tid,
+          posMID: result.mid,
+        };
+      } else {
+        setIntermediateStatus('TRANSACTION_FAILED');
+        return {
+          success: false,
+          transactionId: message.payload?.transactionId || '',
+          errorCode: 'TRANSACTION_FAILED',
+          errorMessage: result.error || 'Transaction failed',
+        };
+      }
+    }
+
+    // Other commands - use framed ECR command
+    let xmlCommand: string;
+    switch (message.command) {
+      case 'GET_STATUS':
+        xmlCommand = buildGetStatusCommand();
+        break;
+      case 'GET_TERMINAL_INFO':
+        xmlCommand = buildGetTerminalInfoCommand();
+        break;
+      case 'RECONCILIATION':
+        xmlCommand = buildReconciliationCommand();
+        break;
+      case 'LAST_TRANSACTION_STATUS':
+        xmlCommand = buildLastTransactionStatusCommand();
+        break;
+      case 'GET_TOTALS':
+        xmlCommand = buildGetTotalsCommand();
+        break;
+      default:
+        xmlCommand = `<?xml version="1.0" encoding="UTF-8"?><EFTData><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></EFTData>`;
+    }
+
+    console.log('[USB ECR] Sending framed command:', message.command);
+    
+    const result = await sendFramedECRCommand(xmlCommand, timeout);
+    
+    if (!result.success || !result.response) {
+      return {
+        success: false,
+        transactionId: message.payload?.transactionId || '',
+        errorCode: result.ackReceived ? 'NO_RESPONSE' : 'NO_ACK',
+        errorMessage: result.error || 'No response from POS',
+      };
+    }
+
+    // Parse response
+    const ecrResponse = parseECRXMLResponse(result.response);
+    return convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
+    
+  } catch (error: any) {
+    console.error('[USB ECR] Error:', error);
+    return {
+      success: false,
+      transactionId: message.payload?.transactionId || '',
+      errorCode: 'USB_ERROR',
+      errorMessage: error.message || 'USB communication error',
+    };
+  }
 };
 
 /**
