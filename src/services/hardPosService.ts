@@ -77,8 +77,17 @@ import {
   onDataReceived as webSerialOnDataReceived,
 } from './webSerialService';
 
-// Import USB Bridge Service (direct USB serial via capacitor-usb-serial)
-import usbBridgeService from './usbBridgeService';
+// Import USB Bridge Service (for USB-to-TCP bridge apps)
+import {
+  initializeBridge,
+  disconnectBridge,
+  sendBridgeCommand,
+  getBridgeState,
+  onBridgeStateChange,
+  onBridgeData,
+  testBridgeConnection,
+  getRecommendedApps,
+} from './usbBridgeService';
 
 // Connection types - added 'usbbridge' for USB bridge apps
 export type ConnectionType = 'usb' | 'ethernet' | 'webserial' | 'usbbridge';
@@ -364,16 +373,36 @@ export const initializePOS = async (config: POSConfig): Promise<boolean> => {
 
 /**
  * Initialize USB Bridge connection
- * Uses capacitor-usb-serial plugin for direct USB serial communication
+ * Uses a USB-to-TCP bridge app (like Serial USB Terminal) on Android
  */
-const initializeUSBBridgeConnection = async (_host: string, _port: number): Promise<boolean> => {
-  console.log('[USBBridge] Initializing direct USB serial connection...');
+const initializeUSBBridgeConnection = async (host: string, port: number): Promise<boolean> => {
+  console.log(`[USBBridge] Initializing connection to ${host}:${port}...`);
   
   try {
-    await usbBridgeService.connect();
-    setConnectionStatus('connected');
-    startConnectionMonitoring();
-    return true;
+    // Subscribe to state changes
+    onBridgeStateChange((state) => {
+      console.log('[USBBridge] State changed:', state);
+      if (state === 'connected') {
+        setConnectionStatus('connected');
+      } else if (state === 'disconnected' || state === 'error') {
+        setConnectionStatus(state === 'error' ? 'error' : 'disconnected');
+      }
+    });
+    
+    // Subscribe to incoming data
+    onBridgeData((data) => {
+      handleIncomingPOSData(data);
+    });
+    
+    const connected = await initializeBridge({ host, port, timeout: currentConfig?.timeout || 120000 });
+    
+    if (connected) {
+      setConnectionStatus('connected');
+      startConnectionMonitoring();
+      return true;
+    }
+    
+    return false;
   } catch (error: any) {
     console.error('[USBBridge] Connection error:', error);
     lastErrorMessage = error.message || 'USB Bridge connection failed';
@@ -655,11 +684,6 @@ const startConnectionMonitoring = () => {
  */
 const checkConnectionHealth = async (): Promise<boolean> => {
   if (!currentConfig) return false;
-  
-  // USB Bridge - check if still connected
-  if (currentConfig.connectionType === 'usbbridge') {
-    return usbBridgeService.isConnected();
-  }
   
   if (currentConfig.connectionType === 'usb') {
     return await detectUSBDevice();
@@ -957,16 +981,10 @@ export const getLastTransactionStatus = async (transactionId: string): Promise<T
 
 /**
  * Send ECR Command to POS and receive response
- * PRIORITY: USB Bridge (direct serial) > Web Serial (Chrome/PWA) > Ethernet (TCP/IP) > Native Bridge
+ * PRIORITY: Web Serial (Chrome/PWA) > Ethernet (TCP/IP) > Native Bridge > USB
  */
 const sendECRCommand = async (message: POSMessage): Promise<TransactionResponse> => {
   const timeout = currentConfig?.timeout || 120000;
-  
-  // USB BRIDGE - Direct USB serial via capacitor-usb-serial (RECOMMENDED for Android)
-  if ((currentConfig?.connectionType === 'usbbridge' || currentConfig?.connectionType === 'usb') && usbBridgeService.isConnected()) {
-    console.log('Sending ECR command via USB Bridge:', message.command);
-    return await sendECRViaUSBBridge(message, timeout);
-  }
   
   // WEB SERIAL for Chrome/PWA (no native plugins required)
   if (currentConfig?.connectionType === 'webserial' && webSerialGetStatus()) {
@@ -1046,81 +1064,6 @@ const sendECRViaWebSerial = async (message: POSMessage, timeout: number): Promis
     return convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
   } catch (error: any) {
     console.error('Web Serial ECR command failed:', error);
-    throw error;
-  }
-};
-
-/**
- * Send ECR command via USB Bridge (direct USB serial via capacitor-usb-serial)
- * Uses proper ECR framing: STX + XML + ETX + LRC
- */
-const sendECRViaUSBBridge = async (message: POSMessage, timeout: number): Promise<TransactionResponse> => {
-  const { frameECRCommand, bytesToHex, ACK } = await import('./ecrFraming');
-  
-  let xmlRequest: string;
-  
-  switch (message.command) {
-    case 'PURCHASE':
-      xmlRequest = buildPurchaseRequest(
-        parseInt(message.payload?.amount || '0'),
-        message.payload?.invoiceNumber,
-        message.payload?.merchantReference
-      );
-      break;
-    case 'GET_STATUS':
-      xmlRequest = buildStatusRequest();
-      break;
-    case 'GET_TERMINAL_INFO':
-      xmlRequest = buildTerminalInfoRequest();
-      break;
-    case 'RECONCILIATION':
-      xmlRequest = buildReconciliationRequest();
-      break;
-    case 'LAST_TRANSACTION_STATUS':
-      xmlRequest = buildLastTransactionRequest();
-      break;
-    case 'GET_TOTALS':
-      xmlRequest = buildTotalsRequest();
-      break;
-    default:
-      xmlRequest = `<?xml version="1.0" encoding="UTF-8"?><EFTData><CommandType>${ECR_COMMANDS[message.command] || message.command}</CommandType></EFTData>`;
-  }
-  
-  try {
-    // Frame the command with STX, ETX, LRC
-    const framedCommand = frameECRCommand(xmlRequest);
-    const framedString = String.fromCharCode(...framedCommand);
-    
-    console.log('[USB Bridge] Sending framed command:', bytesToHex(framedCommand));
-    
-    // Send command and wait for response
-    const responseData = await usbBridgeService.sendCommand(framedString);
-    
-    if (!responseData) {
-      throw new Error('No response from POS');
-    }
-    
-    console.log('[USB Bridge] Received response:', responseData.substring(0, 100));
-    
-    // Send ACK for received message
-    await usbBridgeService.sendCommand(String.fromCharCode(ACK));
-    
-    // Extract XML from response (strip STX/ETX/LRC framing if present)
-    let xmlResponse = responseData;
-    if (responseData.charCodeAt(0) === 0x02) { // STX
-      const etxIndex = responseData.indexOf(String.fromCharCode(0x03));
-      if (etxIndex > 0) {
-        xmlResponse = responseData.substring(1, etxIndex);
-      }
-    }
-    
-    // Parse the XML response
-    const ecrResponse = parseECRXMLResponse(xmlResponse);
-    
-    // Convert ECRResponse to TransactionResponse
-    return convertECRToTransactionResponse(ecrResponse, message.payload?.transactionId || '');
-  } catch (error: any) {
-    console.error('[USB Bridge] ECR command failed:', error);
     throw error;
   }
 };
@@ -1493,11 +1436,6 @@ export const disconnectPOS = async (): Promise<void> => {
   if (connectionCheckInterval) {
     clearInterval(connectionCheckInterval);
     connectionCheckInterval = null;
-  }
-  
-  // Disconnect USB Bridge if connected
-  if (currentConfig?.connectionType === 'usbbridge' || currentConfig?.connectionType === 'usb') {
-    await usbBridgeService.disconnect();
   }
   
   // Disconnect Ethernet if connected
