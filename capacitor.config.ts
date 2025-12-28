@@ -15,6 +15,9 @@ const config: CapacitorConfig = {
       launchShowDuration: 2000,
       backgroundColor: "#157F1F",
       showSpinner: false
+    },
+    UsbSerial: {
+      // Plugin configuration for OM-A880 POS
     }
   },
   android: {
