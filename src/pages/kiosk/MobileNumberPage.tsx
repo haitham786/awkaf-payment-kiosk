@@ -1,15 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Home, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
 
 const MobileNumberPage = () => {
   const navigate = useNavigate();
@@ -21,6 +16,14 @@ const MobileNumberPage = () => {
   const [mobileNumber, setMobileNumber] = useState("");
   const [sending, setSending] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   // Auto-timeout: return to categories after 10 seconds of inactivity
   useEffect(() => {
@@ -97,94 +100,90 @@ const MobileNumberPage = () => {
 
   return (
     <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-md mx-auto flex flex-col min-h-[calc(100vh-120px)] justify-between px-4">
-        <div>
-          {/* Mobile Number Input Card */}
-          <Card className="p-4 bg-white/90 backdrop-blur-sm shadow-lg border-0">
-            <div className="space-y-4">
-              {/* Mobile Number Input with +968 prefix */}
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-lg">
-                  +968
-                </div>
-                <Input
-                  value={mobileNumber}
-                  readOnly
-                  placeholder="________"
-                  className="text-2xl text-center h-14 bg-gray-50 border-2 border-gray-200 focus:border-emerald-500 text-gray-900 pl-16"
-                  maxLength={8}
-                />
-              </div>
-
-              {/* Keypad */}
-              <div className="grid grid-cols-3 gap-2">
-                {keypadNumbers.map((row, rowIndex) => 
-                  row.map((number, colIndex) => (
-                    <KioskButton
-                      key={`${rowIndex}-${colIndex}`}
-                      variant="keypad"
-                      onClick={() => handleKeypadPress(number)}
-                      disabled={!number}
-                      className={`h-14 text-xl bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200 ${!number ? 'invisible' : ''}`}
-                    >
-                      {number}
-                    </KioskButton>
-                  ))
-                )}
-              </div>
-
-              {/* Send Button */}
-              <KioskButton
-                variant="confirm"
-                size="xl"
-                onClick={handleSendSMS}
-                disabled={mobileNumber.length !== 8 || sending}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12"
-              >
-                {sending ? 'جاري الإرسال...' : 'إرسال'}
-              </KioskButton>
+      <div className="w-full max-w-sm mx-auto flex flex-col min-h-[calc(100vh-120px)] justify-between px-4">
+        <div className="flex-1 flex flex-col justify-center">
+          {/* Mobile Number Input with +968 prefix */}
+          <div className="relative mb-4">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-semibold text-lg">
+              +968
             </div>
-          </Card>
+            <Input
+              ref={inputRef}
+              value={mobileNumber}
+              readOnly
+              placeholder="________"
+              className="text-2xl text-center h-14 bg-white/90 border-2 border-gray-300 focus:border-emerald-500 text-gray-900 pl-16 rounded-xl"
+              maxLength={8}
+            />
+          </div>
+
+          {/* Keypad */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {keypadNumbers.map((row, rowIndex) => 
+              row.map((number, colIndex) => (
+                <KioskButton
+                  key={`${rowIndex}-${colIndex}`}
+                  variant="keypad"
+                  onClick={() => handleKeypadPress(number)}
+                  disabled={!number}
+                  className={`h-12 text-xl bg-white/80 hover:bg-white text-gray-900 border border-gray-200 rounded-xl ${!number ? 'invisible' : ''}`}
+                >
+                  {number}
+                </KioskButton>
+              ))
+            )}
+          </div>
+
+          {/* Send Button */}
+          <KioskButton
+            variant="confirm"
+            size="lg"
+            onClick={handleSendSMS}
+            disabled={mobileNumber.length !== 8 || sending}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-xl"
+          >
+            {sending ? 'جاري الإرسال...' : 'إرسال'}
+          </KioskButton>
         </div>
 
-        {/* Home Button at bottom center */}
-        <div className="flex justify-center pb-6 mt-4">
+        {/* Home Button at bottom center - icon only */}
+        <div className="flex justify-center pb-6">
           <KioskButton
-            variant="outline"
-            size="lg"
+            variant="ghost"
+            size="icon"
             soundEffect="navigation"
             onClick={handleReturnHome}
-            className="bg-white/80 backdrop-blur-sm border-0 hover:bg-white text-gray-900 px-8"
+            className="w-14 h-14 rounded-full bg-white/60 hover:bg-white/80 text-gray-700"
           >
-            <Home className="w-5 h-5 ml-2" />
-            الصفحة الرئيسية
+            <Home className="w-7 h-7" />
           </KioskButton>
         </div>
       </div>
 
-      {/* SMS Confirmation Dialog */}
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="sm:max-w-md bg-white border-0 shadow-xl">
-          <button
-            onClick={handleCloseConfirmation}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </button>
-          <div className="text-center py-6">
-            <div className="w-16 h-16 mx-auto mb-4 bg-emerald-100 rounded-full flex items-center justify-center">
-              <span className="text-3xl">✓</span>
+      {/* SMS Confirmation Popup - Rounded, smaller, transparent */}
+      {showConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl mx-8 max-w-xs w-full p-6 relative">
+            <button
+              onClick={handleCloseConfirmation}
+              className="absolute right-3 top-3 p-1 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+            <div className="text-center pt-2">
+              <div className="w-14 h-14 mx-auto mb-3 bg-emerald-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl text-emerald-600">✓</span>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">
+                تم الإرسال بنجاح
+              </h2>
+              <p className="text-gray-600 text-sm">
+                تم إرسال الإيصال إلى رقم الهاتف المحدد
+              </p>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              تم الإرسال بنجاح
-            </h2>
-            <p className="text-gray-600">
-              تم إرسال الإيصال إلى رقم الهاتف المحدد
-            </p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </KioskLayout>
   );
 };

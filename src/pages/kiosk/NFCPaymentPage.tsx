@@ -30,13 +30,15 @@ const NFCPaymentPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   
-  const [stage, setStage] = useState<PaymentStage>('initializing');
+  // Start directly in 'waiting' state for mock mode to skip the initializing screen
+  const [stage, setStage] = useState<PaymentStage>('waiting');
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
   const [categoryData, setCategoryData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isNativeMode, setIsNativeMode] = useState(false);
   const [initLogs, setInitLogs] = useState<string[]>([]);
+  const [skipInitialization, setSkipInitialization] = useState(true); // Skip init for mock mode
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
@@ -169,12 +171,29 @@ const NFCPaymentPage = () => {
   }, [kioskId]);
 
   useEffect(() => {
-    initializePayment();
+    // For mock mode, skip initialization entirely and go straight to branded UI
+    // The initialization will happen in background without blocking UI
+    if (skipInitialization) {
+      // Just fetch category data and set up callbacks
+      const quickSetup = async () => {
+        const status = getSoftPOSStatus();
+        setIsNativeMode(status.isNativeAvailable);
+        
+        // If native mode, run full initialization
+        if (status.isNativeAvailable) {
+          setSkipInitialization(false);
+          initializePayment();
+        }
+      };
+      quickSetup();
+    } else {
+      initializePayment();
+    }
 
     return () => {
       cancelTransaction();
     };
-  }, [initializePayment]);
+  }, [initializePayment, skipInitialization]);
 
   const handlePaymentSuccess = async (result: SoftPOSTransactionResult) => {
     setStage('success');
