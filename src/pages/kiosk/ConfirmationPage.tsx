@@ -35,7 +35,31 @@ const ConfirmationPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    // Check if Soft POS is enabled - if so, navigate directly to NFC payment
+    const kioskId = localStorage.getItem('kiosk_id');
+    if (kioskId) {
+      try {
+        const { data } = await supabase
+          .from('kiosks')
+          .select('configuration')
+          .eq('id', kioskId)
+          .single();
+        
+        const config = data?.configuration as { payment_mode?: string } | null;
+        const paymentMode = config?.payment_mode;
+        
+        if (paymentMode === 'soft_pos') {
+          // Direct navigation to NFC payment for Soft POS
+          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking payment mode:', error);
+      }
+    }
+    
+    // Default: navigate to payment request (Hardware POS flow)
     navigate(`/kiosk/payment-request?category=${category}&amount=${amount}`);
   };
 
