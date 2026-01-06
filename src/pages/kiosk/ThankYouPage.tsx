@@ -13,18 +13,32 @@ const ThankYouPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const referenceNumber = searchParams.get('ref') || '';
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
-  // Load category data
+  // Load category data with image preload
   useEffect(() => {
     const loadCategory = async () => {
-      const { data } = await supabase
-        .from('donation_categories')
-        .select('title, icon_url')
-        .eq('category_id', category)
-        .maybeSingle();
-      
-      if (data) {
-        setCategoryData(data);
+      try {
+        const { data } = await supabase
+          .from('donation_categories')
+          .select('title, icon_url')
+          .eq('category_id', category)
+          .maybeSingle();
+        
+        if (data) {
+          // Preload image before showing
+          if (data.icon_url) {
+            const img = new Image();
+            img.src = data.icon_url;
+            await new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          }
+          setCategoryData(data);
+        }
+      } finally {
+        setIsReady(true);
       }
     };
     loadCategory();
@@ -52,6 +66,17 @@ const ThankYouPage = () => {
     navigate('/kiosk');
   };
 
+  // Don't render until data is loaded to prevent flashing
+  if (!isReady) {
+    return (
+      <KioskLayout showHomeButton={false}>
+        <div className="w-full max-w-md mx-auto flex items-center justify-center min-h-[300px]">
+          <div className="animate-pulse text-white/50">...</div>
+        </div>
+      </KioskLayout>
+    );
+  }
+
   return (
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-md mx-auto flex flex-col min-h-[calc(100vh-120px)] justify-between px-4">
@@ -66,22 +91,24 @@ const ThankYouPage = () => {
             </h2>
           </div>
 
-          {/* Donation Summary - No white boxes */}
+          {/* Donation Summary - Fixed layout, no white boxes */}
           <div className="text-center space-y-4 mb-8">
-            {/* Category with thumbnail */}
-            {categoryData?.icon_url && (
-              <div className="w-20 h-20 mx-auto rounded-full overflow-hidden shadow-lg">
-                <img 
-                  src={categoryData.icon_url} 
-                  alt="" 
-                  className="w-full h-full object-cover"
-                />
+            {/* Category with thumbnail - Fixed height */}
+            <div className="min-h-[100px]">
+              <div className="w-20 h-20 mx-auto rounded-full overflow-hidden shadow-lg flex items-center justify-center bg-white/20">
+                {categoryData?.icon_url && (
+                  <img 
+                    src={categoryData.icon_url} 
+                    alt="" 
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
-            )}
+            </div>
             <div>
               <p className="text-black/70 text-sm mb-1">نوع التبرع</p>
-              <p className="text-xl font-semibold text-black">
-                {categoryData?.title || 'تبرع'}
+              <p className="text-xl font-semibold text-black min-h-[28px]">
+                {categoryData?.title || ''}
               </p>
             </div>
             <div>
@@ -95,7 +122,7 @@ const ThankYouPage = () => {
           {/* Receipt Option - No white box */}
           <div className="text-center space-y-3">
             <p className="text-lg font-semibold text-black">
-              هل تريد إيصال عبر الرسائل النصية؟
+              هل ترغب في الحصول على إيصال الدفع عبر رسالة نصية ؟
             </p>
             
             <KioskButton
@@ -110,16 +137,16 @@ const ThankYouPage = () => {
           </div>
         </div>
 
-        {/* Home Button at bottom center - icon only */}
+        {/* Home Button at bottom center - icon only, white color */}
         <div className="flex justify-center pb-6">
           <KioskButton
             variant="ghost"
             size="icon"
             soundEffect="navigation"
             onClick={handleReturnHome}
-            className="w-14 h-14 rounded-full bg-white/60 hover:bg-white/80 text-gray-700"
+            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
           >
-            <Home className="w-7 h-7" />
+            <Home className="w-8 h-8 text-white drop-shadow-lg" />
           </KioskButton>
         </div>
       </div>

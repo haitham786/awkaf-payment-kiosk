@@ -102,7 +102,7 @@ const MobileNumberPage = () => {
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-sm mx-auto flex flex-col min-h-[calc(100vh-120px)] justify-between px-4">
         <div className="flex-1 flex flex-col justify-center">
-          {/* Mobile Number Input with +968 prefix */}
+          {/* Mobile Number Input with +968 prefix - white box only, no borders */}
           <div className="relative mb-4">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-semibold text-lg">
               +968
@@ -112,7 +112,7 @@ const MobileNumberPage = () => {
               value={mobileNumber}
               readOnly
               placeholder="________"
-              className="text-2xl text-center h-14 bg-white/90 border-2 border-gray-300 focus:border-emerald-500 text-gray-900 pl-16 rounded-xl"
+              className="text-2xl text-center h-14 bg-white border-0 shadow-sm text-gray-900 pl-16 rounded-xl"
               maxLength={8}
             />
           </div>
@@ -146,16 +146,16 @@ const MobileNumberPage = () => {
           </KioskButton>
         </div>
 
-        {/* Home Button at bottom center - icon only */}
+        {/* Home Button at bottom center - icon only, white color */}
         <div className="flex justify-center pb-6">
           <KioskButton
             variant="ghost"
             size="icon"
             soundEffect="navigation"
             onClick={handleReturnHome}
-            className="w-14 h-14 rounded-full bg-white/60 hover:bg-white/80 text-gray-700"
+            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
           >
-            <Home className="w-7 h-7" />
+            <Home className="w-8 h-8 text-white drop-shadow-lg" />
           </KioskButton>
         </div>
       </div>
