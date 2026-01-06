@@ -34,47 +34,65 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
     return localStorage.getItem('kiosk_logo_url') || "";
   });
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadAllData = async () => {
       try {
-        const { data } = await supabase
-          .from("kiosk_settings")
-          .select("background_image_url, logo_url")
-          .limit(1)
-          .maybeSingle();
+        // Load settings and category data in parallel
+        const [settingsResult, categoryResult] = await Promise.all([
+          supabase
+            .from("kiosk_settings")
+            .select("background_image_url, logo_url")
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('donation_categories')
+            .select('title, icon_url')
+            .eq('category_id', category)
+            .maybeSingle()
+        ]);
 
-        if (data) {
-          if (data.background_image_url) {
-            localStorage.setItem('kiosk_background_url', data.background_image_url);
-            setBackgroundImage(data.background_image_url);
-          }
-          if (data.logo_url) {
-            localStorage.setItem('kiosk_logo_url', data.logo_url);
-            setLogoImage(data.logo_url);
+        // Preload all images
+        const imagesToPreload: string[] = [];
+        
+        if (settingsResult.data?.background_image_url) {
+          localStorage.setItem('kiosk_background_url', settingsResult.data.background_image_url);
+          setBackgroundImage(settingsResult.data.background_image_url);
+          imagesToPreload.push(settingsResult.data.background_image_url);
+        }
+        if (settingsResult.data?.logo_url) {
+          localStorage.setItem('kiosk_logo_url', settingsResult.data.logo_url);
+          setLogoImage(settingsResult.data.logo_url);
+          imagesToPreload.push(settingsResult.data.logo_url);
+        }
+        if (categoryResult.data) {
+          setCategoryData(categoryResult.data);
+          if (categoryResult.data.icon_url) {
+            imagesToPreload.push(categoryResult.data.icon_url);
           }
         }
-      } catch (error) {
-        console.error("Error loading kiosk settings:", error);
-      }
-    };
-    loadSettings();
-  }, []);
 
-  // Load category data
-  useEffect(() => {
-    const loadCategory = async () => {
-      const { data } = await supabase
-        .from('donation_categories')
-        .select('title, icon_url')
-        .eq('category_id', category)
-        .maybeSingle();
-      
-      if (data) {
-        setCategoryData(data);
+        // Preload all images before showing content
+        await Promise.all(
+          imagesToPreload.map(
+            (url) =>
+              new Promise((resolve) => {
+                const img = new Image();
+                img.src = url;
+                img.onload = resolve;
+                img.onerror = resolve;
+              })
+          )
+        );
+
+        setIsReady(true);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setIsReady(true);
       }
     };
-    loadCategory();
+    loadAllData();
   }, [category]);
 
   // Auto-timeout for trial mode - simulate success after 10 seconds
@@ -108,35 +126,33 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Logo at top center */}
+      {/* Logo at top center - matching KioskLayout style */}
       {logoImage && (
-        <div className="relative z-10 w-full flex justify-center pt-4">
+        <div className="relative z-10 w-full flex justify-center pt-4 pb-2">
           <img 
             src={logoImage} 
             alt="Organization Logo" 
-            className="h-14 w-auto object-contain"
+            className="h-16 w-auto object-contain"
           />
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Content - Fixed layout to prevent shifts */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6">
-        {/* Category Display with Thumbnail */}
-        <div className="mb-4 text-center">
-          {categoryData?.icon_url && (
-            <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden shadow-lg">
+        {/* Category Display with Thumbnail - Fixed height container */}
+        <div className="mb-4 text-center min-h-[90px]">
+          <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden shadow-lg flex items-center justify-center bg-white/20">
+            {categoryData?.icon_url && (
               <img 
                 src={categoryData.icon_url} 
                 alt="" 
                 className="w-full h-full object-cover"
               />
-            </div>
-          )}
-          {categoryData?.title && (
-            <p className="text-black text-lg font-semibold">
-              {categoryData.title}
-            </p>
-          )}
+            )}
+          </div>
+          <p className="text-black text-lg font-semibold min-h-[28px]">
+            {categoryData?.title || ''}
+          </p>
         </div>
 
         {/* Amount Display */}
@@ -241,28 +257,9 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
         </div>
       </div>
 
-      {/* Supported Payment Methods - Two rows, smaller logos */}
-      <div className="relative z-10 px-6 pb-2">
-        <div className="flex flex-col items-center gap-1.5 py-2 px-3 bg-white/20 backdrop-blur-sm rounded-xl">
-          {/* Row 1: Visa, Mastercard, Apple Pay, Samsung Pay */}
-          <div className="flex justify-center items-center gap-3">
-            <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-3 opacity-90" />
-            <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-3 opacity-90" />
-            <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-3 opacity-90" />
-            <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-3 opacity-90" />
-          </div>
-          {/* Row 2: OmanNet, GCC Net, Mal */}
-          <div className="flex justify-center items-center gap-3">
-            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-3 opacity-90" />
-            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-3 opacity-90" />
-            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-3 opacity-90" />
-          </div>
-        </div>
-      </div>
-
       {/* Trial Mode: Link to proceed to success page */}
       {isTrialMode && stage === "waiting" && (
-        <div className="relative z-10 px-6 pb-3">
+        <div className="relative z-10 px-6 pb-2">
           <button
             onClick={handleTrialSuccess}
             className="w-full py-2 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 text-white font-medium transition-colors text-sm"
@@ -271,6 +268,25 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
           </button>
         </div>
       )}
+
+      {/* Supported Payment Methods - Two rows, larger logos, raised up */}
+      <div className="relative z-10 px-6 pb-6">
+        <div className="flex flex-col items-center gap-2 py-3 px-4 bg-white/20 backdrop-blur-sm rounded-xl">
+          {/* Row 1: Visa, Mastercard, Apple Pay, Samsung Pay */}
+          <div className="flex justify-center items-center gap-4">
+            <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5 opacity-90" />
+            <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 opacity-90" />
+            <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-5 opacity-90" />
+            <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-5 opacity-90" />
+          </div>
+          {/* Row 2: OmanNet, GCC Net, Mal */}
+          <div className="flex justify-center items-center gap-4">
+            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-5 opacity-90" />
+            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-5 opacity-90" />
+            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-5 opacity-90" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

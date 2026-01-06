@@ -12,17 +12,31 @@ const ConfirmationPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadCategory = async () => {
-      const { data, error } = await supabase
-        .from('donation_categories')
-        .select('title, icon_url')
-        .eq('category_id', category)
-        .maybeSingle();
-      
-      if (data) {
-        setCategoryData(data);
+      try {
+        const { data } = await supabase
+          .from('donation_categories')
+          .select('title, icon_url')
+          .eq('category_id', category)
+          .maybeSingle();
+        
+        if (data) {
+          // Preload image before showing
+          if (data.icon_url) {
+            const img = new Image();
+            img.src = data.icon_url;
+            await new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          }
+          setCategoryData(data);
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -67,27 +81,34 @@ const ConfirmationPage = () => {
     navigate(`/kiosk/amount?category=${category}`);
   };
 
+  // Don't render until data is loaded to prevent flashing
+  if (isLoading) {
+    return (
+      <KioskLayout>
+        <div className="w-full max-w-3xl mx-auto flex items-center justify-center min-h-[300px]">
+          <div className="animate-pulse text-white/50">...</div>
+        </div>
+      </KioskLayout>
+    );
+  }
+
   return (
     <KioskLayout>
       <div className="w-full max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-white drop-shadow-lg">
+          <h1 className="text-2xl font-bold text-black drop-shadow-lg">
             تأكيد المبلغ
           </h1>
         </div>
 
         {/* Confirmation Card */}
-        <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
+        <Card className="p-6 bg-white/40 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
-            {/* Icon */}
+            {/* Icon - Fixed height container */}
             <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
-              {categoryData?.icon_url ? (
+              {categoryData?.icon_url && (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
-              ) : (
-                <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full w-full h-full flex items-center justify-center">
-                  <span className="text-3xl">📿</span>
-                </div>
               )}
             </div>
 
@@ -96,7 +117,7 @@ const ConfirmationPage = () => {
               <div className="bg-gray-50/60 rounded-lg p-4 border-0">
                 <p className="text-sm text-gray-600 mb-1">نوع التبرع</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  {categoryData?.title || 'تبرع'}
+                  {categoryData?.title || ''}
                 </p>
               </div>
 
