@@ -106,11 +106,62 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure Maven repositories (JitPack only - Thawani SDK disabled)
+      - name: Exclude Cordova framework from USB plugin
         shell: bash
         run: |
           set -euxo pipefail
-          # Thawani SDK is disabled for trial phase - using mock implementation
+          # The capacitor-plugin-usb-serial has a transitive dep on Cordova which is not on Maven Central
+          # Exclude it since we use Capacitor, not Cordova
+          python - << 'PY'
+          from pathlib import Path
+          import re
+          
+          for gradle_file in [
+              Path("android/app/build.gradle"),
+              Path("android/app/build.gradle.kts")
+          ]:
+              if not gradle_file.exists():
+                  continue
+              content = gradle_file.read_text(encoding="utf-8")
+              
+              # Check if we need to patch
+              if "org.apache.cordova" in content:
+                  continue  # Already has exclusion or reference
+              
+              # For Groovy DSL
+              if gradle_file.suffix == ".gradle":
+                  # Add configuration to exclude Cordova
+                  exclude_block = '''
+          configurations.all {
+              exclude group: 'org.apache.cordova', module: 'framework'
+          }
+          '''
+                  if "configurations.all" not in content:
+                      # Add after android { block closes or at end
+                      content += exclude_block
+                      gradle_file.write_text(content, encoding="utf-8")
+                      print(f"Added Cordova exclusion to {gradle_file}")
+              
+              # For Kotlin DSL
+              elif gradle_file.suffix == ".kts":
+                  exclude_block = '''
+          configurations.all {
+              exclude(group = "org.apache.cordova", module = "framework")
+          }
+          '''
+                  if "configurations.all" not in content:
+                      content += exclude_block
+                      gradle_file.write_text(content, encoding="utf-8")
+                      print(f"Added Cordova exclusion to {gradle_file}")
+          
+          print("Cordova framework exclusion configured")
+          PY
+
+      - name: Ensure Maven repositories (Cordova + JitPack)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # Add Cordova and JitPack Maven repositories
           python - << 'PY'
           from pathlib import Path
           import re
@@ -128,15 +179,23 @@ jobs:
               if patched != original:
                   path.write_text(patched, encoding="utf-8")
                   print(f"Patched {path}")
-          groovy_snippets = [{"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'}]
+          groovy_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
+              {"check": "plugins.gradle.org", "code": 'maven { url "https://plugins.gradle.org/m2/" }'},
+              {"check": "cordova", "code": 'maven { url "https://www.jitpack.io" }\n        maven { url "https://maven.google.com" }'}
+          ]
           patch_file(Path("android/settings.gradle"), groovy_snippets)
           patch_file(Path("android/build.gradle"), groovy_snippets)
           patch_file(Path("android/app/build.gradle"), groovy_snippets)
-          kts_snippets = [{"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'}]
+          kts_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
+              {"check": "plugins.gradle.org", "code": 'maven { url = uri("https://plugins.gradle.org/m2/") }'},
+              {"check": "cordova", "code": 'maven { url = uri("https://maven.google.com") }'}
+          ]
           patch_file(Path("android/settings.gradle.kts"), kts_snippets)
           patch_file(Path("android/build.gradle.kts"), kts_snippets)
           patch_file(Path("android/app/build.gradle.kts"), kts_snippets)
-          print("Maven repositories configured (Thawani SDK disabled for trial)")
+          print("Maven repositories configured")
           PY
 
       - name: Copy Thawani stub plugin
