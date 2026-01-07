@@ -121,19 +121,13 @@ jobs:
                   or 'exclude(group = "org.apache.cordova", module = "framework")' in text
               )
 
-          for gradle_file in [
-              Path("android/app/build.gradle"),
-              Path("android/app/build.gradle.kts"),
-          ]:
-              if not gradle_file.exists():
-                  continue
-
-              content = gradle_file.read_text(encoding="utf-8")
+          def append_exclusion(path: Path) -> None:
+              content = path.read_text(encoding="utf-8")
               if has_exclusion(content):
-                  print(f"Cordova exclusion already present in {gradle_file}")
-                  continue
+                  print(f"Cordova exclusion already present in {path}")
+                  return
 
-              if gradle_file.suffix == ".gradle":
+              if path.suffix == ".gradle":
                   exclude_block = """
 
 configurations.all {
@@ -148,8 +142,16 @@ configurations.all {
 }
 """
 
-              gradle_file.write_text(content.rstrip() + exclude_block + "\n", encoding="utf-8")
-              print(f"Added Cordova exclusion to {gradle_file}")
+              path.write_text(content.rstrip() + exclude_block + "\n", encoding="utf-8")
+              print(f"Added Cordova exclusion to {path}")
+
+          android_dir = Path("android")
+          if android_dir.exists():
+              for p in list(android_dir.rglob("build.gradle")) + list(android_dir.rglob("build.gradle.kts")):
+                  # Skip gradle wrapper / buildSrc if any
+                  if "/.gradle/" in str(p):
+                      continue
+                  append_exclusion(p)
 
           print("Cordova framework exclusion configured")
           PY
@@ -289,6 +291,13 @@ configurations.all {
           set -euxo pipefail
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
 
+      - name: Init build log file (always)
+        if: always()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          : > android-gradle.log
+
       - name: Build Debug APK
         working-directory: android
         shell: bash
@@ -314,6 +323,7 @@ configurations.all {
             android-gradle.log
             android/app/build/reports/**
             android/build/reports/**
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Collect APK
