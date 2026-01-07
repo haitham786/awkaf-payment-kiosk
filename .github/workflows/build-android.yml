@@ -110,51 +110,30 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          # The capacitor-plugin-usb-serial has a transitive dep on Cordova which is not on Maven Central
-          # Exclude it since we use Capacitor, not Cordova
-          python - << 'PY'
+          cat > /tmp/exclude_cordova.py << 'PYEOF'
           from pathlib import Path
-
-          def has_exclusion(text: str) -> bool:
-              return (
-                  "exclude group: 'org.apache.cordova', module: 'framework'" in text
-                  or 'exclude(group = "org.apache.cordova", module = "framework")' in text
-              )
-
-          def append_exclusion(path: Path) -> None:
+          def has_exclusion(text):
+              return "exclude group: 'org.apache.cordova'" in text or 'exclude(group = "org.apache.cordova"' in text
+          def append_exclusion(path):
               content = path.read_text(encoding="utf-8")
               if has_exclusion(content):
                   print(f"Cordova exclusion already present in {path}")
                   return
-
               if path.suffix == ".gradle":
-                  exclude_block = """
-
-configurations.all {
-  exclude group: 'org.apache.cordova', module: 'framework'
-}
-"""
+                  exclude_block = "\nconfigurations.all {\n  exclude group: 'org.apache.cordova', module: 'framework'\n}\n"
               else:
-                  exclude_block = """
-
-configurations.all {
-  exclude(group = \"org.apache.cordova\", module = \"framework\")
-}
-"""
-
-              path.write_text(content.rstrip() + exclude_block + "\n", encoding="utf-8")
+                  exclude_block = '\nconfigurations.all {\n  exclude(group = "org.apache.cordova", module = "framework")\n}\n'
+              path.write_text(content.rstrip() + exclude_block, encoding="utf-8")
               print(f"Added Cordova exclusion to {path}")
-
           android_dir = Path("android")
           if android_dir.exists():
               for p in list(android_dir.rglob("build.gradle")) + list(android_dir.rglob("build.gradle.kts")):
-                  # Skip gradle wrapper / buildSrc if any
                   if "/.gradle/" in str(p):
                       continue
                   append_exclusion(p)
-
           print("Cordova framework exclusion configured")
-          PY
+          PYEOF
+          python /tmp/exclude_cordova.py
 
       - name: Ensure Maven repositories (Cordova + JitPack)
         shell: bash
