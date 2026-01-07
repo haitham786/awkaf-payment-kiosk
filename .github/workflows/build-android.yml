@@ -114,46 +114,43 @@ jobs:
           # Exclude it since we use Capacitor, not Cordova
           python - << 'PY'
           from pathlib import Path
-          import re
-          
+
+          def has_exclusion(text: str) -> bool:
+              return (
+                  "exclude group: 'org.apache.cordova', module: 'framework'" in text
+                  or 'exclude(group = "org.apache.cordova", module = "framework")' in text
+              )
+
           for gradle_file in [
               Path("android/app/build.gradle"),
-              Path("android/app/build.gradle.kts")
+              Path("android/app/build.gradle.kts"),
           ]:
               if not gradle_file.exists():
                   continue
+
               content = gradle_file.read_text(encoding="utf-8")
-              
-              # Check if we need to patch
-              if "org.apache.cordova" in content:
-                  continue  # Already has exclusion or reference
-              
-              # For Groovy DSL
+              if has_exclusion(content):
+                  print(f"Cordova exclusion already present in {gradle_file}")
+                  continue
+
               if gradle_file.suffix == ".gradle":
-                  # Add configuration to exclude Cordova
-                  exclude_block = '''
-          configurations.all {
-              exclude group: 'org.apache.cordova', module: 'framework'
-          }
-          '''
-                  if "configurations.all" not in content:
-                      # Add after android { block closes or at end
-                      content += exclude_block
-                      gradle_file.write_text(content, encoding="utf-8")
-                      print(f"Added Cordova exclusion to {gradle_file}")
-              
-              # For Kotlin DSL
-              elif gradle_file.suffix == ".kts":
-                  exclude_block = '''
-          configurations.all {
-              exclude(group = "org.apache.cordova", module = "framework")
-          }
-          '''
-                  if "configurations.all" not in content:
-                      content += exclude_block
-                      gradle_file.write_text(content, encoding="utf-8")
-                      print(f"Added Cordova exclusion to {gradle_file}")
-          
+                  exclude_block = """
+
+configurations.all {
+  exclude group: 'org.apache.cordova', module: 'framework'
+}
+"""
+              else:
+                  exclude_block = """
+
+configurations.all {
+  exclude(group = \"org.apache.cordova\", module = \"framework\")
+}
+"""
+
+              gradle_file.write_text(content.rstrip() + exclude_block + "\n", encoding="utf-8")
+              print(f"Added Cordova exclusion to {gradle_file}")
+
           print("Cordova framework exclusion configured")
           PY
 
@@ -182,7 +179,7 @@ jobs:
           groovy_snippets = [
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
               {"check": "plugins.gradle.org", "code": 'maven { url "https://plugins.gradle.org/m2/" }'},
-              {"check": "cordova", "code": 'maven { url "https://www.jitpack.io" }\n        maven { url "https://maven.google.com" }'}
+              {"check": "repository.apache.org", "code": 'maven { url "https://repository.apache.org/content/repositories/releases/" }'},
           ]
           patch_file(Path("android/settings.gradle"), groovy_snippets)
           patch_file(Path("android/build.gradle"), groovy_snippets)
@@ -190,7 +187,7 @@ jobs:
           kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
               {"check": "plugins.gradle.org", "code": 'maven { url = uri("https://plugins.gradle.org/m2/") }'},
-              {"check": "cordova", "code": 'maven { url = uri("https://maven.google.com") }'}
+              {"check": "repository.apache.org", "code": 'maven { url = uri("https://repository.apache.org/content/repositories/releases/") }'},
           ]
           patch_file(Path("android/settings.gradle.kts"), kts_snippets)
           patch_file(Path("android/build.gradle.kts"), kts_snippets)
@@ -307,6 +304,17 @@ jobs:
           if [ -f android-gradle.log ]; then
             tail -n 200 android-gradle.log || true
           fi
+
+      - name: Upload build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-logs
+          path: |
+            android-gradle.log
+            android/app/build/reports/**
+            android/build/reports/**
+          retention-days: 14
 
       - name: Collect APK
         if: success()
