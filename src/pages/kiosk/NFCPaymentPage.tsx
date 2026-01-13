@@ -267,7 +267,7 @@ const NFCPaymentPage = () => {
 
   if (useFullScreenUI) {
     return (
-      <ThawaniTapCardScreen
+      <AmwalTapCardScreen
         amount={amount}
         category={category}
         stage={stage as 'waiting' | 'processing'}

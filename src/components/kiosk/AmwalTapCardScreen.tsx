@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface ThawaniTapCardScreenProps {
+interface AmwalTapCardScreenProps {
   amount: number;
   category?: string;
   stage: "waiting" | "processing" | "success" | "declined";
@@ -19,7 +19,7 @@ interface ThawaniTapCardScreenProps {
   onTimeout?: () => void;
 }
 
-export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
+export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
   amount,
   category,
   stage,
