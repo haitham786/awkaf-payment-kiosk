@@ -5,9 +5,6 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Important for Android/iOS (Capacitor) builds that load from bundled files.
-  // Using a relative base prevents "blank screen" issues caused by absolute /assets paths.
-  base: mode === "production" ? "./" : "/",
   server: {
     host: "::",
     port: 8080,
@@ -19,4 +16,3 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
-

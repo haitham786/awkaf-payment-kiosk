@@ -26,19 +26,8 @@ export const useAudioInitializer = () => {
       }
     };
 
-    // Try to initialize immediately (web only). On native WebView some devices are stricter,
-    // so we wait for a user interaction to avoid boot-time audio issues.
-    let isNativeEnv = false;
-    try {
-      const cap = (window as any).Capacitor;
-      isNativeEnv = cap?.isNativePlatform?.() || (cap?.platform && cap.platform !== 'web') || false;
-    } catch {
-      isNativeEnv = false;
-    }
-    
-    if (!isNativeEnv) {
-      initializeAudio();
-    }
+    // Try to initialize immediately
+    initializeAudio();
 
     // Set up listeners for first user interaction
     const events = ['touchstart', 'click', 'keydown'];

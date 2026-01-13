@@ -3,8 +3,32 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
-import { isNativePlatform } from "./utils/capacitorUtils";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
+import FirstLoginPage from "./pages/auth/FirstLoginPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import KioskHomepage from "./pages/kiosk/KioskHomepage";
+import PresetAmountsPage from "./pages/kiosk/PresetAmountsPage";
+import AmountPage from "./pages/kiosk/AmountPage";
+import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
+import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
+import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
+import PaymentProcessingPage from "./pages/kiosk/PaymentProcessingPage";
+import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
+import ThankYouPage from "./pages/kiosk/ThankYouPage";
+import MobileNumberPage from "./pages/kiosk/MobileNumberPage";
+import ErrorPage from "./pages/kiosk/ErrorPage";
+import POSDiagnosticsPage from "./pages/kiosk/POSDiagnosticsPage";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import CategoriesManagement from "./pages/admin/CategoriesManagement";
+import KiosksManagement from "./pages/admin/KiosksManagement";
+import AdminsManagement from "./pages/admin/AdminsManagement";
+import AddAdminPage from "./pages/admin/AddAdminPage";
+import SMSSettings from "./pages/admin/SMSSettings";
+import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
+import ProfilePage from "./pages/admin/ProfilePage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
@@ -12,42 +36,9 @@ import { startBackgroundSync } from "./services/offlineQueueService";
 
 const queryClient = new QueryClient();
 
-// Lazy-load route modules to reduce native startup work and avoid boot-time crashes
-// caused by evaluating rarely-used modules on app launch.
-const Index = React.lazy(() => import("./pages/Index"));
-const NotFound = React.lazy(() => import("./pages/NotFound"));
-const Auth = React.lazy(() => import("./pages/Auth"));
-const FirstLoginPage = React.lazy(() => import("./pages/auth/FirstLoginPage"));
-const ResetPasswordPage = React.lazy(() => import("./pages/auth/ResetPasswordPage"));
-
-const KioskHomepage = React.lazy(() => import("./pages/kiosk/KioskHomepage"));
-const PresetAmountsPage = React.lazy(() => import("./pages/kiosk/PresetAmountsPage"));
-const AmountPage = React.lazy(() => import("./pages/kiosk/AmountPage"));
-const ConfirmationPage = React.lazy(() => import("./pages/kiosk/ConfirmationPage"));
-const KioskSetupPanel = React.lazy(() => import("./pages/kiosk/KioskSetupPanel"));
-const PaymentRequestPage = React.lazy(() => import("./pages/kiosk/PaymentRequestPage"));
-const PaymentProcessingPage = React.lazy(() => import("./pages/kiosk/PaymentProcessingPage"));
-const NFCPaymentPage = React.lazy(() => import("./pages/kiosk/NFCPaymentPage"));
-const ThankYouPage = React.lazy(() => import("./pages/kiosk/ThankYouPage"));
-const MobileNumberPage = React.lazy(() => import("./pages/kiosk/MobileNumberPage"));
-const ErrorPage = React.lazy(() => import("./pages/kiosk/ErrorPage"));
-const POSDiagnosticsPage = React.lazy(() => import("./pages/kiosk/POSDiagnosticsPage"));
-
-const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
-const CategoriesManagement = React.lazy(() => import("./pages/admin/CategoriesManagement"));
-const KiosksManagement = React.lazy(() => import("./pages/admin/KiosksManagement"));
-const AdminsManagement = React.lazy(() => import("./pages/admin/AdminsManagement"));
-const AddAdminPage = React.lazy(() => import("./pages/admin/AddAdminPage"));
-const SMSSettings = React.lazy(() => import("./pages/admin/SMSSettings"));
-const EnhancedStatistics = React.lazy(() => import("./pages/admin/EnhancedStatistics"));
-const ProfilePage = React.lazy(() => import("./pages/admin/ProfilePage"));
-
 const AppContent = () => {
   const { isAudioReady, showInitPrompt } = useAudioInitializer();
-
-  // Use HashRouter on native (file://) to avoid startup route issues like /index.html.
-  const Router = isNativePlatform() ? HashRouter : BrowserRouter;
-
+  
   // Start background sync for offline transactions
   React.useEffect(() => {
     startBackgroundSync();
@@ -63,24 +54,17 @@ const AppContent = () => {
           </div>
         </div>
       )}
-
+      
       <Toaster />
       <Sonner />
       <NetworkStatus />
-      <Router>
-        <React.Suspense
-          fallback={
-            <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-              <p className="text-sm">Loading...</p>
-            </div>
-          }
-        >
+      <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/first-login" element={<FirstLoginPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-
+            
             {/* Kiosk Routes */}
             <Route path="/kiosk" element={<KioskHomepage />} />
             <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
@@ -94,7 +78,7 @@ const AppContent = () => {
             <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
             <Route path="/kiosk/error" element={<ErrorPage />} />
             <Route path="/kiosk/diagnostics" element={<POSDiagnosticsPage />} />
-
+            
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/categories" element={<CategoriesManagement />} />
@@ -104,13 +88,12 @@ const AppContent = () => {
             <Route path="/admin/sms-settings" element={<SMSSettings />} />
             <Route path="/admin/statistics" element={<EnhancedStatistics />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
-
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </React.Suspense>
-      </Router>
-    </>
+        </BrowserRouter>
+      </>
   );
 };
 

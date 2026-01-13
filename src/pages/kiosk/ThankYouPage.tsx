@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
-import { Home } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
 
 const ThankYouPage = () => {
   const navigate = useNavigate();
@@ -12,44 +11,22 @@ const ThankYouPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const transactionId = searchParams.get('transactionId') || '';
   const referenceNumber = searchParams.get('ref') || '';
-  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
-  const [isReady, setIsReady] = useState(false);
+  const categoryReference = searchParams.get('catRef') || '';
+  const [countdown, setCountdown] = useState(10);
 
-  // Load category data with image preload
   useEffect(() => {
-    const loadCategory = async () => {
-      try {
-        const { data } = await supabase
-          .from('donation_categories')
-          .select('title, icon_url')
-          .eq('category_id', category)
-          .maybeSingle();
-        
-        if (data) {
-          // Preload image before showing
-          if (data.icon_url) {
-            const img = new Image();
-            img.src = data.icon_url;
-            await new Promise((resolve) => {
-              img.onload = resolve;
-              img.onerror = resolve;
-            });
-          }
-          setCategoryData(data);
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          navigate('/kiosk');
+          return 0;
         }
-      } finally {
-        setIsReady(true);
-      }
-    };
-    loadCategory();
-  }, [category]);
+        return prev - 1;
+      });
+    }, 1000);
 
-  // Silent countdown - no display but still redirects
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      navigate('/kiosk');
-    }, 10000);
-    return () => clearTimeout(timer);
+    return () => clearInterval(timer);
   }, [navigate]);
 
   const formatAmount = (totalBaisas: number) => {
@@ -66,88 +43,132 @@ const ThankYouPage = () => {
     navigate('/kiosk');
   };
 
-  // Don't render until data is loaded to prevent flashing
-  if (!isReady) {
-    return (
-      <KioskLayout showHomeButton={false}>
-        <div className="w-full max-w-md mx-auto flex items-center justify-center min-h-[300px]">
-          <div className="animate-pulse text-white/50">...</div>
-        </div>
-      </KioskLayout>
-    );
-  }
-
   return (
     <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-md mx-auto flex flex-col min-h-[calc(100vh-120px)] justify-between px-4">
-        <div className="flex-1 flex flex-col justify-center">
-          {/* Thank You Message */}
-          <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-black">
-              شكراً لكم
-            </h1>
-            <h2 className="text-xl font-semibold text-black/80 mt-2">
-              تم قبول تبرعكم بنجاح
-            </h2>
-          </div>
-
-          {/* Donation Summary - Fixed layout, no white boxes */}
-          <div className="text-center space-y-4 mb-8">
-            {/* Category with thumbnail - Fixed height */}
-            <div className="min-h-[100px]">
-              <div className="w-20 h-20 mx-auto rounded-full overflow-hidden shadow-lg flex items-center justify-center bg-white/20">
-                {categoryData?.icon_url && (
-                  <img 
-                    src={categoryData.icon_url} 
-                    alt="" 
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-black/70 text-sm mb-1">نوع التبرع</p>
-              <p className="text-xl font-semibold text-black min-h-[28px]">
-                {categoryData?.title || ''}
-              </p>
-            </div>
-            <div>
-              <p className="text-black/70 text-sm mb-1">المبلغ المتبرع به</p>
-              <p className="text-3xl font-bold text-emerald-700">
-                {formatAmount(amount)}
-              </p>
-            </div>
-          </div>
-
-          {/* Receipt Option - No white box */}
-          <div className="text-center space-y-3">
-            <p className="text-lg font-semibold text-black">
-              هل ترغب في الحصول على إيصال الدفع عبر رسالة نصية ؟
-            </p>
-            
-            <KioskButton
-              variant="confirm"
-              size="lg"
-              soundEffect="navigation"
-              onClick={handleSMSReceipt}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 px-12"
-            >
-              نعم
-            </KioskButton>
+      <div className="w-full max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-4">
+          {/* Organization Logo Placeholder */}
+          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-lg flex items-center justify-center">
+            <span className="text-3xl">🕌</span>
           </div>
         </div>
 
-        {/* Home Button at bottom center - icon only, white color */}
-        <div className="flex justify-center pb-6">
-          <KioskButton
-            variant="ghost"
-            size="icon"
-            soundEffect="navigation"
-            onClick={handleReturnHome}
-            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
-          >
-            <Home className="w-8 h-8 text-white drop-shadow-lg" />
-          </KioskButton>
+        {/* Success Card */}
+        <Card className="p-6 bg-white shadow-lg border-2 border-emerald-300 text-center">
+          <div className="space-y-4">
+            {/* Success Icon */}
+            <div className="w-16 h-16 mx-auto bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full shadow-md flex items-center justify-center">
+              <span className="text-3xl">✅</span>
+            </div>
+
+            {/* Thank You Message */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-emerald-700">
+                شكراً لكم!
+              </h1>
+              <h2 className="text-xl font-semibold text-gray-900">
+                تم قبول تبرعكم بنجاح
+              </h2>
+            </div>
+
+            {/* Donation Summary */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-gray-600 mb-1 text-sm">المبلغ المتبرع به</p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {formatAmount(amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 mb-1 text-sm">نوع التبرع</p>
+                  <p className="text-xl font-semibold text-gray-900">
+                    {category === 'zakat' && 'زكاة'}
+                    {category === 'sadaqah' && 'صدقة'}
+                    {category === 'charity' && 'خيرية'}
+                    {category === 'mosque' && 'مسجد'}
+                    {category === 'orphans' && 'أيتام'}
+                    {category === 'education' && 'تعليم'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Islamic Quote */}
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+              <p className="text-lg font-medium text-gray-800 leading-relaxed">
+                "جَزَاكُمُ اللهُ خَيْرًا"
+              </p>
+              <p className="text-base text-gray-600 mt-1">
+                بارك الله فيكم وجعله في ميزان حسناتكم
+              </p>
+            </div>
+
+            {/* Transaction Details */}
+            <div className="space-y-2">
+              <div className="bg-gray-100 rounded-lg p-3 border border-gray-300">
+                <p className="text-sm text-gray-600">رقم المعاملة</p>
+                <p className="text-base font-mono font-semibold text-gray-900">
+                  {referenceNumber || transactionId}
+                </p>
+              </div>
+              {categoryReference && (
+                <div className="bg-emerald-100 rounded-lg p-3 border border-emerald-300">
+                  <p className="text-sm text-gray-600">رقم مرجع الفئة</p>
+                  <p className="text-base font-mono font-semibold text-emerald-700">
+                    {categoryReference}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Receipt Options */}
+        <div className="mt-4 space-y-3 pb-24">
+          <Card className="p-4 bg-white shadow-md border border-gray-300">
+            <div className="text-center space-y-3">
+              <h3 className="text-lg font-semibold text-gray-900">
+                هل تريد إيصال عبر الرسائل النصية؟
+              </h3>
+              
+              <div className="flex justify-center space-x-3">
+                <KioskButton
+                  variant="secondary"
+                  size="xl"
+                  soundEffect="navigation"
+                  onClick={handleSMSReceipt}
+                  className="min-w-[160px] ml-3 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                >
+                  نعم، أرسل الإيصال
+                </KioskButton>
+                
+                <KioskButton
+                  variant="outline"
+                  size="xl"
+                  soundEffect="navigation"
+                  onClick={handleReturnHome}
+                  className="min-w-[160px] bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
+                >
+                  لا، شكراً
+                </KioskButton>
+              </div>
+            </div>
+          </Card>
+
+          {/* Auto Return Countdown */}
+          <div className="text-center pb-4">
+            <p className="text-gray-600 text-sm">
+              العودة التلقائية إلى الصفحة الرئيسية خلال {countdown} ثواني
+            </p>
+            <div className="w-32 h-2 bg-gray-200 rounded-full mx-auto mt-2">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${((10 - countdown) / 10) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </KioskLayout>

@@ -49,13 +49,10 @@ class SoundEffectManager {
   }
 
   private async preloadSounds(): Promise<void> {
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    const asset = (p: string) => `${baseUrl}${p.replace(/^\/+/, '')}`;
-
     const soundFiles = {
-      keypad: asset('sounds/keypad-click.mp3'),
-      navigation: asset('sounds/navigation.mp3'),
-      category: asset('sounds/category-select.mp3'),
+      keypad: '/sounds/keypad-click.mp3',
+      navigation: '/sounds/navigation.mp3',
+      category: '/sounds/category-select.mp3',
     };
 
     const loadPromises = Object.entries(soundFiles).map(async ([key, path]) => {
