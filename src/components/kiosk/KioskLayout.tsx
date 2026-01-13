@@ -96,19 +96,19 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
       }}
     >
 
-      {/* Logo at top center */}
-      {logoImage && (
-        <div className="relative z-10 w-full flex justify-center pt-4 pb-2">
+      {/* Logo at top center - Always reserve space for stability */}
+      <div className="relative z-10 w-full flex justify-center pt-4 pb-2 min-h-[72px]">
+        {logoImage && (
           <img 
             src={logoImage} 
             alt="Organization Logo" 
-            className="h-16 w-auto object-contain"
+            className="h-14 w-auto object-contain max-w-[200px]"
           />
-        </div>
-      )}
+        )}
+      </div>
       
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-6xl flex-1 flex items-center justify-center">
+      {/* Content - proper spacing below logo */}
+      <div className="relative z-10 w-full max-w-6xl flex-1 flex items-center justify-center pt-2">
         {children}
       </div>
 

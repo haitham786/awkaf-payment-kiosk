@@ -31,17 +31,20 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
   const [backgroundImage, setBackgroundImage] = useState<string>(() => {
     return localStorage.getItem('kiosk_background_url') || "";
   });
+  const [logoImage, setLogoImage] = useState<string>(() => {
+    return localStorage.getItem('kiosk_logo_url') || "";
+  });
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [countdown, setCountdown] = useState(15);
 
-  // Load background image
+  // Load background image and logo
   useEffect(() => {
-    const loadBackground = async () => {
+    const loadSettings = async () => {
       try {
         const { data } = await supabase
           .from("kiosk_settings")
-          .select("background_image_url")
+          .select("background_image_url, logo_url")
           .limit(1)
           .maybeSingle();
 
@@ -49,11 +52,15 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
           localStorage.setItem('kiosk_background_url', data.background_image_url);
           setBackgroundImage(data.background_image_url);
         }
+        if (data?.logo_url) {
+          localStorage.setItem('kiosk_logo_url', data.logo_url);
+          setLogoImage(data.logo_url);
+        }
       } catch (error) {
-        console.error("Error loading background:", error);
+        console.error("Error loading settings:", error);
       }
     };
-    loadBackground();
+    loadSettings();
   }, []);
 
   // Load category data
@@ -121,14 +128,25 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
       className="fixed inset-0 z-50 flex flex-col"
       style={{
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: 'contain',
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         backgroundColor: '#f5f5f5',
       }}
     >
+      {/* Logo at top center */}
+      <div className="w-full flex justify-center pt-4 pb-2 min-h-[72px]">
+        {logoImage && (
+          <img 
+            src={logoImage} 
+            alt="Organization Logo" 
+            className="h-14 w-auto object-contain max-w-[200px]"
+          />
+        )}
+      </div>
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
         {/* Category Info - Fixed height container */}
         <div className="mb-4 text-center min-h-[80px] flex flex-col items-center justify-center">
           {categoryData?.icon_url && imageLoaded && (
