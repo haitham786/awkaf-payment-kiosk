@@ -6,6 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache for preloaded images
+const imageCache = new Map<string, boolean>();
+
 const ThankYouPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -14,12 +17,30 @@ const ThankYouPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const referenceNumber = searchParams.get('ref') || '';
   const [countdown, setCountdown] = useState(10);
-  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(() => {
+    // Try to get from sessionStorage for instant display
+    const cached = sessionStorage.getItem(`category_${category}`);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    return null;
+  });
+  const [isReady, setIsReady] = useState(() => {
+    // If we have cached data, we're ready immediately
+    return !!sessionStorage.getItem(`category_${category}`);
+  });
 
   // Load category data
   useEffect(() => {
     const loadCategory = async () => {
+      // Check if already in cache
+      const cached = sessionStorage.getItem(`category_${category}`);
+      if (cached) {
+        setCategoryData(JSON.parse(cached));
+        setIsReady(true);
+        return;
+      }
+
       const { data } = await supabase
         .from('donation_categories')
         .select('title, icon_url')
@@ -27,21 +48,28 @@ const ThankYouPage = () => {
         .maybeSingle();
       
       if (data) {
-        if (data.icon_url) {
+        // Cache the data
+        sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
+        
+        if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
-          img.src = data.icon_url;
           img.onload = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, true);
             setCategoryData(data);
+            setIsReady(true);
           };
           img.onerror = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, false);
             setCategoryData(data);
+            setIsReady(true);
           };
+          img.src = data.icon_url;
         } else {
-          setImageLoaded(true);
           setCategoryData(data);
+          setIsReady(true);
         }
+      } else {
+        setIsReady(true);
       }
     };
     loadCategory();
@@ -93,17 +121,17 @@ const ThankYouPage = () => {
               </h2>
             </div>
 
-            {/* Category Thumbnail and Title */}
+            {/* Category Thumbnail and Title - Fixed height container */}
             <div className="flex flex-col items-center justify-center gap-2 min-h-[80px]">
-              {categoryData?.icon_url && imageLoaded && (
-                <div className="w-16 h-16">
+              <div className="w-16 h-16 flex items-center justify-center">
+                {categoryData?.icon_url && isReady && (
                   <img 
                     src={categoryData.icon_url} 
                     alt={categoryData.title}
                     className="w-full h-full object-contain"
                   />
-                </div>
-              )}
+                )}
+              </div>
               <p className="text-lg font-semibold text-gray-900">
                 {categoryData?.title || 'تبرع'}
               </p>

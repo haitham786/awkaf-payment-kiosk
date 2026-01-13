@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, X } from "lucide-react";
+import { Home, X, CheckCircle, AlertCircle } from "lucide-react";
 
 const MobileNumberPage = () => {
   const navigate = useNavigate();
@@ -18,7 +18,9 @@ const MobileNumberPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const [mobileNumber, setMobileNumber] = useState("");
   const [sending, setSending] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupType, setPopupType] = useState<'success' | 'error'>('success');
+  const [popupMessage, setPopupMessage] = useState('');
   const [inactivityTimer, setInactivityTimer] = useState(15);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,6 +68,18 @@ const MobileNumberPage = () => {
     }
   };
 
+  const showResultPopup = (type: 'success' | 'error', message: string) => {
+    setPopupType(type);
+    setPopupMessage(message);
+    setShowPopup(true);
+
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+      setShowPopup(false);
+      navigate('/kiosk');
+    }, 5000);
+  };
+
   const handleSendSMS = async () => {
     if (mobileNumber.length !== 8) {
       toast({
@@ -81,34 +95,27 @@ const MobileNumberPage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
-          mobile_number: `+968${mobileNumber}`,
+          mobile_number: `968${mobileNumber}`,
           category,
           reference_number: referenceNumber || transactionId,
           amount_baisas: amount,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('SMS Error:', error);
+        showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.');
+        return;
+      }
 
-      // Show confirmation popup
-      setShowConfirmation(true);
-
-      // Auto-close after 10 seconds
-      setTimeout(() => {
-        setShowConfirmation(false);
-        navigate('/kiosk');
-      }, 10000);
+      if (data?.success) {
+        showResultPopup('success', `تم إرسال الإيصال بنجاح إلى الرقم ${mobileNumber}`);
+      } else {
+        showResultPopup('error', data?.error || 'حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً.');
+      }
     } catch (error: any) {
       console.error('SMS Error:', error);
-      toast({
-        title: "خطأ في الإرسال",
-        description: "حدث خطأ أثناء إرسال الرسالة. سيتم العودة للصفحة الرئيسية.",
-        variant: "destructive",
-      });
-
-      setTimeout(() => {
-        navigate('/kiosk');
-      }, 2000);
+      showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.');
     } finally {
       setSending(false);
     }
@@ -191,13 +198,13 @@ const MobileNumberPage = () => {
           </KioskButton>
         </div>
 
-        {/* SMS Confirmation Popup */}
-        {showConfirmation && (
+        {/* Result Popup - Success or Error */}
+        {showPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 max-w-xs text-center relative">
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 mx-4 max-w-xs text-center relative shadow-xl">
               <button
                 onClick={() => {
-                  setShowConfirmation(false);
+                  setShowPopup(false);
                   navigate('/kiosk');
                 }}
                 className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
@@ -205,12 +212,16 @@ const MobileNumberPage = () => {
                 <X className="w-6 h-6" />
               </button>
               <div className="space-y-3">
-                <span className="text-4xl">✓</span>
+                {popupType === 'success' ? (
+                  <CheckCircle className="w-16 h-16 mx-auto text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-16 h-16 mx-auto text-red-600" />
+                )}
                 <h3 className="text-lg font-bold text-gray-900">
-                  تم إرسال الإيصال
+                  {popupType === 'success' ? 'تم بنجاح' : 'خطأ'}
                 </h3>
                 <p className="text-sm text-gray-600">
-                  سيصلك الإيصال على رقم {mobileNumber}
+                  {popupMessage}
                 </p>
               </div>
             </div>

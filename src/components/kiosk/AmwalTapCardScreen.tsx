@@ -2,13 +2,16 @@
  * Soft POS "Tap Card" Full-Screen UI
  * 
  * This component displays a branded NFC tap card screen for Soft POS payments.
- * Redesigned to remove Thawani branding and show category/amount info.
+ * Redesigned to show category/amount info with instant loading.
  */
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Cache for preloaded images
+const imageCache = new Map<string, boolean>();
 
 interface AmwalTapCardScreenProps {
   amount: number;
@@ -34,8 +37,18 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
   const [logoImage, setLogoImage] = useState<string>(() => {
     return localStorage.getItem('kiosk_logo_url') || "";
   });
-  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(() => {
+    // Try to get from sessionStorage for instant display
+    const cached = sessionStorage.getItem(`category_${category}`);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    return null;
+  });
+  const [isReady, setIsReady] = useState(() => {
+    // If we have cached data, we're ready immediately
+    return !!sessionStorage.getItem(`category_${category}`);
+  });
   const [countdown, setCountdown] = useState(15);
 
   // Load background image and logo
@@ -63,10 +76,21 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
     loadSettings();
   }, []);
 
-  // Load category data
+  // Load category data with caching
   useEffect(() => {
     const loadCategory = async () => {
-      if (!category) return;
+      if (!category) {
+        setIsReady(true);
+        return;
+      }
+      
+      // Check if already in cache
+      const cached = sessionStorage.getItem(`category_${category}`);
+      if (cached) {
+        setCategoryData(JSON.parse(cached));
+        setIsReady(true);
+        return;
+      }
       
       const { data } = await supabase
         .from('donation_categories')
@@ -75,21 +99,28 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         .maybeSingle();
       
       if (data) {
-        if (data.icon_url) {
+        // Cache the data
+        sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
+        
+        if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
-          img.src = data.icon_url;
           img.onload = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, true);
             setCategoryData(data);
+            setIsReady(true);
           };
           img.onerror = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, false);
             setCategoryData(data);
+            setIsReady(true);
           };
+          img.src = data.icon_url;
         } else {
-          setImageLoaded(true);
           setCategoryData(data);
+          setIsReady(true);
         }
+      } else {
+        setIsReady(true);
       }
     };
     loadCategory();
@@ -125,7 +156,7 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
       style={{
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: 'cover',
@@ -134,7 +165,7 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         backgroundColor: '#f5f5f5',
       }}
     >
-      {/* Logo at top center */}
+      {/* Logo at top center - fixed height */}
       <div className="w-full flex justify-center pt-4 pb-2 min-h-[72px]">
         {logoImage && (
           <img 
@@ -145,24 +176,23 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-        {/* Category Info - Fixed height container */}
+      {/* Main Content - flex-1 to fill remaining space, centered */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        {/* Category Info - Fixed height container for stability */}
         <div className="mb-4 text-center min-h-[80px] flex flex-col items-center justify-center">
-          {categoryData?.icon_url && imageLoaded && (
-            <div className="w-14 h-14 mb-2">
+          {/* Always reserve space for icon */}
+          <div className="w-14 h-14 mb-2 flex items-center justify-center">
+            {categoryData?.icon_url && isReady && (
               <img 
                 src={categoryData.icon_url} 
                 alt={categoryData.title}
                 className="w-full h-full object-contain"
               />
-            </div>
-          )}
-          {categoryData?.title && (
-            <p className="text-lg font-bold text-gray-900">
-              {categoryData.title}
-            </p>
-          )}
+            )}
+          </div>
+          <p className="text-lg font-bold text-gray-900 min-h-[28px]">
+            {categoryData?.title || ''}
+          </p>
         </div>
 
         {/* Amount Display - Black text */}
@@ -256,8 +286,8 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
           )}
         </div>
 
-        {/* Payment Method Logos - Two rows, smaller, no background */}
-        <div className="space-y-2">
+        {/* Payment Method Logos - Two rows with spacing */}
+        <div className="space-y-4">
           {/* Row 1: VISA, MasterCard, Apple Pay, Samsung Pay */}
           <div className="flex justify-center items-center gap-3">
             <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5" />
@@ -265,16 +295,16 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
             <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-5" />
             <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-5" />
           </div>
-          {/* Row 2: OmanNet, GCC Net, Mal */}
-          <div className="flex justify-center items-center gap-3">
-            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-5" />
-            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-5" />
-            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-5" />
+          {/* Row 2: OmanNet, GCC Net, Mal - Enlarged */}
+          <div className="flex justify-center items-center gap-4">
+            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-7" />
+            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-7" />
+            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-7" />
           </div>
         </div>
       </div>
 
-      {/* Trial Mode Skip Link (for testing) */}
+      {/* Trial Mode Skip Link (for testing) - at bottom */}
       {isTrialMode && stage === "waiting" && (
         <div className="px-6 pb-4 text-center">
           <button
