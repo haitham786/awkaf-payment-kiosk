@@ -9,7 +9,6 @@ import {
   loadKioskSoftPosConfig,
   initializeSoftPOS,
   checkNFCAvailability,
-  validatePaymentReadiness,
   startSoftPOSTransaction,
   onPaymentStart,
   onSoftPOSApproval,
@@ -19,10 +18,10 @@ import {
   SoftPOSTransactionResult,
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
-import { Wifi, WifiOff, CreditCard, AlertTriangle, Smartphone, Loader2 } from "lucide-react";
+import { Wifi, WifiOff, CreditCard, AlertTriangle, Loader2 } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 
-type PaymentStage = 'initializing' | 'nfc_check' | 'waiting' | 'processing' | 'success' | 'declined' | 'error';
+type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
 const NFCPaymentPage = () => {
   const navigate = useNavigate();
@@ -30,22 +29,16 @@ const NFCPaymentPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   
-  const [stage, setStage] = useState<PaymentStage>('initializing');
+  const [stage, setStage] = useState<PaymentStage>('waiting');
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
   const [categoryData, setCategoryData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isNativeMode, setIsNativeMode] = useState(false);
-  const [initLogs, setInitLogs] = useState<string[]>([]);
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
   const autoStartRef = React.useRef(false);
-
-  const addLog = (message: string) => {
-    console.log(`[NFCPayment] ${message}`);
-    setInitLogs(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
-  };
 
   useEffect(() => {
     // Fetch category data
@@ -72,12 +65,9 @@ const NFCPaymentPage = () => {
   }, [category]);
 
   const initializePayment = useCallback(async () => {
-    addLog('Starting payment initialization...');
-    setStage('initializing');
     setErrorMessage('');
     
     if (!kioskId) {
-      addLog('ERROR: No kiosk ID found');
       setErrorMessage('Kiosk is not registered. Please set up the kiosk first.');
       setStage('error');
       return;
@@ -85,83 +75,61 @@ const NFCPaymentPage = () => {
 
     try {
       // Load kiosk-specific Soft POS config
-      addLog(`Loading Soft POS config for kiosk: ${kioskId}`);
       const config = await loadKioskSoftPosConfig(kioskId);
       
       if (!config) {
-        addLog('ERROR: No Soft POS configuration found');
-        setErrorMessage('Soft POS is not configured for this kiosk. Please configure Thawani settings in the admin panel.');
+        setErrorMessage('Soft POS is not configured for this kiosk.');
         setStage('error');
         return;
       }
       
-      addLog(`Config loaded: environment=${config.environment}, hasToken=${!!config.tajerToken}`);
-      
       // Initialize the SDK
-      addLog('Initializing Thawani Lamsa SDK...');
       const initialized = await initializeSoftPOS(config);
       
       if (!initialized) {
-        addLog('ERROR: SDK initialization failed');
-        setErrorMessage('Failed to initialize Thawani payment terminal.');
+        setErrorMessage('Failed to initialize payment terminal.');
         setStage('error');
         return;
       }
-      
-      addLog('SDK initialized successfully');
       
       // Check if running in native mode
       const status = getSoftPOSStatus();
       setIsNativeMode(status.isNativeAvailable);
-      addLog(`Mode: ${status.isNativeAvailable ? 'NATIVE ANDROID' : 'WEB SIMULATION'}`);
       
       // Check NFC status
-      addLog('Checking NFC availability...');
-      setStage('nfc_check');
-      
       const nfcStatus = await checkNFCAvailability();
-      addLog(`NFC status: available=${nfcStatus.isAvailable}, enabled=${nfcStatus.isEnabled}`);
       
       if (!nfcStatus.isAvailable) {
-        addLog('ERROR: NFC hardware not available');
-        setErrorMessage('NFC is not available on this device. Soft POS requires NFC capability.');
+        setErrorMessage('NFC is not available on this device.');
         setStage('error');
         return;
       }
       
       if (!nfcStatus.isEnabled) {
-        addLog('WARNING: NFC is disabled');
-        setErrorMessage('NFC is disabled. Please enable NFC in device settings to accept card payments.');
+        setErrorMessage('NFC is disabled. Please enable NFC in device settings.');
         setStage('error');
         return;
       }
       
-      addLog('NFC check passed - ready for payment');
-      
       // Register callbacks
       onPaymentStart(() => {
-        addLog('Payment activity started');
         setStage('processing');
       });
 
       onSoftPOSApproval((result) => {
-        addLog(`Payment approved: ref=${result.thawaniReference}`);
         setTransactionResult(result);
         handlePaymentSuccess(result);
       });
 
       onSoftPOSFailure((error, errorCode) => {
-        addLog(`Payment failed: ${errorCode} - ${error}`);
         setStage('declined');
         setTransactionResult({ success: false, error, errorCode });
       });
 
-      // Ready for payment
+      // Ready for payment - go directly to waiting stage
       setStage('waiting');
-      addLog('Ready for payment - waiting for user action');
       
     } catch (error: any) {
-      addLog(`ERROR: ${error.message}`);
       console.error('Failed to initialize payment:', error);
       setErrorMessage(error.message || 'Failed to initialize payment terminal');
       setStage('error');
@@ -177,9 +145,7 @@ const NFCPaymentPage = () => {
   }, [initializePayment]);
 
   const handlePaymentSuccess = async (result: SoftPOSTransactionResult) => {
-    setStage('success');
-    addLog('Processing successful payment...');
-
+    // Skip the success stage - go directly to thank you page
     const transactionData = {
       transactionId,
       kioskId,
@@ -187,7 +153,7 @@ const NFCPaymentPage = () => {
       category,
       paymentResult: result,
       paymentType: 'soft_pos',
-      provider: 'thawani',
+      provider: 'amwal',
       mode: 'trial',
       thawaniReference: result.thawaniReference,
       createdAt: new Date().toISOString(),
@@ -195,7 +161,6 @@ const NFCPaymentPage = () => {
 
     if (isOnline()) {
       try {
-        addLog('Sending to server...');
         const { data, error } = await supabase.functions.invoke('process-payment', {
           body: {
             transactionId,
@@ -205,37 +170,28 @@ const NFCPaymentPage = () => {
             mobileNumber: null,
             softPosResult: result,
             paymentType: 'soft_pos',
-            provider: 'thawani',
+            provider: 'amwal',
             thawaniReference: result.thawaniReference,
           },
         });
 
         if (error) throw error;
-        addLog('Payment recorded successfully');
 
-        setTimeout(() => {
-          navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction?.reference_number || transactionId}&catRef=${categoryData?.category_reference || ''}`);
-        }, 2000);
+        // Go directly to thank you page
+        navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction?.reference_number || transactionId}&catRef=${categoryData?.category_reference || ''}`);
       } catch (error: any) {
-        addLog(`Server error: ${error.message} - queuing for later`);
         queueTransaction(transactionData);
         toast.info('Payment saved. Will sync when online.');
-        setTimeout(() => {
-          navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
-        }, 2000);
+        navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
       }
     } else {
-      addLog('Offline - queuing transaction');
       queueTransaction(transactionData);
       toast.info('Payment saved offline. Will sync automatically.');
-      setTimeout(() => {
-        navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
-      }, 2000);
+      navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
     }
   };
 
   const handleStartPayment = useCallback(async () => {
-    addLog('User initiated payment - launching Thawani SDK...');
     setStage('processing');
 
     try {
@@ -247,22 +203,18 @@ const NFCPaymentPage = () => {
 
       if (result.success) {
         // Success is handled by callback
-        addLog('Payment completed successfully');
       } else if (result.errorCode !== 'USER_CANCELLED') {
-        // Failure is handled by callback (except user cancellation which we handle here)
-        addLog(`Payment result: ${result.error}`);
+        // Failure is handled by callback
       } else {
-        addLog('User cancelled payment');
         setStage('waiting');
       }
     } catch (error: any) {
-      addLog(`Payment error: ${error.message}`);
       setStage('declined');
       setTransactionResult({ success: false, error: error.message });
     }
-  }, [addLog, amount, category, transactionId]);
+  }, [amount, category, transactionId]);
 
-  // In trial/mock mode, auto-launch the Tap Card flow (no button required)
+  // In trial/mock mode, auto-launch the Tap Card flow
   useEffect(() => {
     if (stage !== 'waiting') return;
 
@@ -288,11 +240,16 @@ const NFCPaymentPage = () => {
 
   const handleCancel = () => {
     cancelTransaction();
-    navigate(`/kiosk/amount?category=${category}`);
+    navigate('/kiosk');
+  };
+
+  const handleTimeout = () => {
+    cancelTransaction();
+    navigate('/kiosk');
   };
 
   const handleRetrySetup = () => {
-    setStage('initializing');
+    setStage('waiting');
     setErrorMessage('');
     initializePayment();
   };
@@ -303,78 +260,28 @@ const NFCPaymentPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
   };
 
-  // Use Thawani branded full-screen UI for waiting/processing in trial/mock mode
+  // Use the redesigned full-screen UI for waiting/processing stages
   const status = getSoftPOSStatus();
-  const useThawaniBrandedUI = status.mode === 'mock' && ['waiting', 'processing', 'success', 'declined'].includes(stage);
+  const useFullScreenUI = status.mode === 'mock' && ['waiting', 'processing'].includes(stage);
 
-  if (useThawaniBrandedUI) {
+  if (useFullScreenUI) {
     return (
       <ThawaniTapCardScreen
         amount={amount}
-        stage={stage as 'waiting' | 'processing' | 'success' | 'declined'}
+        category={category}
+        stage={stage as 'waiting' | 'processing'}
         isTrialMode={true}
         onCancel={handleCancel}
+        onTimeout={handleTimeout}
       />
     );
   }
 
-  return (
-    <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-xl mx-auto space-y-3">
-        {/* Online Status Indicator */}
-        <div className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-full text-xs font-medium ${
-          isOnlineStatus ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-        }`}>
-          {isOnlineStatus ? (
-            <>
-              <Wifi className="w-3 h-3" />
-              <span>Online</span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="w-3 h-3" />
-              <span>Offline Mode</span>
-            </>
-          )}
-          {!isNativeMode && stage !== 'initializing' && (
-            <span className="ml-2 text-yellow-600">(Simulation Mode)</span>
-          )}
-        </div>
-
-        {/* Amount Display */}
-        <Card className="p-3 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
-          <p className="text-sm text-gray-600 mb-0.5">المبلغ</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            {formatAmount(amount)}
-          </p>
-        </Card>
-
-        {/* Initializing Stage */}
-        {(stage === 'initializing' || stage === 'nfc_check') && (
-          <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
-            <div className="space-y-4">
-              <Loader2 className="w-16 h-16 mx-auto text-blue-600 animate-spin" />
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {stage === 'initializing' ? 'جاري التهيئة...' : 'فحص NFC...'}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {stage === 'initializing' ? 'Initializing payment terminal...' : 'Checking NFC availability...'}
-                </p>
-              </div>
-              
-              {/* Diagnostic Logs */}
-              <div className="mt-4 p-2 bg-gray-50 rounded text-left max-h-32 overflow-y-auto">
-                {initLogs.map((log, i) => (
-                  <p key={i} className="text-[10px] text-gray-500 font-mono">{log}</p>
-                ))}
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Error Stage */}
-        {stage === 'error' && (
+  // Error stage UI
+  if (stage === 'error') {
+    return (
+      <KioskLayout showHomeButton={false}>
+        <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center">
@@ -385,19 +292,9 @@ const NFCPaymentPage = () => {
                 <h2 className="text-xl font-bold text-red-700">
                   خطأ في النظام
                 </h2>
-                <p className="text-sm text-red-600">
-                  System Error
-                </p>
                 <p className="text-xs text-gray-600 mt-2">
                   {errorMessage}
                 </p>
-              </div>
-
-              {/* Diagnostic Logs */}
-              <div className="mt-4 p-2 bg-white rounded text-left max-h-24 overflow-y-auto border">
-                {initLogs.slice(-5).map((log, i) => (
-                  <p key={i} className="text-[10px] text-gray-500 font-mono">{log}</p>
-                ))}
               </div>
 
               <div className="flex gap-2 justify-center pt-2">
@@ -418,132 +315,16 @@ const NFCPaymentPage = () => {
               </div>
             </div>
           </Card>
-        )}
+        </div>
+      </KioskLayout>
+    );
+  }
 
-        {/* Waiting Stage - Ready for Payment */}
-        {stage === 'waiting' && (
-          <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
-            <div className="space-y-4">
-              {/* NFC Ready Animation */}
-              <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-20 h-20 rounded-full bg-blue-100 animate-ping opacity-30" />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-blue-200 animate-pulse" />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Smartphone className="w-10 h-10 text-blue-600" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Soft POS (Thawani)
-                </h2>
-                <p className="text-sm text-gray-600">
-                  ضع بطاقتك على الجهاز
-                </p>
-                <p className="text-xs text-gray-500">
-                  Tap your card to pay
-                </p>
-              </div>
-
-              {/* Start Payment Button */}
-              <KioskButton
-                variant="confirm"
-                size="lg"
-                onClick={handleStartPayment}
-                className="w-full py-4 text-lg"
-              >
-                <CreditCard className="w-6 h-6 mr-2" />
-                ابدأ الدفع - Start Payment
-              </KioskButton>
-
-              {/* Supported Cards */}
-              <div className="flex justify-center gap-2 pt-2">
-                <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-6" />
-                <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-6" />
-                <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-6" />
-                <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-6" />
-              </div>
-
-              {/* Mode indicator */}
-              <div className="text-xs text-gray-400 pt-2">
-                {isNativeMode ? (
-                  <span className="text-green-600">✓ Thawani Lamsa SDK Ready</span>
-                ) : (
-                  <span className="text-yellow-600">⚠ Simulation Mode (Native SDK not available)</span>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Processing Stage */}
-        {stage === 'processing' && (
-          <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
-            <div className="space-y-4">
-              <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
-                <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <CreditCard className="w-10 h-10 text-blue-600" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-gray-900">
-                  معالجة العملية...
-                </h2>
-                <p className="text-sm text-gray-600">
-                  Processing payment...
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {isNativeMode 
-                    ? 'Tap your card on the device screen'
-                    : 'Simulating payment...'}
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Success Stage */}
-        {stage === 'success' && (
-          <Card className="p-6 bg-green-50 shadow-lg border-2 border-green-300 text-center">
-            <div className="space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-4xl">✓</span>
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-green-700">
-                  تمت العملية بنجاح
-                </h2>
-                <p className="text-sm text-green-600">
-                  Payment Successful
-                </p>
-                {transactionResult && (
-                  <div className="text-xs text-gray-600 mt-2 space-y-1">
-                    {transactionResult.cardType && transactionResult.cardLastFour && (
-                      <p>{transactionResult.cardType} •••• {transactionResult.cardLastFour}</p>
-                    )}
-                    {transactionResult.thawaniReference && (
-                      <p>Thawani Ref: {transactionResult.thawaniReference}</p>
-                    )}
-                    {transactionResult.approvalCode && (
-                      <p>Approval: {transactionResult.approvalCode}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Declined Stage */}
-        {stage === 'declined' && (
+  // Declined stage UI
+  if (stage === 'declined') {
+    return (
+      <KioskLayout showHomeButton={false}>
+        <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
               <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center">
@@ -554,17 +335,9 @@ const NFCPaymentPage = () => {
                 <h2 className="text-xl font-bold text-red-700">
                   تم رفض العملية
                 </h2>
-                <p className="text-sm text-red-600">
-                  Payment Declined
-                </p>
                 {transactionResult?.error && (
                   <p className="text-xs text-gray-600 mt-2">
                     {transactionResult.error}
-                  </p>
-                )}
-                {transactionResult?.errorCode && (
-                  <p className="text-xs text-gray-500">
-                    Code: {transactionResult.errorCode}
                   </p>
                 )}
               </div>
@@ -587,21 +360,44 @@ const NFCPaymentPage = () => {
               </div>
             </div>
           </Card>
-        )}
+        </div>
+      </KioskLayout>
+    );
+  }
 
-        {/* Cancel Button for waiting/processing stages */}
-        {(stage === 'waiting' || stage === 'processing') && (
-          <div className="flex justify-center pt-2">
-            <KioskButton
-              variant="secondary"
-              size="sm"
-              onClick={handleCancel}
-              disabled={stage === 'processing'}
-            >
-              إلغاء
-            </KioskButton>
-          </div>
-        )}
+  // Fallback UI (shouldn't normally reach here)
+  return (
+    <KioskLayout showHomeButton={false}>
+      <div className="w-full max-w-xl mx-auto space-y-3">
+        <div className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-full text-xs font-medium ${
+          isOnlineStatus ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+        }`}>
+          {isOnlineStatus ? (
+            <>
+              <Wifi className="w-3 h-3" />
+              <span>Online</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3 h-3" />
+              <span>Offline Mode</span>
+            </>
+          )}
+        </div>
+
+        <Card className="p-3 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
+          <p className="text-sm text-gray-600 mb-0.5">المبلغ</p>
+          <p className="text-2xl font-bold text-emerald-700">
+            {formatAmount(amount)}
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
+          <Loader2 className="w-16 h-16 mx-auto text-emerald-600 animate-spin" />
+          <h2 className="text-xl font-bold text-gray-900 mt-4">
+            جاري التحميل...
+          </h2>
+        </Card>
       </div>
     </KioskLayout>
   );

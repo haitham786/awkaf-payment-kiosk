@@ -10,8 +10,10 @@ const PresetAmountsPage = () => {
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get("category");
   const [categoryData, setCategoryData] = useState<{ title: string; icon_url: string | null; category_id: string } | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200, 500];
+  // Remove 500 from preset amounts
+  const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200];
 
   useEffect(() => {
     const loadCategoryData = async () => {
@@ -27,10 +29,26 @@ const PresetAmountsPage = () => {
         if (error) throw error;
         
         if (data) {
-          setCategoryData(data);
+          // Preload the image before setting data
+          if (data.icon_url) {
+            const img = new Image();
+            img.src = data.icon_url;
+            img.onload = () => {
+              setImageLoaded(true);
+              setCategoryData(data);
+            };
+            img.onerror = () => {
+              setImageLoaded(true);
+              setCategoryData(data);
+            };
+          } else {
+            setImageLoaded(true);
+            setCategoryData(data);
+          }
         }
       } catch (error) {
         console.error("Error loading category data:", error);
+        setImageLoaded(true);
       }
     };
 
@@ -51,25 +69,27 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-xl mx-auto space-y-1.5 pt-1 pb-3">
-        {/* Header with Category */}
+      <div className="w-full max-w-xl mx-auto space-y-1.5 pt-1 pb-24">
+        {/* Header with Category - Fixed height container for stability */}
         <div className="text-center">
-          <div className="flex flex-col items-center justify-center gap-1 mb-1">
-            {categoryData?.icon_url && (
-              <img 
-                src={categoryData.icon_url} 
-                alt={categoryData.title}
-                className="w-10 h-10 object-contain"
-                loading="eager"
-              />
-            )}
+          <div className="flex flex-col items-center justify-center gap-1 mb-1 min-h-[70px]">
+            {/* Fixed height placeholder for image to prevent layout shift */}
+            <div className="w-12 h-12 flex items-center justify-center">
+              {categoryData?.icon_url && imageLoaded && (
+                <img 
+                  src={categoryData.icon_url} 
+                  alt={categoryData.title}
+                  className="w-12 h-12 object-contain"
+                />
+              )}
+            </div>
             <h1 className="text-lg font-bold text-gray-900 drop-shadow-sm">
               {categoryData?.title || "اختر مبلغ التبرع"}
             </h1>
           </div>
         </div>
 
-        {/* Preset Amount Grid */}
+        {/* Preset Amount Grid - 3x3 grid for 9 amounts */}
         <div className="grid grid-cols-3 gap-2 max-w-md mx-auto">
           {presetAmounts.map((amount) => (
             <Card
@@ -93,14 +113,14 @@ const PresetAmountsPage = () => {
           ))}
         </div>
 
-        {/* Custom Amount Button */}
-        <div className="flex justify-center mt-2">
+        {/* Custom Amount Button - Raised up with more margin */}
+        <div className="flex justify-center mt-4 pt-2">
           <KioskButton
             variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-4 py-1 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
+            className="px-4 py-1.5 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
           >
             إدخال مبلغ مختلف
           </KioskButton>

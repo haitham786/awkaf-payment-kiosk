@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Home, X } from "lucide-react";
 
 const MobileNumberPage = () => {
   const navigate = useNavigate();
@@ -17,16 +18,47 @@ const MobileNumberPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const [mobileNumber, setMobileNumber] = useState("");
   const [sending, setSending] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [inactivityTimer, setInactivityTimer] = useState(15);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // 15-second inactivity timeout
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setInactivityTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          navigate('/kiosk');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  // Reset timer on any interaction
+  const resetTimer = () => {
+    setInactivityTimer(15);
+  };
 
   const keypadNumbers = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
-    ['*', '0', '#'],
-    ['⌫', '', '']
+    ['⌫', '0', '']
   ];
 
   const handleKeypadPress = (value: string) => {
+    resetTimer();
     if (value === '⌫') {
       setMobileNumber(prev => prev.slice(0, -1));
     } else if (value && mobileNumber.length < 8) {
@@ -58,16 +90,14 @@ const MobileNumberPage = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "تم الإرسال!",
-        description: "تم إرسال الإيصال إلى رقم الهاتف المحدد",
-        variant: "default",
-      });
+      // Show confirmation popup
+      setShowConfirmation(true);
 
-      // Return to homepage after 2 seconds
+      // Auto-close after 10 seconds
       setTimeout(() => {
+        setShowConfirmation(false);
         navigate('/kiosk');
-      }, 2000);
+      }, 10000);
     } catch (error: any) {
       console.error('SMS Error:', error);
       toast({
@@ -84,141 +114,108 @@ const MobileNumberPage = () => {
     }
   };
 
-  const handleCancel = () => {
+  const handleReturnHome = () => {
     navigate('/kiosk');
   };
 
-  const formatAmount = (totalBaisas: number) => {
-    const rials = Math.floor(totalBaisas / 1000);
-    const baisas = totalBaisas % 1000;
-    return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
-  };
-
   return (
-    <KioskLayout>
-      <div className="w-full max-w-4xl mx-auto">
+    <KioskLayout showHomeButton={false}>
+      <div className="w-full max-w-md mx-auto" onClick={resetTimer}>
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          <h1 className="text-xl font-bold text-gray-900">
             إدخال رقم الهاتف
           </h1>
-          <p className="text-base text-gray-600">
-            أدخل رقم هاتفك لاستلام إيصال التبرع
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Mobile Number Input Section */}
-          <Card className="p-4 bg-white shadow-md border border-gray-300">
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold text-center mb-3 text-gray-900">رقم الهاتف</h2>
-              
-              {/* Transaction Summary */}
-              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-300 text-center">
-                <p className="text-gray-600 mb-1 text-sm">مبلغ التبرع</p>
-                <p className="text-xl font-bold text-emerald-700">
-                  {formatAmount(amount)}
-                </p>
+        {/* Mobile Number Input Section */}
+        <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
+          <div className="space-y-3">
+            {/* Mobile Number Display with +968 prefix inside field */}
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700">
+                +968
               </div>
+              <Input
+                ref={inputRef}
+                value={mobileNumber}
+                readOnly
+                placeholder="أدخل رقم الهاتف"
+                className="text-2xl text-center h-14 bg-white/80 backdrop-blur-sm border-0 text-gray-900 pl-16"
+                maxLength={8}
+              />
+            </div>
 
-              {/* Mobile Number Display */}
+            {/* Keypad */}
+            <div className="grid grid-cols-3 gap-2">
+              {keypadNumbers.map((row, rowIndex) => 
+                row.map((number, colIndex) => (
+                  <KioskButton
+                    key={`${rowIndex}-${colIndex}`}
+                    variant="keypad"
+                    soundEffect="keypad"
+                    onClick={() => handleKeypadPress(number)}
+                    disabled={!number}
+                    className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold"
+                  >
+                    {number}
+                  </KioskButton>
+                ))
+              )}
+            </div>
+
+            {/* Send Button */}
+            <KioskButton
+              variant="confirm"
+              size="xl"
+              soundEffect="navigation"
+              onClick={handleSendSMS}
+              disabled={mobileNumber.length !== 8 || sending}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+            >
+              {sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}
+            </KioskButton>
+          </div>
+        </Card>
+
+        {/* Home Button - Centered, matching style */}
+        <div className="flex justify-center mt-6">
+          <KioskButton
+            variant="ghost"
+            size="lg"
+            soundEffect="navigation"
+            onClick={handleReturnHome}
+            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
+          >
+            <Home className="w-8 h-8 text-white drop-shadow-lg" />
+          </KioskButton>
+        </div>
+
+        {/* SMS Confirmation Popup */}
+        {showConfirmation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 max-w-xs text-center relative">
+              <button
+                onClick={() => {
+                  setShowConfirmation(false);
+                  navigate('/kiosk');
+                }}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
               <div className="space-y-3">
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-xl">🇴🇲</span>
-                  <span className="text-lg font-medium text-gray-900">+968</span>
-                </div>
-                
-                <Input
-                  value={mobileNumber}
-                  readOnly
-                  placeholder="أدخل رقم الهاتف"
-                  className="text-2xl text-center h-12 bg-gray-50 border-2 border-gray-300 focus:border-emerald-500 text-gray-900"
-                  maxLength={8}
-                />
-                
-                <p className="text-center text-gray-600 text-sm">
-                  8 أرقام (بدون +968)
+                <span className="text-4xl">✓</span>
+                <h3 className="text-lg font-bold text-gray-900">
+                  تم إرسال الإيصال
+                </h3>
+                <p className="text-sm text-gray-600">
+                  سيصلك الإيصال على رقم {mobileNumber}
                 </p>
-              </div>
-
-              {/* Example */}
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <p className="text-center text-sm text-gray-700">
-                  <span className="font-medium">مثال:</span> 91234567
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Keypad Section */}
-          <Card className="p-4 bg-white shadow-md border border-gray-300">
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold text-center mb-3 text-gray-900">لوحة الأرقام</h2>
-              
-              {/* Keypad */}
-              <div className="grid grid-cols-3 gap-2">
-                {keypadNumbers.map((row, rowIndex) => 
-                  row.map((number, colIndex) => (
-                    <KioskButton
-                      key={`${rowIndex}-${colIndex}`}
-                      variant="keypad"
-                      onClick={() => handleKeypadPress(number)}
-                      disabled={!number}
-                      className="aspect-square bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300"
-                    >
-                      {number}
-                    </KioskButton>
-                  ))
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-2">
-                <KioskButton
-                  variant="confirm"
-                  size="xl"
-                  onClick={handleSendSMS}
-                  disabled={mobileNumber.length !== 8 || sending}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}
-                </KioskButton>
-                
-                <KioskButton
-                  variant="outline"
-                  size="lg"
-                  onClick={handleCancel}
-                  className="w-full bg-white border-2 border-gray-300 hover:bg-gray-100 text-gray-900"
-                >
-                  إلغاء والعودة للرئيسية
-                </KioskButton>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* SMS Info */}
-        <Card className="mt-4 p-4 bg-white shadow-md border border-gray-300">
-          <div className="text-center space-y-2">
-            <h3 className="text-base font-semibold text-gray-900">
-              📱 سيصلك إيصال يحتوي على:
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <div className="text-center">
-                <p className="font-medium text-gray-900 text-sm">رقم العملية</p>
-                <p className="text-xs text-gray-600">للمراجعة والاستعلام</p>
-              </div>
-              <div className="text-center">
-                <p className="font-medium text-gray-900 text-sm">تفاصيل التبرع</p>
-                <p className="text-xs text-gray-600">النوع والمبلغ والتاريخ</p>
-              </div>
-              <div className="text-center">
-                <p className="font-medium text-gray-900 text-sm">شكر وتقدير</p>
-                <p className="text-xs text-gray-600">رسالة شكر من المؤسسة</p>
               </div>
             </div>
           </div>
-        </Card>
+        )}
       </div>
     </KioskLayout>
   );
