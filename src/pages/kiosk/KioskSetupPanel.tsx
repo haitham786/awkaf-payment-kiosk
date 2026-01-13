@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { testConnection, ConnectionStatus, getConnectionStatus, onConnectionStatusChange, initializePOS } from "@/services/hardPosService";
-import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
+import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode, AmwalEnvironment } from "@/services/softPosService";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -42,9 +42,13 @@ const KioskSetupPanel = () => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const [softPosConfig, setSoftPosConfig] = useState({
-    tajerToken: "",
-    environment: "trial" as "trial" | "live",
+    merchantId: "",
+    terminalId: "",
+    sessionToken: "",
+    environment: "SIT" as AmwalEnvironment,
     mode: "mock" as SoftPosMode,
+    locale: "ar" as 'ar' | 'en',
+    transactionType: "NFC" as 'NFC' | 'CARD_WALLET' | 'GOOGLE_PAY',
   });
   
   const [softPosNfcStatus, setSoftPosNfcStatus] = useState<{
@@ -103,13 +107,25 @@ const KioskSetupPanel = () => {
       });
     }
 
-    // Set Soft POS config if available
+    // Set Soft POS config if available (Amwal Pay)
     if (config.soft_pos && typeof config.soft_pos === 'object') {
-      const sp = config.soft_pos as { tajer_token?: string; environment?: string; mode?: string };
+      const sp = config.soft_pos as { 
+        merchant_id?: string; 
+        terminal_id?: string; 
+        session_token?: string;
+        environment?: string; 
+        mode?: string;
+        locale?: string;
+        transaction_type?: string;
+      };
       setSoftPosConfig({
-        tajerToken: sp.tajer_token || '',
-        environment: (sp.environment as 'trial' | 'live') || 'trial',
+        merchantId: sp.merchant_id || '',
+        terminalId: sp.terminal_id || '',
+        sessionToken: sp.session_token || '',
+        environment: (sp.environment as AmwalEnvironment) || 'SIT',
         mode: (sp.mode as SoftPosMode) || 'mock',
+        locale: (sp.locale as 'ar' | 'en') || 'ar',
+        transactionType: (sp.transaction_type as 'NFC' | 'CARD_WALLET' | 'GOOGLE_PAY') || 'NFC',
       });
     }
   };
@@ -210,11 +226,15 @@ const KioskSetupPanel = () => {
     });
     
     try {
-      // Initialize Soft POS service with current config
+      // Initialize Soft POS service with current config (Amwal Pay)
       await initializeSoftPOS({
-        tajerToken: softPosConfig.tajerToken || 'MOCK_TOKEN',
+        merchantId: softPosConfig.merchantId || '',
+        terminalId: softPosConfig.terminalId || '',
+        sessionToken: softPosConfig.sessionToken || '',
         environment: softPosConfig.environment,
         mode: softPosConfig.mode,
+        locale: softPosConfig.locale,
+        transactionType: softPosConfig.transactionType,
       });
       
       // Check NFC status
@@ -762,15 +782,15 @@ const KioskSetupPanel = () => {
                       <div>
                         <Label className="text-gray-900 text-sm">Environment</Label>
                         <Input
-                          value={softPosConfig.environment === 'trial' ? 'Trial / Sandbox' : 'Live'}
+                          value={softPosConfig.environment}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />
                       </div>
                       <div>
-                        <Label className="text-gray-900 text-sm">Tajer Token</Label>
+                        <Label className="text-gray-900 text-sm">Merchant ID</Label>
                         <Input
-                          value={softPosConfig.tajerToken ? '••••••••' : 'Not configured'}
+                          value={softPosConfig.merchantId ? '••••••••' : 'Not configured'}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />
