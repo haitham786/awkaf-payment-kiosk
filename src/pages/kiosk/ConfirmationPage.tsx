@@ -12,6 +12,7 @@ const ConfirmationPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     const loadCategory = async () => {
@@ -22,7 +23,22 @@ const ConfirmationPage = () => {
         .maybeSingle();
       
       if (data) {
-        setCategoryData(data);
+        // Preload the image before setting data to prevent flash
+        if (data.icon_url) {
+          const img = new Image();
+          img.src = data.icon_url;
+          img.onload = () => {
+            setImageLoaded(true);
+            setCategoryData(data);
+          };
+          img.onerror = () => {
+            setImageLoaded(true);
+            setCategoryData(data);
+          };
+        } else {
+          setImageLoaded(true);
+          setCategoryData(data);
+        }
       }
     };
     
@@ -35,7 +51,29 @@ const ConfirmationPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    // Check if kiosk is configured for Soft POS
+    const kioskId = localStorage.getItem('kiosk_id');
+    if (kioskId) {
+      try {
+        const { data: kioskData } = await supabase
+          .from('kiosks')
+          .select('configuration')
+          .eq('id', kioskId)
+          .maybeSingle();
+        
+        const config = kioskData?.configuration as any;
+        if (config?.payment_mode === 'soft_pos') {
+          // Go directly to NFC payment page for Soft POS
+          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking kiosk config:', error);
+      }
+    }
+    
+    // Default to payment request page for Hardware POS
     navigate(`/kiosk/payment-request?category=${category}&amount=${amount}`);
   };
 
@@ -46,9 +84,9 @@ const ConfirmationPage = () => {
   return (
     <KioskLayout>
       <div className="w-full max-w-3xl mx-auto">
-        {/* Header */}
+        {/* Header - Black title as requested */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-white drop-shadow-lg">
+          <h1 className="text-2xl font-bold text-gray-900 drop-shadow-lg">
             تأكيد المبلغ
           </h1>
         </div>
@@ -56,14 +94,12 @@ const ConfirmationPage = () => {
         {/* Confirmation Card */}
         <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
-            {/* Icon */}
-            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
-              {categoryData?.icon_url ? (
+            {/* Icon - Fixed height container for stability, no placeholder image */}
+            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1 min-h-[80px]">
+              {categoryData?.icon_url && imageLoaded ? (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
               ) : (
-                <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full w-full h-full flex items-center justify-center">
-                  <span className="text-3xl">📿</span>
-                </div>
+                <div className="w-full h-full" />
               )}
             </div>
 
