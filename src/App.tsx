@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
+import { isNativePlatform } from "./utils/capacitorUtils";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
@@ -46,7 +46,7 @@ const AppContent = () => {
   const { isAudioReady, showInitPrompt } = useAudioInitializer();
 
   // Use HashRouter on native (file://) to avoid startup route issues like /index.html.
-  const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
+  const Router = isNativePlatform() ? HashRouter : BrowserRouter;
 
   // Start background sync for offline transactions
   React.useEffect(() => {
