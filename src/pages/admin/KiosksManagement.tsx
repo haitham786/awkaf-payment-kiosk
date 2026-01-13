@@ -150,10 +150,10 @@ const KiosksManagement = () => {
   const validateForm = (): boolean => {
     setValidationError(null);
     
-    // If Soft POS is selected, Tajer Token is required
+    // If Soft POS is selected, Merchant ID is required
     if (formData.configuration.payment_mode === 'soft_pos') {
-      if (!formData.configuration.soft_pos?.tajer_token?.trim()) {
-        setValidationError('Tajer Token is required for Thawani Soft POS (Trial Mode)');
+      if (!formData.configuration.soft_pos?.merchant_id?.trim()) {
+        setValidationError('Merchant ID is required for Amwal Pay Soft POS');
         return false;
       }
     }
@@ -791,32 +791,51 @@ const KiosksManagement = () => {
                     <div className="flex items-start gap-2">
                       <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Thawani trial mode uses a single Tajer Token for authentication. Live credentials will be available after production setup.
+                        Amwal Pay Soft POS is in mock/trial mode. Production credentials will be configured after agreement signing.
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="tajer_token">Tajer Token (Required)</Label>
+                    <Label htmlFor="merchant_id">Merchant ID (Required)</Label>
                     <Input
-                      id="tajer_token"
-                      value={formData.configuration.soft_pos?.tajer_token || ''}
+                      id="merchant_id"
+                      value={formData.configuration.soft_pos?.merchant_id || ''}
                       onChange={(e) => setFormData({ 
                         ...formData, 
                         configuration: { 
                           ...formData.configuration, 
                           soft_pos: { 
                             ...formData.configuration.soft_pos!,
-                            tajer_token: e.target.value 
+                            merchant_id: e.target.value 
                           }
                         }
                       })}
-                      placeholder="Enter Thawani Tajer Token"
+                      placeholder="Enter Amwal Pay Merchant ID"
                       className={validationError ? 'border-destructive' : ''}
                     />
                     {validationError && (
                       <p className="text-xs text-destructive mt-1">{validationError}</p>
                     )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="terminal_id">Terminal ID</Label>
+                    <Input
+                      id="terminal_id"
+                      value={formData.configuration.soft_pos?.terminal_id || ''}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        configuration: { 
+                          ...formData.configuration, 
+                          soft_pos: { 
+                            ...formData.configuration.soft_pos!,
+                            terminal_id: e.target.value 
+                          }
+                        }
+                      })}
+                      placeholder="Enter Terminal ID (optional for trial)"
+                    />
                   </div>
 
                   {/* Soft POS Mode */}
@@ -848,15 +867,15 @@ const KiosksManagement = () => {
                       </div>
                     </RadioGroup>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Live Soft POS will be enabled after Thawani SDK approval
+                      Live Soft POS will be enabled after Amwal Pay SDK integration
                     </p>
                   </div>
 
                   <div>
                     <Label>Environment</Label>
                     <RadioGroup
-                      value={formData.configuration.soft_pos?.environment || 'trial'}
-                      onValueChange={(value: 'trial' | 'live') => setFormData({ 
+                      value={formData.configuration.soft_pos?.environment || 'SIT'}
+                      onValueChange={(value: AmwalEnvironment) => setFormData({ 
                         ...formData, 
                         configuration: { 
                           ...formData.configuration, 
@@ -869,13 +888,17 @@ const KiosksManagement = () => {
                       className="flex gap-4 mt-2"
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="trial" id="env_trial" />
-                        <Label htmlFor="env_trial" className="cursor-pointer">Trial / Sandbox</Label>
+                        <RadioGroupItem value="SIT" id="env_sit" />
+                        <Label htmlFor="env_sit" className="cursor-pointer">SIT (Testing)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="UAT" id="env_uat" />
+                        <Label htmlFor="env_uat" className="cursor-pointer">UAT (Staging)</Label>
                       </div>
                       <div className="flex items-center space-x-2 opacity-50">
-                        <RadioGroupItem value="live" id="env_live" disabled />
-                        <Label htmlFor="env_live" className="cursor-not-allowed text-muted-foreground">
-                          Live (Coming Soon)
+                        <RadioGroupItem value="PROD" id="env_prod" disabled />
+                        <Label htmlFor="env_prod" className="cursor-not-allowed text-muted-foreground">
+                          PROD (Coming Soon)
                         </Label>
                       </div>
                     </RadioGroup>
