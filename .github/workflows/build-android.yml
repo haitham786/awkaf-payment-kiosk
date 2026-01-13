@@ -176,16 +176,58 @@ jobs:
           print("Maven repositories configured")
           PY
 
-      - name: Copy Thawani stub plugin
+      - name: Copy and register Thawani stub plugin
         shell: bash
         run: |
           set -euxo pipefail
           PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
           mkdir -p "$PLUGIN_DIR"
+          
+          # Copy the plugin file
           if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
             cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
             echo "Copied ThawaniLamsaPlugin.java (stub for trial)"
           fi
+          
+          # Find and patch MainActivity to register our plugin
+          MAIN_ACTIVITY=$(find android/app/src/main/java -name "MainActivity.java" -o -name "MainActivity.kt" 2>/dev/null | head -n 1)
+          
+          if [ -n "$MAIN_ACTIVITY" ] && [ -f "$MAIN_ACTIVITY" ]; then
+            echo "Found MainActivity at: $MAIN_ACTIVITY"
+            
+            # Check if it's Java or Kotlin
+            if [[ "$MAIN_ACTIVITY" == *.java ]]; then
+              # Check if already patched
+              if ! grep -q "ThawaniLamsaPlugin" "$MAIN_ACTIVITY"; then
+                # Add import
+                sed -i 's/^package /import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n\npackage /' "$MAIN_ACTIVITY" 2>/dev/null || \
+                sed -i '' 's/^package /import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n\npackage /' "$MAIN_ACTIVITY"
+                
+                # Check if there's an onCreate method to add plugin registration
+                if grep -q "public void onCreate" "$MAIN_ACTIVITY"; then
+                  echo "MainActivity has onCreate - adding plugin registration"
+                  sed -i 's/super.onCreate/registerPlugin(ThawaniLamsaPlugin.class);\n        super.onCreate/' "$MAIN_ACTIVITY" 2>/dev/null || \
+                  sed -i '' 's/super.onCreate/registerPlugin(ThawaniLamsaPlugin.class);\n        super.onCreate/' "$MAIN_ACTIVITY"
+                else
+                  echo "MainActivity uses default Capacitor structure"
+                  # For standard Capacitor MainActivity, add the plugin list override
+                  if ! grep -q "registerPlugin" "$MAIN_ACTIVITY"; then
+                    # Insert before the closing brace
+                    sed -i 's/}$/\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(ThawaniLamsaPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}/' "$MAIN_ACTIVITY" 2>/dev/null || \
+                    sed -i '' 's/}$/\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(ThawaniLamsaPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}/' "$MAIN_ACTIVITY"
+                  fi
+                fi
+                echo "Patched MainActivity to register ThawaniLamsaPlugin"
+              else
+                echo "MainActivity already has ThawaniLamsaPlugin registered"
+              fi
+            fi
+          else
+            echo "WARNING: MainActivity not found - plugin may not be registered"
+          fi
+          
+          # Also verify the plugin package matches
+          cat "$PLUGIN_DIR/ThawaniLamsaPlugin.java" | head -n 20 || true
 
       - name: Create USB device filter XML
         run: |
