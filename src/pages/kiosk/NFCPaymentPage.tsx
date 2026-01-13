@@ -19,7 +19,7 @@ import {
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { Wifi, WifiOff, CreditCard, AlertTriangle, Loader2 } from "lucide-react";
-import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
+import { AmwalTapCardScreen } from "@/components/kiosk/AmwalTapCardScreen";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -146,6 +146,7 @@ const NFCPaymentPage = () => {
 
   const handlePaymentSuccess = async (result: SoftPOSTransactionResult) => {
     // Skip the success stage - go directly to thank you page
+    const status = getSoftPOSStatus();
     const transactionData = {
       transactionId,
       kioskId,
@@ -154,8 +155,8 @@ const NFCPaymentPage = () => {
       paymentResult: result,
       paymentType: 'soft_pos',
       provider: 'amwal',
-      mode: 'trial',
-      thawaniReference: result.thawaniReference,
+      mode: status.mode === 'test' ? 'test' : 'live',
+      amwalReference: result.amwalReference,
       createdAt: new Date().toISOString(),
     };
 
@@ -171,7 +172,7 @@ const NFCPaymentPage = () => {
             softPosResult: result,
             paymentType: 'soft_pos',
             provider: 'amwal',
-            thawaniReference: result.thawaniReference,
+            amwalReference: result.amwalReference,
           },
         });
 
@@ -219,7 +220,7 @@ const NFCPaymentPage = () => {
     if (stage !== 'waiting') return;
 
     const status = getSoftPOSStatus();
-    if (status.mode !== 'mock') return;
+    if (status.mode !== 'test') return;
 
     if (autoStartRef.current) return;
     autoStartRef.current = true;
@@ -262,7 +263,7 @@ const NFCPaymentPage = () => {
 
   // Use the redesigned full-screen UI for waiting/processing stages
   const status = getSoftPOSStatus();
-  const useFullScreenUI = status.mode === 'mock' && ['waiting', 'processing'].includes(stage);
+  const useFullScreenUI = status.mode === 'test' && ['waiting', 'processing'].includes(stage);
 
   if (useFullScreenUI) {
     return (

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { testConnection, ConnectionStatus, getConnectionStatus, onConnectionStatusChange, initializePOS } from "@/services/hardPosService";
-import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
+import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode, AmwalEnvironment } from "@/services/softPosService";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -42,9 +42,11 @@ const KioskSetupPanel = () => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const [softPosConfig, setSoftPosConfig] = useState({
-    tajerToken: "",
-    environment: "trial" as "trial" | "live",
-    mode: "mock" as SoftPosMode,
+    merchantId: "",
+    terminalId: "",
+    secretKey: "",
+    environment: "UAT" as AmwalEnvironment,
+    mode: "test" as SoftPosMode,
   });
   
   const [softPosNfcStatus, setSoftPosNfcStatus] = useState<{
@@ -103,13 +105,15 @@ const KioskSetupPanel = () => {
       });
     }
 
-    // Set Soft POS config if available
+    // Set Soft POS config if available (Amwal Pay)
     if (config.soft_pos && typeof config.soft_pos === 'object') {
-      const sp = config.soft_pos as { tajer_token?: string; environment?: string; mode?: string };
+      const sp = config.soft_pos as { merchant_id?: string; terminal_id?: string; secret_key?: string; environment?: string; mode?: string };
       setSoftPosConfig({
-        tajerToken: sp.tajer_token || '',
-        environment: (sp.environment as 'trial' | 'live') || 'trial',
-        mode: (sp.mode as SoftPosMode) || 'mock',
+        merchantId: sp.merchant_id || '',
+        terminalId: sp.terminal_id || '',
+        secretKey: sp.secret_key || '',
+        environment: (sp.environment as AmwalEnvironment) || 'UAT',
+        mode: (sp.mode as SoftPosMode) || 'test',
       });
     }
   };
@@ -210,9 +214,11 @@ const KioskSetupPanel = () => {
     });
     
     try {
-      // Initialize Soft POS service with current config
+      // Initialize Soft POS service with Amwal Pay config
       await initializeSoftPOS({
-        tajerToken: softPosConfig.tajerToken || 'MOCK_TOKEN',
+        merchantId: softPosConfig.merchantId || 'TEST_MERCHANT',
+        terminalId: softPosConfig.terminalId || 'TEST_TERMINAL',
+        secretKey: softPosConfig.secretKey || '',
         environment: softPosConfig.environment,
         mode: softPosConfig.mode,
       });
@@ -232,7 +238,7 @@ const KioskSetupPanel = () => {
       if (nfcStatus.isAvailable && nfcStatus.isEnabled) {
         toast({
           title: "NFC Ready",
-          description: `Soft POS is ready for contactless payments. Mode: ${status.mode === 'mock' ? 'Trial/Simulation' : 'Live'}`,
+          description: `Amwal Pay Soft POS is ready for contactless payments. Mode: ${status.mode === 'test' ? 'Test/Simulation' : 'Live'}`,
         });
       } else if (!nfcStatus.isAvailable) {
         toast({
@@ -746,31 +752,31 @@ const KioskSetupPanel = () => {
                         <Smartphone className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="text-xs font-semibold text-blue-900">
-                            Mode: {softPosConfig.mode === 'mock' ? 'Trial / Simulation' : 'Live (Production)'}
+                            Mode: {softPosConfig.mode === 'test' ? 'Test / Simulation' : 'Live (Production)'}
                           </p>
                           <p className="text-[10px] text-blue-700 mt-1">
-                            {softPosConfig.mode === 'mock' 
-                              ? 'Payments are simulated for testing. Card taps will generate mock transactions.'
-                              : 'Live Thawani SDK active. Real card transactions.'}
+                            {softPosConfig.mode === 'test' 
+                              ? 'Payments are simulated for testing. Card taps will generate test transactions.'
+                              : 'Amwal Pay SDK active. Real card transactions.'}
                           </p>
                         </div>
                       </div>
                     </div>
                     
-                    {/* Environment */}
+                    {/* Environment & Credentials */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-gray-900 text-sm">Environment</Label>
                         <Input
-                          value={softPosConfig.environment === 'trial' ? 'Trial / Sandbox' : 'Live'}
+                          value={softPosConfig.environment === 'PROD' ? 'Production' : softPosConfig.environment}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />
                       </div>
                       <div>
-                        <Label className="text-gray-900 text-sm">Tajer Token</Label>
+                        <Label className="text-gray-900 text-sm">Merchant ID</Label>
                         <Input
-                          value={softPosConfig.tajerToken ? '••••••••' : 'Not configured'}
+                          value={softPosConfig.merchantId ? '••••••••' : 'Not configured'}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />

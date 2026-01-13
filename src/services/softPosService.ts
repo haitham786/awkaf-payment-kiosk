@@ -2,10 +2,10 @@
  * Soft POS Service - Abstraction Layer for SoftPOS Payments
  * 
  * This service provides a unified interface for Soft POS payments with two modes:
- * - MOCK: Trial/Demo mode that simulates payments (default)
- * - REAL: Production mode using Thawani Lamsa SDK (disabled until SDK approval)
+ * - TEST: Test/Demo mode that simulates payments (default)
+ * - LIVE: Production mode using Amwal Pay SDK
  * 
- * The mock mode allows full end-to-end testing of the payment flow including:
+ * The test mode allows full end-to-end testing of the payment flow including:
  * - UI flow and user experience
  * - Transaction recording and reporting
  * - SMS receipt delivery
@@ -18,26 +18,30 @@ import { supabase } from '@/integrations/supabase/client';
 // SOFT POS MODE CONFIGURATION
 // ============================================================================
 
-export type SoftPosMode = 'mock' | 'real';
+export type SoftPosMode = 'test' | 'live';
 
-// Current mode - defaults to MOCK for trial phase
-// When Thawani SDK is approved, this can be switched to 'real' per kiosk
-const DEFAULT_MODE: SoftPosMode = 'mock';
+// Amwal Pay environments
+export type AmwalEnvironment = 'SIT' | 'UAT' | 'PROD';
+
+// Current mode - defaults to TEST for development phase
+const DEFAULT_MODE: SoftPosMode = 'test';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
 export interface SoftPOSConfig {
-  tajerToken: string;
-  environment: 'trial' | 'live';
+  merchantId: string;
+  terminalId: string;
+  secretKey: string;
+  environment: AmwalEnvironment;
   mode: SoftPosMode;
 }
 
 export interface SoftPOSTransactionResult {
   success: boolean;
   transactionId?: string;
-  thawaniReference?: string;
+  amwalReference?: string;
   approvalCode?: string;
   cardType?: string;
   cardLastFour?: string;
@@ -46,7 +50,7 @@ export interface SoftPOSTransactionResult {
   timestamp?: string;
   error?: string;
   errorCode?: string;
-  isMock?: boolean;
+  isTest?: boolean;
 }
 
 export interface NFCReaderStatus {
@@ -94,19 +98,21 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
       return null;
     }
     
-    // For trial phase, we don't strictly require the token since we're in mock mode
+    // Get Amwal Pay config
     const softPosConfig = config?.soft_pos || {};
-    const mode: SoftPosMode = softPosConfig.mode || 'mock';
+    const mode: SoftPosMode = softPosConfig.mode || 'test';
     
-    // In mock mode, token is optional
-    if (mode === 'real' && !softPosConfig.tajer_token) {
-      console.error('[SoftPOS] Tajer Token required for real mode');
+    // In live mode, credentials are required
+    if (mode === 'live' && (!softPosConfig.merchant_id || !softPosConfig.terminal_id)) {
+      console.error('[SoftPOS] Merchant ID and Terminal ID required for live mode');
       return null;
     }
     
     return {
-      tajerToken: softPosConfig.tajer_token || 'MOCK_TOKEN',
-      environment: softPosConfig.environment || 'trial',
+      merchantId: softPosConfig.merchant_id || 'TEST_MERCHANT',
+      terminalId: softPosConfig.terminal_id || 'TEST_TERMINAL',
+      secretKey: softPosConfig.secret_key || '',
+      environment: softPosConfig.environment || 'UAT',
       mode: mode,
     };
   } catch (error) {
@@ -123,37 +129,38 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
  * Initialize the SoftPOS service with configuration
  */
 export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean> => {
-  console.log('[SoftPOS] Initializing...', {
+  console.log('[SoftPOS] Initializing Amwal Pay...', {
     environment: config.environment,
     mode: config.mode,
-    hasToken: !!config.tajerToken,
+    hasMerchantId: !!config.merchantId,
+    hasTerminalId: !!config.terminalId,
   });
 
-  currentMode = config.mode || 'mock';
+  currentMode = config.mode || 'test';
   currentConfig = config;
 
-  if (currentMode === 'mock') {
-    console.log('[SoftPOS] Running in MOCK mode - payments will be simulated');
+  if (currentMode === 'test') {
+    console.log('[SoftPOS] Running in TEST mode - payments will be simulated');
     isInitialized = true;
     return true;
   }
 
-  // REAL MODE - Thawani SDK (disabled for trial)
-  // This section will be enabled when SDK is approved
-  console.warn('[SoftPOS] Real mode is not available during trial phase');
-  console.warn('[SoftPOS] Falling back to mock mode');
-  currentMode = 'mock';
+  // LIVE MODE - Amwal Pay SDK
+  // This section will be enabled when SDK is integrated
+  console.warn('[SoftPOS] Live mode requires Amwal Pay SDK integration');
+  console.warn('[SoftPOS] Falling back to test mode');
+  currentMode = 'test';
   isInitialized = true;
   return true;
 };
 
 // ============================================================================
-// NFC STATUS (MOCK/TRIAL IMPLEMENTATION FOR SAMSUNG A33 & SUNMI FLEX 3)
+// NFC STATUS (TEST IMPLEMENTATION FOR SAMSUNG A33 & SUNMI FLEX 3)
 // ============================================================================
 
 /**
  * Check if NFC reader is available and enabled
- * In mock/trial mode, this simulates NFC as available for Samsung A33 and Sunmi Flex 3
+ * In test mode, this simulates NFC as available for Samsung A33 and Sunmi Flex 3
  * This allows full testing of the payment flow without actual NFC hardware
  */
 export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
@@ -161,11 +168,10 @@ export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
   
   // Try to detect real NFC first (for native Android)
   const isNativeAndroid = typeof (window as any).Android !== 'undefined' || 
-                          (navigator.userAgent.includes('Android') && typeof (window as any).ThawaniLamsa !== 'undefined');
+                          (navigator.userAgent.includes('Android') && typeof (window as any).AmwalPay !== 'undefined');
   
-  if (isNativeAndroid && currentMode === 'real') {
-    // In real mode on Android, try to check actual NFC status
-    // This would be implemented when Thawani SDK is available
+  if (isNativeAndroid && currentMode === 'live') {
+    // In live mode on Android, try to check actual NFC status
     console.log('[SoftPOS] Native Android detected - would check real NFC');
     return {
       isAvailable: true,
@@ -174,10 +180,10 @@ export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
     };
   }
   
-  // For trial/mock mode, always simulate NFC as available
+  // For test mode, always simulate NFC as available
   // This allows testing on Samsung A33, Sunmi Flex 3, and any other device
-  if (currentMode === 'mock') {
-    console.log('[SoftPOS] Mock mode - simulating NFC as available for trial');
+  if (currentMode === 'test') {
+    console.log('[SoftPOS] Test mode - simulating NFC as available');
     console.log('[SoftPOS] Compatible with: Samsung A33, Sunmi Flex 3, and other NFC devices');
     return {
       isAvailable: true,
@@ -186,7 +192,7 @@ export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
     };
   }
   
-  // Fallback - in trial phase, always return available for testing
+  // Fallback - always return available for testing
   return {
     isAvailable: true,
     isEnabled: true,
@@ -217,27 +223,27 @@ export const validatePaymentReadiness = async (): Promise<{ ready: boolean; erro
 };
 
 // ============================================================================
-// MOCK PAYMENT PROCESSING
+// TEST PAYMENT PROCESSING
 // ============================================================================
 
 /**
- * Generate a mock Thawani reference number
+ * Generate a test Amwal reference number
  */
-const generateMockThawaniReference = (): string => {
+const generateTestAmwalReference = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `THMOCK${timestamp}${random}`;
+  return `AMWAL${timestamp}${random}`;
 };
 
 /**
- * Generate a mock approval code
+ * Generate a test approval code
  */
-const generateMockApprovalCode = (): string => {
+const generateTestApprovalCode = (): string => {
   return `APR${Math.floor(100000 + Math.random() * 900000)}`;
 };
 
 /**
- * Get a random card type for mock transactions
+ * Get a random card type for test transactions
  */
 const getRandomCardType = (): { type: string; lastFour: string } => {
   const cards = [
@@ -250,29 +256,29 @@ const getRandomCardType = (): { type: string; lastFour: string } => {
 };
 
 /**
- * Simulate a mock payment with configurable delay and success rate
- * This simulates the Thawani Soft POS flow for Samsung A33 and Sunmi Flex 3
+ * Simulate a test payment with configurable delay and success rate
+ * This simulates the Amwal Pay Soft POS flow for Samsung A33 and Sunmi Flex 3
  */
-const processMockPayment = async (
+const processTestPayment = async (
   amountBaisas: number,
   transactionId: string,
   remarks?: string
 ): Promise<SoftPOSTransactionResult> => {
-  console.log('[SoftPOS-MOCK] Processing simulated Thawani payment...', { amountBaisas, transactionId });
-  console.log('[SoftPOS-MOCK] Simulating NFC card tap on Samsung A33 / Sunmi Flex 3...');
+  console.log('[SoftPOS-TEST] Processing simulated Amwal Pay payment...', { amountBaisas, transactionId });
+  console.log('[SoftPOS-TEST] Simulating NFC card tap on Samsung A33 / Sunmi Flex 3...');
   
   // Simulate NFC activation and card detection (1.5 seconds)
-  console.log('[SoftPOS-MOCK] NFC Reader activated - waiting for card tap...');
+  console.log('[SoftPOS-TEST] NFC Reader activated - waiting for card tap...');
   await new Promise(resolve => setTimeout(resolve, 1500));
   
   // Simulate card detection
-  console.log('[SoftPOS-MOCK] Card detected! Processing payment...');
+  console.log('[SoftPOS-TEST] Card detected! Processing payment...');
   
   // Simulate payment processing delay (1-2 seconds for realism)
   const delay = 1000 + Math.random() * 1000;
   await new Promise(resolve => setTimeout(resolve, delay));
   
-  // 95% success rate for mock transactions (higher for trial to ensure good testing)
+  // 95% success rate for test transactions
   const isSuccess = Math.random() > 0.05;
   
   if (isSuccess) {
@@ -280,14 +286,14 @@ const processMockPayment = async (
     return {
       success: true,
       transactionId,
-      thawaniReference: generateMockThawaniReference(),
-      approvalCode: generateMockApprovalCode(),
+      amwalReference: generateTestAmwalReference(),
+      approvalCode: generateTestApprovalCode(),
       cardType: card.type,
       cardLastFour: card.lastFour,
       responseCode: '00',
       responseMessage: 'APPROVED',
       timestamp: new Date().toISOString(),
-      isMock: true,
+      isTest: true,
     };
   } else {
     // Simulate various decline reasons
@@ -306,7 +312,7 @@ const processMockPayment = async (
       responseCode: reason.code,
       responseMessage: reason.message,
       timestamp: new Date().toISOString(),
-      isMock: true,
+      isTest: true,
     };
   }
 };
@@ -347,15 +353,14 @@ export const startSoftPOSTransaction = async (
   
   let result: SoftPOSTransactionResult;
   
-  if (currentMode === 'mock') {
-    // MOCK MODE - Simulate payment
-    result = await processMockPayment(amountBaisas, transactionId, remarks);
+  if (currentMode === 'test') {
+    // TEST MODE - Simulate payment
+    result = await processTestPayment(amountBaisas, transactionId, remarks);
   } else {
-    // REAL MODE - Thawani SDK (placeholder for future implementation)
-    // This will be implemented when SDK is approved
-    console.warn('[SoftPOS] Real mode not implemented - using mock');
-    result = await processMockPayment(amountBaisas, transactionId, remarks);
-    result.isMock = true;
+    // LIVE MODE - Amwal Pay SDK (placeholder for future implementation)
+    console.warn('[SoftPOS] Live mode not implemented - using test');
+    result = await processTestPayment(amountBaisas, transactionId, remarks);
+    result.isTest = true;
   }
   
   // Trigger appropriate callback
@@ -407,7 +412,7 @@ export const onSoftPOSFailure = (callback: (error: string, errorCode?: string) =
  */
 export const cancelTransaction = async (): Promise<void> => {
   console.log('[SoftPOS] Cancelling current transaction...');
-  // In mock mode, cancellation is immediate
+  // In test mode, cancellation is immediate
   console.log('[SoftPOS] Transaction cancelled');
 };
 
@@ -427,7 +432,7 @@ export const getSoftPOSStatus = (): {
   return {
     isInitialized,
     config: currentConfig,
-    isNativeAvailable: false, // Always false during trial (no real SDK)
+    isNativeAvailable: false, // Always false until SDK is integrated
     mode: currentMode,
   };
 };
@@ -451,29 +456,31 @@ export const cleanupSoftPOS = async (): Promise<void> => {
 };
 
 // ============================================================================
-// FUTURE: REAL THAWANI SDK INTEGRATION (NOT IMPLEMENTED)
+// FUTURE: REAL AMWAL PAY SDK INTEGRATION (NOT IMPLEMENTED)
 // ============================================================================
 
 /**
- * Start a real Thawani Soft POS transaction
+ * Start a real Amwal Pay Soft POS transaction
  * 
  * IMPORTANT: This function is a placeholder for future SDK integration.
- * It exists but is NOT called during the trial phase.
+ * It exists but is NOT called during the test phase.
  * 
  * @param amount - Amount in OMR
- * @param tajerToken - Thawani Tajer authentication token
+ * @param merchantId - Amwal Pay Merchant ID
+ * @param terminalId - Amwal Pay Terminal ID
  */
-export const startRealThawaniSoftPos = async (
+export const startRealAmwalSoftPos = async (
   amount: number,
-  tajerToken: string
+  merchantId: string,
+  terminalId: string
 ): Promise<SoftPOSTransactionResult> => {
-  // PLACEHOLDER: This will be implemented when Thawani SDK is approved
-  console.warn('[SoftPOS] startRealThawaniSoftPos called but SDK is not available');
-  console.warn('[SoftPOS] This function will be implemented after SDK approval');
+  // PLACEHOLDER: This will be implemented when Amwal Pay SDK is integrated
+  console.warn('[SoftPOS] startRealAmwalSoftPos called but SDK is not available');
+  console.warn('[SoftPOS] This function will be implemented after SDK integration');
   
   return {
     success: false,
-    error: 'Real Thawani SDK is not available during trial phase',
+    error: 'Amwal Pay SDK is not available in test mode',
     errorCode: 'SDK_NOT_AVAILABLE',
     timestamp: new Date().toISOString(),
   };
@@ -487,4 +494,4 @@ export { checkNFCAvailability as activateNFCReader };
 export { checkNFCAvailability as deactivateNFCReader };
 
 // Re-export types
-export type { SoftPosMode as ThawaniPaymentResult };
+export type { SoftPosMode as AmwalPaymentResult };
