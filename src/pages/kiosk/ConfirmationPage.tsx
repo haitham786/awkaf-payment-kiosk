@@ -6,16 +6,37 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache for preloaded images
+const imageCache = new Map<string, boolean>();
+
 const ConfirmationPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(() => {
+    // Try to get from sessionStorage for instant display
+    const cached = sessionStorage.getItem(`category_${category}`);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    return null;
+  });
+  const [isReady, setIsReady] = useState(() => {
+    // If we have cached data, we're ready immediately
+    return !!sessionStorage.getItem(`category_${category}`);
+  });
 
   useEffect(() => {
     const loadCategory = async () => {
+      // Check if already in cache
+      const cached = sessionStorage.getItem(`category_${category}`);
+      if (cached) {
+        setCategoryData(JSON.parse(cached));
+        setIsReady(true);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('donation_categories')
         .select('title, icon_url')
@@ -23,22 +44,29 @@ const ConfirmationPage = () => {
         .maybeSingle();
       
       if (data) {
+        // Cache the data
+        sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
+        
         // Preload the image before setting data to prevent flash
-        if (data.icon_url) {
+        if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
-          img.src = data.icon_url;
           img.onload = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, true);
             setCategoryData(data);
+            setIsReady(true);
           };
           img.onerror = () => {
-            setImageLoaded(true);
+            imageCache.set(data.icon_url!, false);
             setCategoryData(data);
+            setIsReady(true);
           };
+          img.src = data.icon_url;
         } else {
-          setImageLoaded(true);
           setCategoryData(data);
+          setIsReady(true);
         }
+      } else {
+        setIsReady(true);
       }
     };
     
@@ -94,12 +122,10 @@ const ConfirmationPage = () => {
         {/* Confirmation Card */}
         <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
-            {/* Icon - Fixed height container for stability, no placeholder image */}
-            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1 min-h-[80px]">
-              {categoryData?.icon_url && imageLoaded ? (
+            {/* Icon - Fixed height container for stability */}
+            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
+              {categoryData?.icon_url && isReady && (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
-              ) : (
-                <div className="w-full h-full" />
               )}
             </div>
 

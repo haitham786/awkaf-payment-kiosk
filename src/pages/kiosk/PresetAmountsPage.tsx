@@ -5,19 +5,28 @@ import { Card } from "@/components/ui/card";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache for preloaded images
+const imageCache = new Map<string, string>();
+
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get("category");
   const [categoryData, setCategoryData] = useState<{ title: string; icon_url: string | null; category_id: string } | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   // Remove 500 from preset amounts
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200];
 
   useEffect(() => {
     const loadCategoryData = async () => {
-      if (!categoryId) return;
+      if (!categoryId) {
+        setIsReady(true);
+        return;
+      }
+      
+      // Check if already cached
+      const cachedIcon = imageCache.get(categoryId);
       
       try {
         const { data, error } = await supabase
@@ -29,26 +38,30 @@ const PresetAmountsPage = () => {
         if (error) throw error;
         
         if (data) {
-          // Preload the image before setting data
-          if (data.icon_url) {
+          // If image is cached or no image, show immediately
+          if (cachedIcon || !data.icon_url) {
+            setCategoryData(data);
+            setIsReady(true);
+          } else {
+            // Preload the image
             const img = new Image();
             img.src = data.icon_url;
             img.onload = () => {
-              setImageLoaded(true);
+              imageCache.set(categoryId, data.icon_url!);
               setCategoryData(data);
+              setIsReady(true);
             };
             img.onerror = () => {
-              setImageLoaded(true);
               setCategoryData(data);
+              setIsReady(true);
             };
-          } else {
-            setImageLoaded(true);
-            setCategoryData(data);
           }
+        } else {
+          setIsReady(true);
         }
       } catch (error) {
         console.error("Error loading category data:", error);
-        setImageLoaded(true);
+        setIsReady(true);
       }
     };
 
@@ -73,13 +86,13 @@ const PresetAmountsPage = () => {
         {/* Header with Category - Fixed height container for stability */}
         <div className="text-center">
           <div className="flex flex-col items-center justify-center gap-1 mb-1 min-h-[70px]">
-            {/* Fixed height placeholder for image to prevent layout shift */}
-            <div className="w-12 h-12 flex items-center justify-center">
-              {categoryData?.icon_url && imageLoaded && (
+            {/* Fixed height placeholder for image - matched to w-14 h-14 like other pages */}
+            <div className="w-14 h-14 flex items-center justify-center">
+              {categoryData?.icon_url && isReady && (
                 <img 
                   src={categoryData.icon_url} 
                   alt={categoryData.title}
-                  className="w-12 h-12 object-contain"
+                  className="w-14 h-14 object-contain"
                 />
               )}
             </div>

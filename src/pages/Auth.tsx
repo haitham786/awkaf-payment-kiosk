@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff } from "lucide-react";
-
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -22,22 +22,31 @@ const Auth = () => {
     let mounted = true;
 
     const checkExistingSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session && mounted) {
-        // Verify user has admin role before redirecting
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .in('role', ['admin', 'super_admin']);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (roles && roles.length > 0) {
-          navigate("/admin", { replace: true });
-        } else {
-          // If no admin role, sign out
-          await supabase.auth.signOut();
+        if (session && mounted) {
+          // Verify user has admin role before redirecting
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .in('role', ['admin', 'super_admin']);
+          
+          if (roles && roles.length > 0) {
+            navigate("/admin", { replace: true });
+            return; // Don't set checkingSession to false, we're navigating away
+          } else {
+            // If no admin role, sign out
+            await supabase.auth.signOut();
+          }
         }
+      } catch (error) {
+        console.error('Session check error:', error);
+      }
+      
+      if (mounted) {
+        setCheckingSession(false);
       }
     };
 
@@ -141,7 +150,7 @@ const Auth = () => {
         .from('profiles')
         .select('id')
         .eq('email', email)
-        .single();
+        .maybeSingle();
 
       if (!profileData) {
         toast({
@@ -191,6 +200,18 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  // Show loading spinner while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-primary/10 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-primary/10 flex items-center justify-center p-4">

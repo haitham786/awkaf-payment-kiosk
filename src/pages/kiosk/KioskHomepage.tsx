@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
@@ -8,10 +8,14 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 
+// Cache for preloaded images
+const imageCache = new Map<string, boolean>();
+
 const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imagesPreloaded, setImagesPreloaded] = useState(false);
   const [quranicVerse, setQuranicVerse] = useState<string>("");
   // Initialize status based on localStorage to prevent flashing
   const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
@@ -19,6 +23,29 @@ const KioskHomepage = () => {
     return kioskId ? 'active' : 'unregistered';
   });
   const [kioskMessage, setKioskMessage] = useState('');
+
+  // Preload all category images
+  const preloadImages = async (cats: any[]) => {
+    const imagePromises = cats
+      .filter(cat => cat.icon_url && !imageCache.has(cat.icon_url))
+      .map(cat => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            imageCache.set(cat.icon_url, true);
+            resolve();
+          };
+          img.onerror = () => {
+            imageCache.set(cat.icon_url, false);
+            resolve();
+          };
+          img.src = cat.icon_url;
+        });
+      });
+    
+    await Promise.all(imagePromises);
+    setImagesPreloaded(true);
+  };
 
   useEffect(() => {
     checkKioskStatus();
@@ -134,6 +161,12 @@ const KioskHomepage = () => {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
+      
+      // Preload images before showing categories
+      if (data && data.length > 0) {
+        await preloadImages(data);
+      }
+      
       setCategories(data || []);
       
       // Load Quranic verse from kiosk_settings
@@ -240,7 +273,7 @@ const KioskHomepage = () => {
 
         {/* Donation Categories Grid */}
         <div className="grid grid-cols-2 gap-4 mb-4">
-          {loading ? (
+          {loading || !imagesPreloaded ? (
             <div className="col-span-2 text-center text-lg text-white/90">
               جاري التحميل...
             </div>
@@ -269,16 +302,16 @@ const KioskHomepage = () => {
                   className="w-full h-full flex flex-col items-center justify-center space-y-2 border-0 rounded-xl bg-transparent hover:bg-emerald-50/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >
-                  {category.icon_url && (
-                    <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform duration-300">
+                  {/* Fixed height container for image - always reserve space */}
+                  <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
+                    {category.icon_url && (
                       <img
                         src={category.icon_url}
                         alt={category.title}
                         className="w-full h-full object-contain"
-                        loading="eager"
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                     {category.title}
                   </h3>

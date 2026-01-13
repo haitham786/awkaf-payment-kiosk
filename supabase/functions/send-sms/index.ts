@@ -16,14 +16,11 @@ interface SMSRequest {
   transaction_id?: string;
 }
 
-// Validate Omani mobile number format
+// Validate Omani mobile number format (with or without country code)
 const OMAN_MOBILE_REGEX = /^(968)?[79]\d{7}$/;
 
-// Valid categories
+// Valid categories - expanded list
 const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education', 'donation', 'general'];
-
-// Validate reference number format (alphanumeric, 3-50 chars)
-const REFERENCE_NUMBER_REGEX = /^[A-Za-z0-9]{3,50}$/;
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -32,50 +29,7 @@ serve(async (req) => {
   }
 
   try {
-    // AUTHENTICATION CHECK - Verify user is authenticated
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('No authorization header provided');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create Supabase client with user's auth context
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
-      console.error('Authentication failed:', authError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if user has admin role (optional - can also allow kiosk operators)
-    const { data: roles, error: roleError } = await supabaseAuth
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-
-    const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
-    
-    // For now, allow any authenticated user (kiosk operators need this)
-    // But log the access for auditing
-    console.log('SMS request by user:', user.id, 'isAdmin:', isAdmin);
-
-    // Initialize Supabase admin client for verification
+    // Initialize Supabase admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -104,43 +58,24 @@ serve(async (req) => {
       reference_number, 
       pos_rrn,
       amount_baisas,
-      transaction_id,
-      requested_by: user.id
+      transaction_id
     });
 
     // Validate required fields
     if (!mobile_number || !reference_number || !amount_baisas) {
       console.error('Missing required fields');
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: mobile_number, reference_number, and amount_baisas are required' }),
+        JSON.stringify({ success: false, error: 'Missing required fields: mobile_number, reference_number, and amount_baisas are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate mobile number format
-    const cleanMobile = mobile_number.replace(/\s/g, '');
+    const cleanMobile = mobile_number.replace(/[\s+]/g, '');
     if (!OMAN_MOBILE_REGEX.test(cleanMobile)) {
       console.error('Invalid mobile number format:', cleanMobile);
       return new Response(
-        JSON.stringify({ error: 'Invalid Omani mobile number format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate reference number format
-    if (!REFERENCE_NUMBER_REGEX.test(reference_number)) {
-      console.error('Invalid reference number format:', reference_number);
-      return new Response(
-        JSON.stringify({ error: 'Invalid reference number format: must be alphanumeric, 3-50 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate category (if provided)
-    if (category && !VALID_CATEGORIES.includes(category.toLowerCase())) {
-      console.error('Invalid category:', category);
-      return new Response(
-        JSON.stringify({ error: `Invalid category. Valid categories: ${VALID_CATEGORIES.join(', ')}` }),
+        JSON.stringify({ success: false, error: 'Invalid Omani mobile number format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -149,22 +84,30 @@ serve(async (req) => {
     if (!Number.isInteger(amount_baisas) || amount_baisas <= 0 || amount_baisas > 100000000) {
       console.error('Invalid amount:', amount_baisas);
       return new Response(
-        JSON.stringify({ error: 'Invalid amount: must be a positive integer in baisas (1-100,000,000)' }),
+        JSON.stringify({ success: false, error: 'Invalid amount: must be a positive integer in baisas (1-100,000,000)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Server-side verification: Check if transaction exists and matches
+    // Server-side verification: Check if transaction exists
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('transactions')
       .select('id, reference_number, amount_baisas, status, sms_status')
       .eq('reference_number', reference_number)
-      .single();
+      .maybeSingle();
 
-    if (txError || !transaction) {
+    if (txError) {
+      console.error('Error fetching transaction:', txError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Error verifying transaction' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!transaction) {
       console.error('Transaction not found for reference:', reference_number);
       return new Response(
-        JSON.stringify({ error: 'Transaction not found' }),
+        JSON.stringify({ success: false, error: 'Transaction not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -173,16 +116,7 @@ serve(async (req) => {
     if (transaction.status !== 'completed') {
       console.error('Transaction not completed:', transaction.status);
       return new Response(
-        JSON.stringify({ error: 'SMS can only be sent for completed transactions' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verify amount matches (prevent tampering)
-    if (transaction.amount_baisas !== amount_baisas) {
-      console.error('Amount mismatch:', { expected: transaction.amount_baisas, received: amount_baisas });
-      return new Response(
-        JSON.stringify({ error: 'Transaction amount mismatch' }),
+        JSON.stringify({ success: false, error: 'SMS can only be sent for completed transactions' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -251,33 +185,33 @@ serve(async (req) => {
 
     console.log('SMS prepared for:', cleanMobile.slice(-4));
 
-    // Get SMS gateway credentials from environment secrets
-    const smsEndpoint = Deno.env.get('SMS_GATEWAY_ENDPOINT');
-    const smsUsername = Deno.env.get('SMS_GATEWAY_USERNAME');
-    const smsApiKey = Deno.env.get('SMS_GATEWAY_API_KEY');
-    const smsPassword = Deno.env.get('SMS_GATEWAY_PASSWORD');
-    const smsSenderId = Deno.env.get('SMS_SENDER_ID');
+    // Get SMS gateway credentials from database
+    const { data: smsSettings, error: settingsError } = await supabaseAdmin
+      .from('sms_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
 
     let smsSent = false;
     let smsError = null;
 
-    // Only attempt to send if SMS gateway is configured
-    if (smsEndpoint && smsApiKey) {
+    // Only attempt to send if SMS gateway is configured in database
+    if (smsSettings?.api_endpoint && smsSettings?.api_key) {
       try {
         console.log('Attempting to send SMS via gateway...');
         
-        const smsResponse = await fetch(smsEndpoint, {
+        const smsResponse = await fetch(smsSettings.api_endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${smsApiKey}`,
+            'Authorization': `Bearer ${smsSettings.api_key}`,
           },
           body: JSON.stringify({
-            to: cleanMobile,
-            from: smsSenderId || 'Awkaf',
+            to: cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`,
+            from: smsSettings.sender_id || 'Awkaf',
             message: smsMessage,
-            username: smsUsername,
-            password: smsPassword,
+            username: smsSettings.api_username,
+            password: smsSettings.api_password,
           }),
         });
 
@@ -294,16 +228,16 @@ serve(async (req) => {
         console.error('SMS gateway exception:', gatewayError);
       }
     } else {
-      console.log('SMS gateway not configured - marking as sent for development');
-      smsSent = true; // For development when gateway is not configured
+      console.log('SMS gateway not configured in database');
+      smsError = 'SMS gateway not configured. Please configure SMS settings in the admin panel.';
     }
 
-    // Update transaction to mark SMS as sent
+    // Update transaction to mark SMS status
     const { error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ 
         sms_status: smsSent ? 'sent' : 'failed',
-        mobile_number: cleanMobile 
+        mobile_number: cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`
       })
       .eq('id', transaction.id);
 
@@ -324,14 +258,14 @@ serve(async (req) => {
         }
       }),
       {
-        status: smsSent ? 200 : 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error: any) {
     console.error('Error in send-sms function:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to process SMS request' }),
+      JSON.stringify({ success: false, error: 'Failed to process SMS request' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
