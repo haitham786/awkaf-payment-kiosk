@@ -1,8 +1,10 @@
 /**
- * Soft POS "Tap Card" Full-Screen UI
+ * Amwal Pay "Tap Card" Full-Screen UI
  * 
  * This component displays an NFC tap card screen for Soft POS payments.
  * Used in TRIAL/MOCK mode with admin-configured background.
+ * 
+ * Provider: Amwal Pay (https://amwal-pay.com)
  */
 
 import React, { useEffect, useState } from "react";
@@ -10,14 +12,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Wifi, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface ThawaniTapCardScreenProps {
+interface AmwalPayTapCardScreenProps {
   amount: number;
   stage: "waiting" | "processing" | "success" | "declined";
   isTrialMode?: boolean;
   onCancel?: () => void;
 }
 
-export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
+export const AmwalPayTapCardScreen: React.FC<AmwalPayTapCardScreenProps> = ({
   amount,
   stage,
   isTrialMode = true,

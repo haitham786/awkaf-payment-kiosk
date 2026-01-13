@@ -20,7 +20,7 @@ import {
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { Wifi, WifiOff, CreditCard, AlertTriangle, Smartphone, Loader2 } from "lucide-react";
-import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
+import { AmwalPayTapCardScreen } from "@/components/kiosk/AmwalPayTapCardScreen";
 
 type PaymentStage = 'initializing' | 'nfc_check' | 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -92,20 +92,20 @@ const NFCPaymentPage = () => {
       
       if (!config) {
         addLog('ERROR: No Soft POS configuration found');
-        setErrorMessage('Soft POS is not configured for this kiosk. Please configure Thawani settings in the admin panel.');
+        setErrorMessage('Soft POS is not configured for this kiosk. Please configure Amwal Pay settings in the admin panel.');
         setStage('error');
         return;
       }
       
-      addLog(`Config loaded: environment=${config.environment}, hasToken=${!!config.tajerToken}`);
+      addLog(`Config loaded: environment=${config.environment}, hasMerchantId=${!!config.merchantId}`);
       
       // Initialize the SDK
-      addLog('Initializing Thawani Lamsa SDK...');
+      addLog('Initializing Amwal Pay SDK...');
       const initialized = await initializeSoftPOS(config);
       
       if (!initialized) {
         addLog('ERROR: SDK initialization failed');
-        setErrorMessage('Failed to initialize Thawani payment terminal.');
+        setErrorMessage('Failed to initialize Amwal Pay payment terminal.');
         setStage('error');
         return;
       }
@@ -147,7 +147,7 @@ const NFCPaymentPage = () => {
       });
 
       onSoftPOSApproval((result) => {
-        addLog(`Payment approved: ref=${result.thawaniReference}`);
+        addLog(`Payment approved: ref=${result.amwalReference}`);
         setTransactionResult(result);
         handlePaymentSuccess(result);
       });
@@ -206,9 +206,9 @@ const NFCPaymentPage = () => {
       category,
       paymentResult: result,
       paymentType: 'soft_pos',
-      provider: 'thawani',
+      provider: 'amwal_pay',
       mode: 'trial',
-      thawaniReference: result.thawaniReference,
+      amwalReference: result.amwalReference,
       createdAt: new Date().toISOString(),
     };
 
@@ -224,8 +224,8 @@ const NFCPaymentPage = () => {
             mobileNumber: null,
             softPosResult: result,
             paymentType: 'soft_pos',
-            provider: 'thawani',
-            thawaniReference: result.thawaniReference,
+            provider: 'amwal_pay',
+            amwalReference: result.amwalReference,
           },
         });
 
@@ -254,7 +254,7 @@ const NFCPaymentPage = () => {
   };
 
   const handleStartPayment = useCallback(async () => {
-    addLog('User initiated payment - launching Thawani SDK...');
+    addLog('User initiated payment - launching Amwal Pay SDK...');
     setStage('processing');
 
     try {
@@ -322,13 +322,13 @@ const NFCPaymentPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
   };
 
-  // Use Thawani branded full-screen UI for waiting/processing in trial/mock mode
+  // Use Amwal Pay branded full-screen UI for waiting/processing in trial/mock mode
   const status = getSoftPOSStatus();
-  const useThawaniBrandedUI = status.mode === 'mock' && ['waiting', 'processing', 'success', 'declined'].includes(stage);
+  const useAmwalBrandedUI = status.mode === 'mock' && ['waiting', 'processing', 'success', 'declined'].includes(stage);
 
-  if (useThawaniBrandedUI) {
+  if (useAmwalBrandedUI) {
     return (
-      <ThawaniTapCardScreen
+      <AmwalPayTapCardScreen
         amount={amount}
         stage={stage as 'waiting' | 'processing' | 'success' | 'declined'}
         isTrialMode={true}
@@ -458,7 +458,7 @@ const NFCPaymentPage = () => {
 
               <div className="space-y-2">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Soft POS (Thawani)
+                  Soft POS (Amwal Pay)
                 </h2>
                 <p className="text-sm text-gray-600">
                   ضع بطاقتك على الجهاز
@@ -490,7 +490,7 @@ const NFCPaymentPage = () => {
               {/* Mode indicator */}
               <div className="text-xs text-gray-400 pt-2">
                 {isNativeMode ? (
-                  <span className="text-green-600">✓ Thawani Lamsa SDK Ready</span>
+                  <span className="text-green-600">✓ Amwal Pay SDK Ready</span>
                 ) : (
                   <span className="text-yellow-600">⚠ Simulation Mode (Native SDK not available)</span>
                 )}
@@ -548,8 +548,8 @@ const NFCPaymentPage = () => {
                     {transactionResult.cardType && transactionResult.cardLastFour && (
                       <p>{transactionResult.cardType} •••• {transactionResult.cardLastFour}</p>
                     )}
-                    {transactionResult.thawaniReference && (
-                      <p>Thawani Ref: {transactionResult.thawaniReference}</p>
+                    {transactionResult.amwalReference && (
+                      <p>Amwal Ref: {transactionResult.amwalReference}</p>
                     )}
                     {transactionResult.approvalCode && (
                       <p>Approval: {transactionResult.approvalCode}</p>

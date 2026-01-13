@@ -13,6 +13,7 @@ import { testConnection, POSConfig } from "@/services/hardPosService";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'mock' | 'real';
+type AmwalEnvironment = 'SIT' | 'UAT' | 'PROD';
 
 interface KioskConfiguration {
   payment_mode: 'hardware_pos' | 'soft_pos';
@@ -22,9 +23,14 @@ interface KioskConfiguration {
     port: string;
   };
   soft_pos?: {
-    tajer_token: string;
-    environment: 'trial' | 'live';
+    merchant_id: string;
+    terminal_id: string;
+    session_token: string;
+    environment: AmwalEnvironment;
     mode: SoftPosMode;
+    locale: 'ar' | 'en';
+    transaction_type: 'NFC' | 'CARD_WALLET' | 'GOOGLE_PAY';
+    // Note: secret_key stored securely in backend
   };
   sound_enabled?: boolean;
 }
@@ -44,7 +50,7 @@ const KiosksManagement = () => {
     configuration: {
       payment_mode: 'hardware_pos' as 'hardware_pos' | 'soft_pos',
       pos: { connectionType: 'usb', ipAddress: '', port: '' },
-      soft_pos: { tajer_token: '', environment: 'trial' as 'trial' | 'live', mode: 'mock' as SoftPosMode },
+      soft_pos: { merchant_id: '', terminal_id: '', session_token: '', environment: 'SIT' as AmwalEnvironment, mode: 'mock' as SoftPosMode, locale: 'ar' as 'ar' | 'en', transaction_type: 'NFC' as 'NFC' | 'CARD_WALLET' | 'GOOGLE_PAY' },
       sound_enabled: true,
     } as KioskConfiguration
   });
@@ -210,7 +216,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: config.payment_mode || 'hardware_pos',
         pos: config.pos || { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: config.soft_pos || { tajer_token: '', environment: 'trial', mode: 'mock' },
+        soft_pos: config.soft_pos || { merchant_id: '', terminal_id: '', session_token: '', environment: 'SIT', mode: 'mock', locale: 'ar', transaction_type: 'NFC' },
         sound_enabled: config.sound_enabled !== false,
       }
     });
@@ -244,7 +250,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: 'hardware_pos',
         pos: { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: { tajer_token: '', environment: 'trial', mode: 'mock' },
+        soft_pos: { merchant_id: '', terminal_id: '', session_token: '', environment: 'SIT', mode: 'mock', locale: 'ar', transaction_type: 'NFC' },
         sound_enabled: true,
       }
     });
@@ -453,7 +459,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'soft_pos') {
-      return 'Soft POS (Thawani)';
+      return 'Soft POS (Amwal Pay)';
     }
     const connectionType = kiosk.configuration?.pos?.connectionType?.toUpperCase() || 'USB';
     return `Hardware POS (${connectionType})`;
