@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -38,7 +39,10 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { isAudioReady, showInitPrompt } = useAudioInitializer();
-  
+
+  // Use HashRouter on native (file://) to avoid startup route issues like /index.html.
+  const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
+
   // Start background sync for offline transactions
   React.useEffect(() => {
     startBackgroundSync();
@@ -54,46 +58,46 @@ const AppContent = () => {
           </div>
         </div>
       )}
-      
+
       <Toaster />
       <Sonner />
       <NetworkStatus />
-      <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/auth/first-login" element={<FirstLoginPage />} />
-            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-            
-            {/* Kiosk Routes */}
-            <Route path="/kiosk" element={<KioskHomepage />} />
-            <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
-            <Route path="/kiosk/preset-amounts" element={<PresetAmountsPage />} />
-            <Route path="/kiosk/amount" element={<AmountPage />} />
-            <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
-            <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
-            <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
-            <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
-            <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
-            <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
-            <Route path="/kiosk/error" element={<ErrorPage />} />
-            <Route path="/kiosk/diagnostics" element={<POSDiagnosticsPage />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/categories" element={<CategoriesManagement />} />
-            <Route path="/admin/kiosks" element={<KiosksManagement />} />
-            <Route path="/admin/admins" element={<AdminsManagement />} />
-            <Route path="/admin/add-admin" element={<AddAdminPage />} />
-            <Route path="/admin/sms-settings" element={<SMSSettings />} />
-            <Route path="/admin/statistics" element={<EnhancedStatistics />} />
-            <Route path="/admin/profile" element={<ProfilePage />} />
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/first-login" element={<FirstLoginPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+
+          {/* Kiosk Routes */}
+          <Route path="/kiosk" element={<KioskHomepage />} />
+          <Route path="/kiosk/setup" element={<KioskSetupPanel />} />
+          <Route path="/kiosk/preset-amounts" element={<PresetAmountsPage />} />
+          <Route path="/kiosk/amount" element={<AmountPage />} />
+          <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
+          <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
+          <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
+          <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
+          <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
+          <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
+          <Route path="/kiosk/error" element={<ErrorPage />} />
+          <Route path="/kiosk/diagnostics" element={<POSDiagnosticsPage />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/categories" element={<CategoriesManagement />} />
+          <Route path="/admin/kiosks" element={<KiosksManagement />} />
+          <Route path="/admin/admins" element={<AdminsManagement />} />
+          <Route path="/admin/add-admin" element={<AddAdminPage />} />
+          <Route path="/admin/sms-settings" element={<SMSSettings />} />
+          <Route path="/admin/statistics" element={<EnhancedStatistics />} />
+          <Route path="/admin/profile" element={<ProfilePage />} />
+
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Router>
+    </>
   );
 };
 
