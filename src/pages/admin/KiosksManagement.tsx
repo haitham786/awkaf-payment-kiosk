@@ -13,7 +13,6 @@ import { testConnection, POSConfig } from "@/services/hardPosService";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type AmwalEnvironment = 'SIT' | 'UAT' | 'PROD';
 
 interface KioskConfiguration {
   payment_mode: 'hardware_pos' | 'soft_pos';
@@ -23,10 +22,8 @@ interface KioskConfiguration {
     port: string;
   };
   soft_pos?: {
-    merchant_id: string;
-    terminal_id: string;
-    secret_key: string;
-    environment: AmwalEnvironment;
+    auth_key: string;
+    is_production: boolean;
     mode: SoftPosMode;
   };
   sound_enabled?: boolean;
@@ -47,7 +44,7 @@ const KiosksManagement = () => {
     configuration: {
       payment_mode: 'hardware_pos' as 'hardware_pos' | 'soft_pos',
       pos: { connectionType: 'usb', ipAddress: '', port: '' },
-      soft_pos: { merchant_id: '', terminal_id: '', secret_key: '', environment: 'UAT' as AmwalEnvironment, mode: 'test' as SoftPosMode },
+      soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
       sound_enabled: true,
     } as KioskConfiguration
   });
@@ -149,8 +146,8 @@ const KiosksManagement = () => {
     
     // If Soft POS is selected, Merchant ID is required for live mode
     if (formData.configuration.payment_mode === 'soft_pos') {
-      if (formData.configuration.soft_pos?.mode === 'live' && !formData.configuration.soft_pos?.merchant_id?.trim()) {
-        setValidationError('Merchant ID is required for Amwal Pay Live Mode');
+      if (formData.configuration.soft_pos?.mode === 'live' && !formData.configuration.soft_pos?.auth_key?.trim()) {
+        setValidationError('Auth Key is required for Thawani Lamsa Live Mode');
         return false;
       }
     }
@@ -213,7 +210,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: config.payment_mode || 'hardware_pos',
         pos: config.pos || { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: config.soft_pos || { merchant_id: '', terminal_id: '', secret_key: '', environment: 'UAT', mode: 'test' },
+        soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         sound_enabled: config.sound_enabled !== false,
       }
     });
@@ -247,7 +244,7 @@ const KiosksManagement = () => {
       configuration: {
         payment_mode: 'hardware_pos',
         pos: { connectionType: 'usb', ipAddress: '', port: '' },
-        soft_pos: { merchant_id: '', terminal_id: '', secret_key: '', environment: 'UAT', mode: 'test' },
+        soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         sound_enabled: true,
       }
     });
@@ -456,7 +453,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'soft_pos') {
-      return 'Soft POS (Amwal Pay)';
+      return 'Soft POS (Thawani Lamsa)';
     }
     const connectionType = kiosk.configuration?.pos?.connectionType?.toUpperCase() || 'USB';
     return `Hardware POS (${connectionType})`;
@@ -690,8 +687,8 @@ const KiosksManagement = () => {
                     <Label htmlFor="soft_pos" className="flex items-center gap-2 cursor-pointer flex-1">
                       <Smartphone className="w-4 h-4" />
                       <div>
-                        <p className="font-medium">Soft POS (Powered by Amwal Pay)</p>
-                        <p className="text-xs text-muted-foreground">NFC contactless payments on device screen</p>
+                        <p className="font-medium">Soft POS (Powered by Thawani Lamsa)</p>
+                        <p className="text-xs text-muted-foreground">NFC contactless payments via Thawani Lamsa SDK</p>
                       </div>
                     </Label>
                   </div>
@@ -779,76 +776,38 @@ const KiosksManagement = () => {
               {/* Soft POS (Thawani) Configuration - shown when soft_pos selected */}
               {formData.configuration.payment_mode === 'soft_pos' && (
                 <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
                     <Smartphone className="w-4 h-4" />
-                    Amwal Pay Soft POS Configuration
+                    Thawani Lamsa Soft POS Configuration
                   </h4>
                   
                   <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                     <div className="flex items-start gap-2">
                       <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Amwal Pay requires Merchant ID, Terminal ID and Secret Key. Contact Amwal Pay for credentials.
+                        Thawani Lamsa requires an Auth Key (touchpoint key). Register at <a href="https://merchant.thawani.om/" target="_blank" rel="noopener noreferrer" className="underline">merchant.thawani.om</a> and create your branch and touchpoints to obtain the authorization key.
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="merchant_id">Merchant ID</Label>
+                    <Label htmlFor="auth_key">Auth Key (Touchpoint Key)</Label>
                     <Input
-                      id="merchant_id"
-                      value={formData.configuration.soft_pos?.merchant_id || ''}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        configuration: { 
-                          ...formData.configuration, 
-                          soft_pos: { 
-                            ...formData.configuration.soft_pos!,
-                            merchant_id: e.target.value 
-                          }
-                        }
-                      })}
-                      placeholder="Enter Amwal Pay Merchant ID"
-                      className={validationError ? 'border-destructive' : ''}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="terminal_id">Terminal ID</Label>
-                    <Input
-                      id="terminal_id"
-                      value={formData.configuration.soft_pos?.terminal_id || ''}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        configuration: { 
-                          ...formData.configuration, 
-                          soft_pos: { 
-                            ...formData.configuration.soft_pos!,
-                            terminal_id: e.target.value 
-                          }
-                        }
-                      })}
-                      placeholder="Enter Terminal ID"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="secret_key">Secret Key</Label>
-                    <Input
-                      id="secret_key"
+                      id="auth_key"
                       type="password"
-                      value={formData.configuration.soft_pos?.secret_key || ''}
+                      value={formData.configuration.soft_pos?.auth_key || ''}
                       onChange={(e) => setFormData({ 
                         ...formData, 
                         configuration: { 
                           ...formData.configuration, 
                           soft_pos: { 
                             ...formData.configuration.soft_pos!,
-                            secret_key: e.target.value 
+                            auth_key: e.target.value 
                           }
                         }
                       })}
-                      placeholder="Enter Secret Key"
+                      placeholder="Enter Thawani Auth Key"
+                      className={validationError ? 'border-destructive' : ''}
                     />
                     {validationError && (
                       <p className="text-xs text-destructive mt-1">{validationError}</p>
@@ -886,37 +845,33 @@ const KiosksManagement = () => {
                   <div>
                     <Label>Environment</Label>
                     <RadioGroup
-                      value={formData.configuration.soft_pos?.environment || 'UAT'}
-                      onValueChange={(value: AmwalEnvironment) => setFormData({ 
+                      value={formData.configuration.soft_pos?.is_production ? 'production' : 'staging'}
+                      onValueChange={(value: string) => setFormData({ 
                         ...formData, 
                         configuration: { 
                           ...formData.configuration, 
                           soft_pos: { 
                             ...formData.configuration.soft_pos!,
-                            environment: value 
+                            is_production: value === 'production' 
                           }
                         }
                       })}
                       className="flex gap-4 mt-2"
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="SIT" id="env_sit" />
-                        <Label htmlFor="env_sit" className="cursor-pointer">SIT</Label>
+                        <RadioGroupItem value="staging" id="env_staging" />
+                        <Label htmlFor="env_staging" className="cursor-pointer">Staging</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="UAT" id="env_uat" />
-                        <Label htmlFor="env_uat" className="cursor-pointer">UAT</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="PROD" id="env_prod" />
-                        <Label htmlFor="env_prod" className="cursor-pointer">Production</Label>
+                        <RadioGroupItem value="production" id="env_production" />
+                        <Label htmlFor="env_production" className="cursor-pointer">Production</Label>
                       </div>
                     </RadioGroup>
                   </div>
 
                   <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                      <strong>Samsung A33 & SUNMI Flex 3 Ready:</strong> NFC payments via Amwal Pay. In Test mode, payments are simulated.
+                      <strong>Samsung A33 & SUNMI Flex 3 Ready:</strong> NFC payments via Thawani Lamsa. In Test mode, payments are simulated.
                     </p>
                   </div>
                 </div>

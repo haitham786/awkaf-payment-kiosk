@@ -1,7 +1,7 @@
 /**
  * Soft POS "Tap Card" Full-Screen UI
  * 
- * This component displays a branded NFC tap card screen for Soft POS payments.
+ * This component displays a branded NFC tap card screen for Thawani Lamsa Soft POS payments.
  * Redesigned to show category/amount info with instant loading.
  */
 
@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Cache for preloaded images
 const imageCache = new Map<string, boolean>();
 
-interface AmwalTapCardScreenProps {
+interface ThawaniTapCardScreenProps {
   amount: number;
   category?: string;
   stage: "waiting" | "processing" | "success" | "declined";
@@ -22,7 +22,7 @@ interface AmwalTapCardScreenProps {
   onTimeout?: () => void;
 }
 
-export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
+export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
   amount,
   category,
   stage,
@@ -38,7 +38,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
     return localStorage.getItem('kiosk_logo_url') || "";
   });
   const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(() => {
-    // Try to get from sessionStorage for instant display
     const cached = sessionStorage.getItem(`category_${category}`);
     if (cached) {
       return JSON.parse(cached);
@@ -46,7 +45,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
     return null;
   });
   const [isReady, setIsReady] = useState(() => {
-    // If we have cached data, we're ready immediately
     return !!sessionStorage.getItem(`category_${category}`);
   });
   const [countdown, setCountdown] = useState(15);
@@ -84,7 +82,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         return;
       }
       
-      // Check if already in cache
       const cached = sessionStorage.getItem(`category_${category}`);
       if (cached) {
         setCategoryData(JSON.parse(cached));
@@ -99,7 +96,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         .maybeSingle();
       
       if (data) {
-        // Cache the data
         sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
         
         if (data.icon_url && !imageCache.has(data.icon_url)) {
@@ -180,7 +176,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center px-6">
         {/* Category Info - Fixed height container for stability */}
         <div className="mb-4 text-center min-h-[80px] flex flex-col items-center justify-center">
-          {/* Always reserve space for icon */}
           <div className="w-14 h-14 mb-2 flex items-center justify-center">
             {categoryData?.icon_url && isReady && (
               <img 
@@ -195,7 +190,7 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
           </p>
         </div>
 
-        {/* Amount Display - Black text */}
+        {/* Amount Display */}
         <div className="mb-6 text-center">
           <div className="flex items-baseline justify-center gap-1">
             <span className="text-gray-900 text-4xl font-bold tracking-tight">
@@ -207,7 +202,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
 
         {/* NFC Animation Area */}
         <div className="relative w-48 h-48 mb-6">
-          {/* Animated Ripple Effects for waiting stage */}
           {stage === "waiting" && (
             <>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -231,7 +225,6 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
             </>
           )}
 
-          {/* Processing Spinner */}
           {stage === "processing" && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-40 h-40 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
@@ -267,7 +260,7 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
           </div>
         </div>
 
-        {/* Instructions - Black text, Arabic only */}
+        {/* Instructions - Arabic only */}
         <div className="text-center space-y-2 mb-6">
           {stage === "waiting" && (
             <h2 className="text-gray-900 text-xl font-bold">
@@ -304,12 +297,11 @@ export const AmwalTapCardScreen: React.FC<AmwalTapCardScreenProps> = ({
         </div>
       </div>
 
-      {/* Trial Mode Skip Link (for testing) - at bottom */}
+      {/* Trial Mode Skip Link */}
       {isTrialMode && stage === "waiting" && (
         <div className="px-6 pb-4 text-center">
           <button
             onClick={() => {
-              // Trigger mock success
               if (onCancel) onCancel();
             }}
             className="text-gray-500 text-xs underline"
