@@ -1,12 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin') || '';
+  const isAllowed = origin.endsWith('.lovable.app') || origin === 'http://localhost:8080' || origin === 'http://localhost:5173';
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://awkaf-payment-kiosk.lovable.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  };
+}
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -53,7 +60,6 @@ serve(async (req) => {
     console.log('Action requested:', action);
 
     if (action === 'check') {
-      // Check if API key is configured (don't return the actual key)
       const apiKey = Deno.env.get('SOFT_POS_API_KEY');
       return new Response(
         JSON.stringify({ 
@@ -65,8 +71,6 @@ serve(async (req) => {
     }
 
     if (action === 'get_for_transaction') {
-      // This endpoint returns the API key for server-side transaction processing only
-      // In a production app, this would be called by another edge function, not the client
       const apiKey = Deno.env.get('SOFT_POS_API_KEY');
       
       if (!apiKey) {
@@ -76,8 +80,6 @@ serve(async (req) => {
         );
       }
 
-      // Note: In production, you would NOT return this to the client
-      // Instead, this function would be called internally by other edge functions
       return new Response(
         JSON.stringify({ 
           success: true,
