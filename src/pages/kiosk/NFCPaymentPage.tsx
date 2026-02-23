@@ -19,7 +19,7 @@ import {
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { Wifi, WifiOff, CreditCard, AlertTriangle, Loader2 } from "lucide-react";
-import { AmwalTapCardScreen } from "@/components/kiosk/AmwalTapCardScreen";
+import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -154,9 +154,9 @@ const NFCPaymentPage = () => {
       category,
       paymentResult: result,
       paymentType: 'soft_pos',
-      provider: 'amwal',
+      provider: 'thawani',
       mode: status.mode === 'test' ? 'test' : 'live',
-      amwalReference: result.amwalReference,
+      thawaniReference: result.thawaniReference,
       createdAt: new Date().toISOString(),
     };
 
@@ -171,8 +171,8 @@ const NFCPaymentPage = () => {
             mobileNumber: null,
             softPosResult: result,
             paymentType: 'soft_pos',
-            provider: 'amwal',
-            amwalReference: result.amwalReference,
+            provider: 'thawani',
+            thawaniReference: result.thawaniReference,
           },
         });
 
@@ -267,7 +267,7 @@ const NFCPaymentPage = () => {
 
   if (useFullScreenUI) {
     return (
-      <AmwalTapCardScreen
+      <ThawaniTapCardScreen
         amount={amount}
         category={category}
         stage={stage as 'waiting' | 'processing'}

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { testConnection, ConnectionStatus, getConnectionStatus, onConnectionStatusChange, initializePOS } from "@/services/hardPosService";
-import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode, AmwalEnvironment } from "@/services/softPosService";
+import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -42,10 +42,8 @@ const KioskSetupPanel = () => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   const [softPosConfig, setSoftPosConfig] = useState({
-    merchantId: "",
-    terminalId: "",
-    secretKey: "",
-    environment: "UAT" as AmwalEnvironment,
+    authKey: "",
+    isProduction: false,
     mode: "test" as SoftPosMode,
   });
   
@@ -105,14 +103,12 @@ const KioskSetupPanel = () => {
       });
     }
 
-    // Set Soft POS config if available (Amwal Pay)
+    // Set Soft POS config if available (Thawani Lamsa)
     if (config.soft_pos && typeof config.soft_pos === 'object') {
-      const sp = config.soft_pos as { merchant_id?: string; terminal_id?: string; secret_key?: string; environment?: string; mode?: string };
+      const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
       setSoftPosConfig({
-        merchantId: sp.merchant_id || '',
-        terminalId: sp.terminal_id || '',
-        secretKey: sp.secret_key || '',
-        environment: (sp.environment as AmwalEnvironment) || 'UAT',
+        authKey: sp.auth_key || '',
+        isProduction: sp.is_production ?? false,
         mode: (sp.mode as SoftPosMode) || 'test',
       });
     }
@@ -214,12 +210,10 @@ const KioskSetupPanel = () => {
     });
     
     try {
-      // Initialize Soft POS service with Amwal Pay config
+      // Initialize Soft POS service with Thawani Lamsa config
       await initializeSoftPOS({
-        merchantId: softPosConfig.merchantId || 'TEST_MERCHANT',
-        terminalId: softPosConfig.terminalId || 'TEST_TERMINAL',
-        secretKey: softPosConfig.secretKey || '',
-        environment: softPosConfig.environment,
+        authKey: softPosConfig.authKey || 'TEST_AUTH_KEY',
+        isProduction: softPosConfig.isProduction,
         mode: softPosConfig.mode,
       });
       
@@ -238,7 +232,7 @@ const KioskSetupPanel = () => {
       if (nfcStatus.isAvailable && nfcStatus.isEnabled) {
         toast({
           title: "NFC Ready",
-          description: `Amwal Pay Soft POS is ready for contactless payments. Mode: ${status.mode === 'test' ? 'Test/Simulation' : 'Live'}`,
+          description: `Thawani Lamsa Soft POS is ready for contactless payments. Mode: ${status.mode === 'test' ? 'Test/Simulation' : 'Live'}`,
         });
       } else if (!nfcStatus.isAvailable) {
         toast({
@@ -709,8 +703,8 @@ const KioskSetupPanel = () => {
           {/* Soft POS Tab */}
           <TabsContent value="soft-pos" className="space-y-3">
             <Card className="p-4 bg-white border-gray-200">
-              <h2 className="text-lg font-bold mb-3 text-gray-900">Soft POS Configuration (Thawani)</h2>
-              <p className="text-xs text-gray-600 mb-3">NFC contactless payment settings. Managed from admin panel under "Manage KIOSK".</p>
+              <h2 className="text-lg font-bold mb-3 text-gray-900">Soft POS Configuration (Thawani Lamsa)</h2>
+              <p className="text-xs text-gray-600 mb-3">NFC contactless payment settings powered by Thawani Lamsa SDK. Managed from admin panel under "Manage KIOSK".</p>
               
               <div className="space-y-3">
                 {/* Current Payment Mode */}
@@ -728,7 +722,7 @@ const KioskSetupPanel = () => {
                     kioskPaymentMode === 'soft_pos' ? 'text-emerald-700' : 'text-gray-600'
                   }`}>
                     {kioskPaymentMode === 'soft_pos' 
-                      ? 'Soft POS Active - Thawani NFC Payments' 
+                      ? 'Soft POS Active - Thawani Lamsa NFC Payments' 
                       : 'Hardware POS Active - Soft POS Disabled'}
                   </span>
                 </div>
@@ -757,26 +751,26 @@ const KioskSetupPanel = () => {
                           <p className="text-[10px] text-blue-700 mt-1">
                             {softPosConfig.mode === 'test' 
                               ? 'Payments are simulated for testing. Card taps will generate test transactions.'
-                              : 'Amwal Pay SDK active. Real card transactions.'}
+                              : 'Thawani Lamsa SDK active. Real card transactions.'}
                           </p>
                         </div>
                       </div>
                     </div>
                     
-                    {/* Environment & Credentials */}
+                    {/* Credentials */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-gray-900 text-sm">Environment</Label>
                         <Input
-                          value={softPosConfig.environment === 'PROD' ? 'Production' : softPosConfig.environment}
+                          value={softPosConfig.isProduction ? 'Production' : 'Staging'}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />
                       </div>
                       <div>
-                        <Label className="text-gray-900 text-sm">Merchant ID</Label>
+                        <Label className="text-gray-900 text-sm">Auth Key</Label>
                         <Input
-                          value={softPosConfig.merchantId ? '••••••••' : 'Not configured'}
+                          value={softPosConfig.authKey ? '••••••••' : 'Not configured'}
                           className="bg-gray-50 text-gray-700 border-gray-300 h-9"
                           readOnly
                         />
