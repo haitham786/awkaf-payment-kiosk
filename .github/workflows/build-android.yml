@@ -358,5 +358,5 @@ jobs:
           TAG="v${GITHUB_RUN_NUMBER}"
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
-            --title "Release $TAG (Trial Mode)" \
-            --notes "## Awkaf Payment Kiosk APK\n\nUSB POS Support + Mock SoftPOS (Trial)\n\n### Features:\n- Hardware POS via USB\n- Soft POS in mock/trial mode\n\n### Installation:\n1. Download awkaf-kiosk-usb.apk\n2. Install on Samsung A33\n3. Connect OM-A880 POS via USB OTG\n"
+            --title "Release $TAG" \
+            --notes "## Awkaf Payment Kiosk APK\n\nUSB POS + Thawani Lamsa Soft POS\n\n### Features:\n- Hardware POS via USB (OM-A880)\n- Soft POS via Thawani Lamsa SDK (NFC tap-to-pay)\n- Test/Staging/Production environments\n\n### Installation:\n1. Download awkaf-kiosk-usb.apk\n2. Install on NFC-capable Android device\n3. Configure payment mode in Admin panel\n"
