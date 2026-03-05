@@ -106,11 +106,10 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure Maven repositories (JitPack only - Thawani SDK disabled)
+      - name: Ensure Maven repositories (JitPack + Thawani SDK)
         shell: bash
         run: |
           set -euxo pipefail
-          # Thawani SDK is disabled for trial phase - using mock implementation
           python - << 'PY'
           from pathlib import Path
           import re
@@ -128,18 +127,66 @@ jobs:
               if patched != original:
                   path.write_text(patched, encoding="utf-8")
                   print(f"Patched {path}")
-          groovy_snippets = [{"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'}]
-          patch_file(Path("android/settings.gradle"), groovy_snippets)
-          patch_file(Path("android/build.gradle"), groovy_snippets)
-          patch_file(Path("android/app/build.gradle"), groovy_snippets)
-          kts_snippets = [{"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'}]
-          patch_file(Path("android/settings.gradle.kts"), kts_snippets)
-          patch_file(Path("android/build.gradle.kts"), kts_snippets)
-          patch_file(Path("android/app/build.gradle.kts"), kts_snippets)
-          print("Maven repositories configured (Thawani SDK disabled for trial)")
+          # Groovy-style repos
+          groovy_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
+              {"check": "ThawaniMobile/Lamsa-SDK", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = "ThawaniMobile"\n                password = "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"\n            }\n        }'},
+          ]
+          for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
+              patch_file(Path(f), groovy_snippets)
+          # Kotlin DSL repos
+          kts_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
+              {"check": "ThawaniMobile/Lamsa-SDK", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = "ThawaniMobile"\n                password = "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"\n            }\n        }'},
+          ]
+          for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
+              patch_file(Path(f), kts_snippets)
+          print("Maven repositories configured (JitPack + Thawani)")
           PY
 
-      - name: Copy Thawani stub plugin
+      - name: Add Thawani SDK dependency and dataBinding
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - << 'PY'
+          from pathlib import Path
+          import re
+
+          # Try both .gradle and .gradle.kts
+          for ext, dep_line, databinding_line in [
+              (".gradle",
+               '    implementation "om.thawani:lamsa.sdk:0.0.22"',
+               "        dataBinding true"),
+              (".gradle.kts",
+               '    implementation("om.thawani:lamsa.sdk:0.0.22")',
+               "        dataBinding = true"),
+          ]:
+              p = Path(f"android/app/build{ext}")
+              if not p.exists():
+                  continue
+              text = p.read_text(encoding="utf-8")
+              changed = False
+
+              # Add SDK dependency
+              if "lamsa.sdk" not in text:
+                  text = re.sub(r"(dependencies\s*\{)", r"\1\n" + dep_line, text, count=1)
+                  changed = True
+
+              # Add dataBinding
+              if "dataBinding" not in text:
+                  if "buildFeatures" in text:
+                      text = re.sub(r"(buildFeatures\s*\{)", r"\1\n" + databinding_line, text, count=1)
+                  else:
+                      bf_block = f"\n    buildFeatures {{\n{databinding_line}\n    }}\n"
+                      text = re.sub(r"(android\s*\{)", r"\1" + bf_block, text, count=1)
+                  changed = True
+
+              if changed:
+                  p.write_text(text, encoding="utf-8")
+                  print(f"Patched {p} with SDK dependency + dataBinding")
+          PY
+
+      - name: Copy Thawani plugin
         shell: bash
         run: |
           set -euxo pipefail
@@ -147,8 +194,31 @@ jobs:
           mkdir -p "$PLUGIN_DIR"
           if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
             cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
-            echo "Copied ThawaniLamsaPlugin.java (stub for trial)"
+            echo "Copied ThawaniLamsaPlugin.java"
           fi
+
+      - name: Register LamsaSDK Activity in manifest
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - << 'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          xml = p.read_text(encoding="utf-8")
+          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+              activity_tag = '''
+            <activity
+                android:name="om.thawani.lamsa.sdk.LamsaSDK"
+                android:parentActivityName=".MainActivity"
+                android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            </activity>
+          '''
+              xml = xml.replace("</application>", activity_tag + "    </application>")
+              p.write_text(xml, encoding="utf-8")
+              print("Added LamsaSDK Activity to AndroidManifest.xml")
+          else:
+              print("LamsaSDK Activity already present")
+          PY
 
       - name: Create USB device filter XML
         run: |
