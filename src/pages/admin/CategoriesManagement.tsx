@@ -218,6 +218,7 @@ const CategoriesManagement = () => {
     setFormData({
       category_id: category.category_id,
       title: category.title,
+      title_en: category.title_en || '',
       description: category.description,
       is_visible: category.is_visible,
       icon_url: category.icon_url || '',
