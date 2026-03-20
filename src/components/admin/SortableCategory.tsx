@@ -58,8 +58,13 @@ export const SortableCategory = ({
 
         {/* Category details */}
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-lg font-bold">{category.title}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <div>
+              <h3 className="text-lg font-bold">{category.title}</h3>
+              {category.title_en && (
+                <p className="text-sm text-muted-foreground">{category.title_en}</p>
+              )}
+            </div>
             {category.is_visible ? (
               <Eye className="w-4 h-4 text-success" />
             ) : (

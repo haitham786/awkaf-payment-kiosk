@@ -421,6 +421,16 @@ const CategoriesManagement = () => {
               </div>
 
               <div>
+                <Label htmlFor="title_en">Title (English)</Label>
+                <Input
+                  id="title_en"
+                  value={formData.title_en}
+                  onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
+                  placeholder="Category title in English"
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="description">Description (Arabic)</Label>
                 <Textarea
                   id="description"
