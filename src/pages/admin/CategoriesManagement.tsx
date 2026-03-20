@@ -39,6 +39,7 @@ const CategoriesManagement = () => {
   const [formData, setFormData] = useState({
     category_id: '',
     title: '',
+    title_en: '',
     description: '',
     is_visible: true,
     icon_url: '',
@@ -217,6 +218,7 @@ const CategoriesManagement = () => {
     setFormData({
       category_id: category.category_id,
       title: category.title,
+      title_en: category.title_en || '',
       description: category.description,
       is_visible: category.is_visible,
       icon_url: category.icon_url || '',
@@ -321,6 +323,7 @@ const CategoriesManagement = () => {
     setFormData({
       category_id: '',
       title: '',
+      title_en: '',
       description: '',
       is_visible: true,
       icon_url: '',
@@ -414,6 +417,16 @@ const CategoriesManagement = () => {
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   required
                   placeholder="عنوان الفئة"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="title_en">Title (English)</Label>
+                <Input
+                  id="title_en"
+                  value={formData.title_en}
+                  onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
+                  placeholder="Category title in English"
                 />
               </div>
 

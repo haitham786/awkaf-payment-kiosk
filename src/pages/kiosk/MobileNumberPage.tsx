@@ -24,205 +24,115 @@ const MobileNumberPage = () => {
   const [inactivityTimer, setInactivityTimer] = useState(15);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus input on mount
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
+  useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, []);
 
-  // 15-second inactivity timeout
   useEffect(() => {
     const timer = setInterval(() => {
       setInactivityTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          navigate('/kiosk');
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(timer); navigate('/kiosk'); return 0; }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [navigate]);
 
-  // Reset timer on any interaction
-  const resetTimer = () => {
-    setInactivityTimer(15);
-  };
+  const resetTimer = () => setInactivityTimer(15);
 
-  const keypadNumbers = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['⌫', '0', '']
-  ];
+  const keypadNumbers = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['⌫', '0', '']];
 
   const handleKeypadPress = (value: string) => {
     resetTimer();
-    if (value === '⌫') {
-      setMobileNumber(prev => prev.slice(0, -1));
-    } else if (value && mobileNumber.length < 8) {
-      setMobileNumber(prev => prev + value);
-    }
+    if (value === '⌫') setMobileNumber(prev => prev.slice(0, -1));
+    else if (value && mobileNumber.length < 8) setMobileNumber(prev => prev + value);
   };
 
   const showResultPopup = (type: 'success' | 'error', message: string) => {
     setPopupType(type);
     setPopupMessage(message);
     setShowPopup(true);
-
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-      setShowPopup(false);
-      navigate('/kiosk');
-    }, 5000);
+    setTimeout(() => { setShowPopup(false); navigate('/kiosk'); }, 5000);
   };
 
   const handleSendSMS = async () => {
     if (mobileNumber.length !== 8) {
-      toast({
-        title: "رقم غير صحيح",
-        description: "يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام",
-        variant: "destructive",
-      });
+      toast({ title: "رقم غير صحيح", description: "يرجى إدخال رقم هاتف صحيح مكون من 8 أرقام", variant: "destructive" });
       return;
     }
-
     setSending(true);
-
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: {
-          mobile_number: `968${mobileNumber}`,
-          category,
-          reference_number: referenceNumber || transactionId,
-          amount_baisas: amount,
-        },
+        body: { mobile_number: `968${mobileNumber}`, category, reference_number: referenceNumber || transactionId, amount_baisas: amount },
       });
-
-      if (error) {
-        console.error('SMS Error:', error);
-        showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.');
-        return;
-      }
-
-      if (data?.success) {
-        showResultPopup('success', `تم إرسال الإيصال بنجاح إلى الرقم ${mobileNumber}`);
-      } else {
-        showResultPopup('error', data?.error || 'حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً.');
-      }
+      if (error) { showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.'); return; }
+      if (data?.success) showResultPopup('success', `تم إرسال الإيصال بنجاح إلى الرقم ${mobileNumber}`);
+      else showResultPopup('error', data?.error || 'حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً.');
     } catch (error: any) {
-      console.error('SMS Error:', error);
       showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.');
-    } finally {
-      setSending(false);
-    }
+    } finally { setSending(false); }
   };
 
-  const handleReturnHome = () => {
-    navigate('/kiosk');
-  };
+  const handleReturnHome = () => navigate('/kiosk');
 
   return (
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-md mx-auto" onClick={resetTimer}>
-        {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-xl font-bold text-gray-900">
-            إدخال رقم الهاتف
-          </h1>
+          <h1 className="text-xl font-bold text-gray-900">إدخال رقم الهاتف</h1>
+          <p className="text-sm text-gray-600">Enter Phone Number</p>
         </div>
 
-        {/* Mobile Number Input Section */}
         <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
           <div className="space-y-3">
-            {/* Mobile Number Display with +968 prefix inside field */}
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700">
-                +968
-              </div>
-              <Input
-                ref={inputRef}
-                value={mobileNumber}
-                readOnly
-                placeholder="أدخل رقم الهاتف"
-                className="text-2xl text-center h-14 bg-white/80 backdrop-blur-sm border-0 text-gray-900 pl-16"
-                maxLength={8}
-              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700">+968</div>
+              <Input ref={inputRef} value={mobileNumber} readOnly placeholder="أدخل رقم الهاتف" className="text-2xl text-center h-14 bg-white/80 backdrop-blur-sm border-0 text-gray-900 pl-16" maxLength={8} />
             </div>
 
-            {/* Keypad */}
             <div className="grid grid-cols-3 gap-2">
-              {keypadNumbers.map((row, rowIndex) => 
+              {keypadNumbers.map((row, rowIndex) =>
                 row.map((number, colIndex) => (
-                  <KioskButton
-                    key={`${rowIndex}-${colIndex}`}
-                    variant="keypad"
-                    soundEffect="keypad"
-                    onClick={() => handleKeypadPress(number)}
-                    disabled={!number}
-                    className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold"
-                  >
+                  <KioskButton key={`${rowIndex}-${colIndex}`} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(number)} disabled={!number} className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
                     {number}
                   </KioskButton>
                 ))
               )}
             </div>
 
-            {/* Send Button */}
             <KioskButton
               variant="confirm"
               size="xl"
               soundEffect="navigation"
               onClick={handleSendSMS}
               disabled={mobileNumber.length !== 8 || sending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0 flex flex-col items-center"
             >
-              {sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}
+              <span>{sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}</span>
+              <span className="text-xs opacity-80">{sending ? 'Sending...' : 'Send Receipt'}</span>
             </KioskButton>
           </div>
         </Card>
 
-        {/* Home Button - Centered, matching style */}
         <div className="flex justify-center mt-6">
-          <KioskButton
-            variant="ghost"
-            size="lg"
-            soundEffect="navigation"
-            onClick={handleReturnHome}
-            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
-          >
+          <KioskButton variant="ghost" size="lg" soundEffect="navigation" onClick={handleReturnHome} className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3">
             <Home className="w-8 h-8 text-white drop-shadow-lg" />
           </KioskButton>
         </div>
 
-        {/* Result Popup - Success or Error */}
         {showPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
             <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 mx-4 max-w-xs text-center relative shadow-xl">
-              <button
-                onClick={() => {
-                  setShowPopup(false);
-                  navigate('/kiosk');
-                }}
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={() => { setShowPopup(false); navigate('/kiosk'); }} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
                 <X className="w-6 h-6" />
               </button>
               <div className="space-y-3">
-                {popupType === 'success' ? (
-                  <CheckCircle className="w-16 h-16 mx-auto text-emerald-600" />
-                ) : (
-                  <AlertCircle className="w-16 h-16 mx-auto text-red-600" />
-                )}
+                {popupType === 'success' ? <CheckCircle className="w-16 h-16 mx-auto text-emerald-600" /> : <AlertCircle className="w-16 h-16 mx-auto text-red-600" />}
                 <h3 className="text-lg font-bold text-gray-900">
                   {popupType === 'success' ? 'تم بنجاح' : 'خطأ'}
                 </h3>
-                <p className="text-sm text-gray-600">
-                  {popupMessage}
+                <p className="text-xs text-gray-400">
+                  {popupType === 'success' ? 'Success' : 'Error'}
                 </p>
+                <p className="text-sm text-gray-600">{popupMessage}</p>
               </div>
             </div>
           </div>

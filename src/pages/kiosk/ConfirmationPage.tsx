@@ -5,8 +5,8 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
-// Cache for preloaded images
 const imageCache = new Map<string, boolean>();
 
 const ConfirmationPage = () => {
@@ -14,94 +14,48 @@ const ConfirmationPage = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const [categoryData, setCategoryData] = useState<{title: string; icon_url: string | null} | null>(() => {
-    // Try to get from sessionStorage for instant display
+  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => {
     const cached = sessionStorage.getItem(`category_${category}`);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-    return null;
+    return cached ? JSON.parse(cached) : null;
   });
-  const [isReady, setIsReady] = useState(() => {
-    // If we have cached data, we're ready immediately
-    return !!sessionStorage.getItem(`category_${category}`);
-  });
+  const [isReady, setIsReady] = useState(() => !!sessionStorage.getItem(`category_${category}`));
 
   useEffect(() => {
     const loadCategory = async () => {
-      // Check if already in cache
       const cached = sessionStorage.getItem(`category_${category}`);
-      if (cached) {
-        setCategoryData(JSON.parse(cached));
-        setIsReady(true);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('donation_categories')
-        .select('title, icon_url')
-        .eq('category_id', category)
-        .maybeSingle();
-      
+      if (cached) { setCategoryData(JSON.parse(cached)); setIsReady(true); return; }
+      const { data } = await supabase.from('donation_categories').select('title, title_en, icon_url').eq('category_id', category).maybeSingle();
       if (data) {
-        // Cache the data
         sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
-        
-        // Preload the image before setting data to prevent flash
         if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
-          img.onload = () => {
-            imageCache.set(data.icon_url!, true);
-            setCategoryData(data);
-            setIsReady(true);
-          };
-          img.onerror = () => {
-            imageCache.set(data.icon_url!, false);
-            setCategoryData(data);
-            setIsReady(true);
-          };
+          img.onload = () => { imageCache.set(data.icon_url!, true); setCategoryData(data); setIsReady(true); };
+          img.onerror = () => { imageCache.set(data.icon_url!, false); setCategoryData(data); setIsReady(true); };
           img.src = data.icon_url;
-        } else {
-          setCategoryData(data);
-          setIsReady(true);
-        }
-      } else {
-        setIsReady(true);
-      }
+        } else { setCategoryData(data); setIsReady(true); }
+      } else { setIsReady(true); }
     };
-    
     loadCategory();
   }, [category]);
 
-  const formatAmount = (totalBaisas: number) => {
+  const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
     const baisas = totalBaisas % 1000;
-    return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
+    return `${rials}.${baisas.toString().padStart(3, '0')}`;
   };
 
   const handleConfirm = async () => {
-    // Check if kiosk is configured for Soft POS
     const kioskId = localStorage.getItem('kiosk_id');
     if (kioskId) {
       try {
-        const { data: kioskData } = await supabase
-          .from('kiosks')
-          .select('configuration')
-          .eq('id', kioskId)
-          .maybeSingle();
-        
+        const { data: kioskData } = await supabase.from('kiosks').select('configuration').eq('id', kioskId).maybeSingle();
         const config = kioskData?.configuration as any;
         if (config?.payment_mode === 'soft_pos') {
-          // Go directly to NFC payment page for Soft POS
           navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
           return;
         }
-      } catch (error) {
-        console.error('Error checking kiosk config:', error);
-      }
+      } catch (error) { console.error('Error checking kiosk config:', error); }
     }
-    
-    // Default to payment request page for Hardware POS
     navigate(`/kiosk/payment-request?category=${category}&amount=${amount}`);
   };
 
@@ -112,43 +66,43 @@ const ConfirmationPage = () => {
   return (
     <KioskLayout>
       <div className="w-full max-w-3xl mx-auto">
-        {/* Header - Black title as requested */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 drop-shadow-lg">
-            تأكيد المبلغ
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 drop-shadow-lg">تأكيد المبلغ</h1>
+          <p className="text-base text-gray-600">Confirm Amount</p>
         </div>
 
-        {/* Confirmation Card */}
         <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
-            {/* Icon - Fixed height container for stability */}
             <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
               {categoryData?.icon_url && isReady && (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
               )}
             </div>
 
-            {/* Donation Details */}
             <div className="space-y-3">
               <div className="bg-gray-50/60 rounded-lg p-4 border-0">
-                <p className="text-sm text-gray-600 mb-1">نوع التبرع</p>
+                <p className="text-sm text-gray-600 mb-0.5">نوع التبرع</p>
+                <p className="text-xs text-gray-400 mb-1">Donation Type</p>
                 <p className="text-2xl font-bold text-emerald-700">
                   {categoryData?.title || 'تبرع'}
                 </p>
+                {categoryData?.title_en && (
+                  <p className="text-base text-gray-600">{categoryData.title_en}</p>
+                )}
               </div>
 
               <div className="bg-emerald-50/60 rounded-lg p-4 border-0">
-                <p className="text-sm text-gray-600 mb-1">مبلغ التبرع</p>
-                <p className="text-3xl font-bold text-emerald-700">
-                  {formatAmount(amount)}
+                <p className="text-sm text-gray-600 mb-0.5">مبلغ التبرع</p>
+                <p className="text-xs text-gray-400 mb-1">Donation Amount</p>
+                <p className="text-3xl font-bold text-emerald-700 flex items-center justify-center gap-2">
+                  <CurrencyLogo className="h-6" />
+                  {formatAmountNum(amount)}
                 </p>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Action Buttons */}
         <div className="flex justify-center space-x-4 mt-4 pb-20">
           <KioskButton
             variant="outline"
@@ -158,7 +112,10 @@ const ConfirmationPage = () => {
             className="min-w-[160px] ml-4 bg-white/60 backdrop-blur-sm border-0 hover:bg-gray-100/60 text-gray-900"
           >
             <ArrowRight className="w-5 h-5 ml-2" />
-            تعديل المبلغ
+            <span className="flex flex-col items-start">
+              <span>تعديل المبلغ</span>
+              <span className="text-xs text-gray-500">Edit Amount</span>
+            </span>
           </KioskButton>
           
           <KioskButton
@@ -168,7 +125,10 @@ const ConfirmationPage = () => {
             onClick={handleConfirm}
             className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white border-0"
           >
-            تأكيد والدفع
+            <span className="flex flex-col items-end">
+              <span>تأكيد والدفع</span>
+              <span className="text-xs text-white/80">Confirm & Pay</span>
+            </span>
             <ArrowLeft className="w-5 h-5 mr-2" />
           </KioskButton>
         </div>
