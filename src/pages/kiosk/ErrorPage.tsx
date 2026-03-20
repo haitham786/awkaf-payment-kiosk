@@ -5,151 +5,92 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
 const ErrorPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const [categoryData, setCategoryData] = useState<{ title: string; icon_url: string | null } | null>(null);
-  
-  // Get error type from URL params or default to payment
+  const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null } | null>(null);
   const errorType = searchParams.get('error') || 'payment';
 
-  // Auto-navigate to home after 10 seconds of inactivity
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigate('/kiosk');
-    }, 10000);
-
+    const timer = setTimeout(() => navigate('/kiosk'), 10000);
     return () => clearTimeout(timer);
   }, [navigate]);
 
   useEffect(() => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
-      
       try {
-        const { data, error } = await supabase
-          .from("donation_categories")
-          .select("title, icon_url")
-          .eq("id", categoryId)
-          .single();
-
+        const { data, error } = await supabase.from("donation_categories").select("title, title_en, icon_url").eq("id", categoryId).single();
         if (error) throw error;
-        
-        if (data) {
-          setCategoryData(data);
-        }
-      } catch (error) {
-        console.error("Error loading category data:", error);
-      }
+        if (data) setCategoryData(data);
+      } catch (error) { console.error("Error loading category data:", error); }
     };
-
     loadCategoryData();
   }, [categoryId]);
 
-  const getErrorMessage = () => {
-    switch (errorType) {
-      case 'network':
-        return {
-          title: "خطأ في الاتصال",
-          description: "تعذر الاتصال بالشبكة، يرجى المحاولة مرة أخرى",
-          icon: "🌐"
-        };
-      case 'card':
-        return {
-          title: "خطأ في البطاقة",
-          description: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى",
-          icon: "💳"
-        };
-      case 'insufficient':
-        return {
-          title: "رصيد غير كافٍ",
-          description: "الرصيد في البطاقة غير كافٍ لإتمام العملية",
-          icon: "💰"
-        };
-      case 'declined':
-        return {
-          title: "تم رفض العملية",
-          description: "تم رفض العملية من البنك، يرجى التواصل مع البنك",
-          icon: "❌"
-        };
-      default:
-        return {
-          title: "خطأ في الدفع",
-          description: "حدث خطأ أثناء معالجة الدفع، يرجى المحاولة مرة أخرى",
-          icon: "⚠️"
-        };
-    }
+  const errorMessages: Record<string, { ar: string; en: string; descAr: string; descEn: string; icon: string }> = {
+    network: { ar: "خطأ في الاتصال", en: "Connection Error", descAr: "تعذر الاتصال بالشبكة، يرجى المحاولة مرة أخرى", descEn: "Network connection failed, please try again", icon: "🌐" },
+    card: { ar: "خطأ في البطاقة", en: "Card Error", descAr: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى", descEn: "Failed to read card, please check your card and try again", icon: "💳" },
+    insufficient: { ar: "رصيد غير كافٍ", en: "Insufficient Balance", descAr: "الرصيد في البطاقة غير كافٍ لإتمام العملية", descEn: "Insufficient card balance to complete the transaction", icon: "💰" },
+    declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "تم رفض العملية من البنك، يرجى التواصل مع البنك", descEn: "Transaction declined by bank, please contact your bank", icon: "❌" },
+    payment: { ar: "خطأ في الدفع", en: "Payment Error", descAr: "حدث خطأ أثناء معالجة الدفع، يرجى المحاولة مرة أخرى", descEn: "An error occurred during payment processing, please try again", icon: "⚠️" },
   };
 
-  const formatAmount = (totalBaisas: number) => {
+  const errorInfo = errorMessages[errorType] || errorMessages.payment;
+
+  const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
     const baisas = totalBaisas % 1000;
-    return `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
+    return `${rials}.${baisas.toString().padStart(3, '0')}`;
   };
 
-  const handleTryAgain = () => {
-    navigate(`/kiosk/amount?category=${categoryId}`);
-  };
-
-  const errorInfo = getErrorMessage();
+  const handleTryAgain = () => navigate(`/kiosk/amount?category=${categoryId}`);
 
   return (
     <KioskLayout>
       <div className="w-full max-w-3xl mx-auto space-y-4">
-        {/* Category Header */}
         {categoryData && (
           <div className="text-center">
             <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 shadow-md border-0">
               {categoryData.icon_url && (
                 <div className="flex justify-center mb-2">
-                  <img 
-                    src={categoryData.icon_url} 
-                    alt={categoryData.title}
-                    className="w-12 h-12 object-contain"
-                  />
+                  <img src={categoryData.icon_url} alt={categoryData.title} className="w-12 h-12 object-contain" />
                 </div>
               )}
-              <h2 className="text-lg font-bold text-gray-900">
-                {categoryData.title}
-              </h2>
+              <h2 className="text-lg font-bold text-gray-900">{categoryData.title}</h2>
+              {categoryData.title_en && <p className="text-sm text-gray-600">{categoryData.title_en}</p>}
             </div>
           </div>
         )}
 
-        {/* Error Card */}
         <Card className="p-6 bg-white shadow-lg border-2 border-red-300 text-center">
           <div className="space-y-4">
-            {/* Error Icon */}
             <div className="w-16 h-16 mx-auto bg-red-50 rounded-full shadow-md flex items-center justify-center border-2 border-red-300">
               <span className="text-3xl">{errorInfo.icon}</span>
             </div>
-
-            {/* Error Message */}
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-red-600">
-                {errorInfo.title}
-              </h2>
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold text-red-600">{errorInfo.ar}</h2>
+              <p className="text-sm text-red-400">{errorInfo.en}</p>
             </div>
 
-            {/* Transaction Details */}
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 className="text-base font-semibold mb-3 text-gray-900">
-                تفاصيل العملية المتأثرة:
-              </h3>
+              <h3 className="text-base font-semibold mb-1 text-gray-900">تفاصيل العملية المتأثرة:</h3>
+              <p className="text-xs text-gray-400 mb-3">Affected Transaction Details:</p>
               <div className="text-center">
-                <p className="text-gray-600 mb-1 text-sm">المبلغ</p>
-                <p className="text-2xl font-bold text-emerald-700">
-                  {formatAmount(amount)}
+                <p className="text-gray-600 mb-0.5 text-sm">المبلغ <span className="text-xs text-gray-400">Amount</span></p>
+                <p className="text-2xl font-bold text-emerald-700 flex items-center justify-center gap-2">
+                  <CurrencyLogo className="h-5" />
+                  {formatAmountNum(amount)}
                 </p>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Action Button */}
         <div className="flex justify-center mt-4">
           <KioskButton
             variant="confirm"
@@ -158,7 +99,10 @@ const ErrorPage = () => {
             className="min-w-[240px] bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 flex items-center justify-center border border-white/40"
           >
             <RefreshCw className="w-5 h-5 ml-2" />
-            المحاولة مرة أخرى
+            <span className="flex flex-col items-start">
+              <span>المحاولة مرة أخرى</span>
+              <span className="text-xs text-gray-500">Try Again</span>
+            </span>
           </KioskButton>
         </div>
       </div>
