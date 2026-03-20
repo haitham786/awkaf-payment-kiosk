@@ -323,6 +323,7 @@ const CategoriesManagement = () => {
     setFormData({
       category_id: '',
       title: '',
+      title_en: '',
       description: '',
       is_visible: true,
       icon_url: '',
