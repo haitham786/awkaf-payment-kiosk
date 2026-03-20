@@ -1,0 +1,1 @@
+ALTER TABLE public.donation_categories ADD COLUMN title_en text;

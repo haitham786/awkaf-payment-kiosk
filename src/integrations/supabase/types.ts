@@ -26,6 +26,7 @@ export type Database = {
           info_text: string | null
           is_visible: boolean | null
           title: string
+          title_en: string | null
           updated_at: string | null
         }
         Insert: {
@@ -39,6 +40,7 @@ export type Database = {
           info_text?: string | null
           is_visible?: boolean | null
           title: string
+          title_en?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -52,6 +54,7 @@ export type Database = {
           info_text?: string | null
           is_visible?: boolean | null
           title?: string
+          title_en?: string | null
           updated_at?: string | null
         }
         Relationships: []
