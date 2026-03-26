@@ -166,10 +166,10 @@ const KioskHomepage = () => {
               {statusMessageEn[kioskMessage] || ''}
             </p>
             {kioskStatus === 'unregistered' && (
-              <Button size="lg" className="text-xl px-8 py-6 bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
-                <Settings className="w-6 h-6 ml-2" />
-                فتح لوحة الإعدادات
-                <span className="text-base ml-2 opacity-80">Open Settings</span>
+              <Button size="lg" className="text-lg px-6 py-4 max-w-xs w-full bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
+                <Settings className="w-5 h-5 ml-2 flex-shrink-0" />
+                <span className="truncate">فتح لوحة الإعدادات</span>
+                <span className="text-sm ml-1 opacity-80 truncate">Open Settings</span>
               </Button>
             )}
             {kioskStatus !== 'unregistered' && (

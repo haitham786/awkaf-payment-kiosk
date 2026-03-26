@@ -96,7 +96,14 @@ const AdminDashboard = () => {
 
   const checkAuth = async (): Promise<boolean> => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // First ensure we have a fresh session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        navigate("/auth", { replace: true });
+        return false;
+      }
       
       if (!session) {
         navigate("/auth", { replace: true });
@@ -110,7 +117,19 @@ const AdminDashboard = () => {
         .eq('user_id', session.user.id)
         .in('role', ['admin', 'super_admin']);
 
-      if (error || !roles || roles.length === 0) {
+      if (error) {
+        console.error('Role check error:', error);
+        // Don't sign out immediately on error - could be transient
+        toast({
+          title: "Access Error",
+          description: "Could not verify admin privileges. Please try again.",
+          variant: "destructive",
+        });
+        navigate("/auth", { replace: true });
+        return false;
+      }
+
+      if (!roles || roles.length === 0) {
         toast({
           title: "Access Denied",
           description: "You don't have admin privileges.",

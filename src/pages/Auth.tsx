@@ -21,23 +21,37 @@ const Auth = () => {
   useEffect(() => {
     let mounted = true;
 
+    // Listen for auth state changes FIRST, then check existing session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
+      if (event === 'SIGNED_IN' && session) {
+        // Don't do async work here to avoid deadlocks - just let the login handler deal with it
+        return;
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        setCheckingSession(false);
+      }
+    });
+
     const checkExistingSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session && mounted) {
           // Verify user has admin role before redirecting
-          const { data: roles } = await supabase
+          const { data: roles, error } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', session.user.id)
             .in('role', ['admin', 'super_admin']);
           
-          if (roles && roles.length > 0) {
+          if (!error && roles && roles.length > 0) {
             navigate("/admin", { replace: true });
-            return; // Don't set checkingSession to false, we're navigating away
+            return;
           } else {
-            // If no admin role, sign out
+            // If no admin role or error, sign out
             await supabase.auth.signOut();
           }
         }
@@ -54,6 +68,7 @@ const Auth = () => {
 
     return () => {
       mounted = false;
+      subscription.unsubscribe();
     };
   }, [navigate]);
 
