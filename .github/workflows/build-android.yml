@@ -315,16 +315,4 @@ jobs:
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
-            --notes "## Awkaf Payment Kiosk APK
-
-### Features:
-- Hardware POS via USB (OM-A880)
-- Soft POS (Test Mode - Thawani Lamsa SDK stub)
-- NFC detection on Samsung A33 / Sunmi Flex 3
-- Bilingual UI (Arabic + English)
-
-### Installation:
-1. Download awkaf-kiosk-usb.apk
-2. Install on Android device
-3. Configure payment mode in Admin panel
-"
+            --notes "Awkaf Payment Kiosk APK - Hardware POS (USB OM-A880) + Soft POS (Test Mode) + NFC + Bilingual UI"
