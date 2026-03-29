@@ -5,26 +5,26 @@ import { cn } from "@/lib/utils";
 import { soundManager } from "@/utils/soundEffects";
 
 const kioskButtonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-bold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 kiosk-button relative",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-2xl text-sm font-semibold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 kiosk-button relative overflow-hidden",
   {
     variants: {
       variant: {
-        default: "bg-gradient-primary text-primary-foreground shadow-elegant hover:shadow-neon border border-primary/50",
-        secondary: "bg-gradient-gold text-secondary-foreground shadow-card hover:shadow-elegant border border-secondary/50",
-        success: "bg-success text-success-foreground shadow-card hover:shadow-elegant border border-success/50",
-        destructive: "bg-destructive text-destructive-foreground shadow-card hover:shadow-elegant border border-destructive/50",
-        outline: "border-2 border-primary/60 bg-card/20 backdrop-blur-sm text-foreground hover:bg-primary/10 hover:border-primary hover:shadow-elegant",
-        ghost: "hover:bg-primary/20 hover:text-primary hover:shadow-card",
-        link: "text-primary underline-offset-4 hover:underline",
-        donation: "bg-gradient-card backdrop-blur-sm border-2 border-primary/40 text-foreground shadow-card hover:border-primary hover:shadow-elegant hover:scale-105 transform-3d min-h-[120px] p-6 text-lg font-bold",
-        keypad: "bg-card/40 backdrop-blur-md border-2 border-primary/40 text-foreground shadow-card hover:bg-primary/10 hover:border-primary hover:shadow-elegant hover:text-primary min-h-[80px] text-2xl font-bold",
-        confirm: "bg-gradient-neon text-primary-foreground shadow-neon hover:shadow-elegant min-h-[60px] text-xl font-bold animate-glow border-2 border-primary/70",
+        default: "liquid-glass text-foreground hover:bg-white/30",
+        secondary: "liquid-glass-tinted text-foreground hover:bg-white/30",
+        success: "liquid-glass text-foreground border-emerald-300/40 hover:bg-emerald-50/20",
+        destructive: "liquid-glass text-destructive border-red-300/40 hover:bg-red-50/20",
+        outline: "liquid-glass text-foreground hover:bg-white/25",
+        ghost: "bg-transparent hover:bg-white/15 hover:backdrop-blur-md border-transparent",
+        link: "text-primary underline-offset-4 hover:underline bg-transparent border-transparent",
+        donation: "liquid-glass-strong text-foreground hover:bg-white/35 hover:shadow-lg min-h-[120px] p-6 text-lg font-bold",
+        keypad: "liquid-glass text-foreground hover:bg-white/30 hover:shadow-md min-h-[80px] text-2xl font-bold",
+        confirm: "liquid-glass-strong bg-emerald-500/20 text-foreground border-emerald-400/50 hover:bg-emerald-500/30 hover:shadow-lg min-h-[60px] text-xl font-bold",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        xl: "h-14 rounded-lg px-12",
+        sm: "h-9 rounded-xl px-3",
+        lg: "h-11 rounded-xl px-8",
+        xl: "h-14 rounded-2xl px-12",
         icon: "h-10 w-10",
         kiosk: "h-16 px-8 text-lg",
         donation: "min-h-[120px] p-6",
@@ -102,8 +102,7 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
       if (variant === 'donation' || variant === 'confirm') return 'button-glow-emerald';
       if (variant === 'keypad') return 'button-glow-blue';
       if (variant === 'secondary') return 'button-glow-gold';
-      if (variant === 'default') return 'button-glow-emerald';
-      return 'button-glow-blue'; // fallback for outline, ghost, etc.
+      return 'button-glow-effect';
     };
 
     return (
@@ -123,7 +122,7 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
         {ripples.map(ripple => (
           <span
             key={ripple.id}
-            className="absolute rounded-full bg-white/40 pointer-events-none animate-ripple"
+            className="absolute rounded-full bg-white/30 pointer-events-none animate-ripple z-[3]"
             style={{
               left: ripple.x,
               top: ripple.y,
