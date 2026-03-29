@@ -50,6 +50,10 @@ const ConfirmationPage = () => {
       try {
         const { data: kioskData } = await supabase.from('kiosks').select('configuration').eq('id', kioskId).maybeSingle();
         const config = kioskData?.configuration as any;
+        if (config?.payment_mode === 'payment_gateway') {
+          navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
+          return;
+        }
         if (config?.payment_mode === 'soft_pos') {
           navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
           return;
