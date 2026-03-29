@@ -358,10 +358,37 @@ export const startSoftPOSTransaction = async (
     // TEST MODE - Simulate payment
     result = await processTestPayment(amountBaisas, transactionId, remarks);
   } else {
-    // LIVE MODE - Thawani Lamsa SDK (placeholder for future implementation)
-    console.warn('[SoftPOS] Live mode not implemented - using test');
-    result = await processTestPayment(amountBaisas, transactionId, remarks);
-    result.isTest = true;
+    // LIVE MODE - Use Thawani Lamsa SDK via Capacitor plugin
+    try {
+      const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
+      const amountOMR = amountBaisas / 1000;
+      const lamsaResult = await thawaniLamsaService.startPayment(amountOMR, transactionId, remarks);
+      
+      result = {
+        success: lamsaResult.success,
+        transactionId: lamsaResult.transactionId,
+        thawaniReference: lamsaResult.thawaniReference,
+        approvalCode: lamsaResult.approvalCode,
+        cardType: lamsaResult.cardType,
+        cardLastFour: lamsaResult.cardLastFour,
+        responseCode: lamsaResult.responseCode,
+        responseMessage: lamsaResult.responseMessage,
+        timestamp: lamsaResult.timestamp,
+        error: lamsaResult.errorMessage,
+        errorCode: lamsaResult.errorCode,
+        isTest: false,
+      };
+    } catch (error: any) {
+      console.error('[SoftPOS] Lamsa SDK payment error:', error);
+      result = {
+        success: false,
+        transactionId,
+        error: error.message || 'Lamsa SDK payment failed',
+        errorCode: 'SDK_ERROR',
+        timestamp: new Date().toISOString(),
+        isTest: false,
+      };
+    }
   }
   
   // Trigger appropriate callback
