@@ -104,7 +104,7 @@ const MobileNumberPage = () => {
               soundEffect="navigation"
               onClick={handleSendSMS}
               disabled={mobileNumber.length !== 8 || sending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0 flex flex-col items-center"
+              className="w-full border-0 flex flex-col items-center"
             >
               <span>{sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}</span>
               <span className="text-xs opacity-80">{sending ? 'Sending...' : 'Send Receipt'}</span>

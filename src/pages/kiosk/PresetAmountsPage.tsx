@@ -102,11 +102,11 @@ const PresetAmountsPage = () => {
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-4 py-1.5 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
+            className="px-4 py-1.5 text-xs font-bold text-foreground border-0"
           >
             إدخال مبلغ مختلف
           </KioskButton>
-          <span className="text-xs text-gray-500">Enter a different amount</span>
+          <span className="text-xs text-muted-foreground">Enter a different amount</span>
         </div>
       </div>
     </KioskLayout>
