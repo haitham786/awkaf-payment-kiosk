@@ -85,7 +85,7 @@ const MobileNumberPage = () => {
           <div className="space-y-3">
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700">+968</div>
-              <Input ref={inputRef} value={mobileNumber} readOnly placeholder="أدخل رقم الهاتف" className="text-2xl text-center h-14 bg-white/80 backdrop-blur-sm border-0 text-gray-900 pl-16" maxLength={8} />
+              <Input ref={inputRef} value={mobileNumber} readOnly placeholder="أدخل رقم الهاتف" className="text-2xl text-center h-14 liquid-glass border-0 text-foreground pl-16 rounded-xl" maxLength={8} />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
