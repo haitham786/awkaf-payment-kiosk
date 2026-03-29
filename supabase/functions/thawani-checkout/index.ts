@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const THAWANI_API_KEY = Deno.env.get('THAWANI_API_KEY');
     const THAWANI_PUBLISHABLE_KEY = Deno.env.get('THAWANI_PUBLISHABLE_KEY');
-    const THAWANI_ENV = Deno.env.get('THAWANI_ENV') || 'test'; // 'test' or 'live'
+    const THAWANI_ENV = Deno.env.get('THAWANI_ENV') || 'test';
 
     if (!THAWANI_API_KEY) {
       return new Response(
@@ -31,6 +31,13 @@ serve(async (req) => {
       ? 'https://checkout.thawani.om'
       : 'https://uatcheckout.thawani.om';
 
+    // Use service role key for DB operations (needed for UPDATE which requires admin RLS)
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     const body = await req.json();
     const { action } = body;
 
@@ -45,25 +52,34 @@ serve(async (req) => {
       }
 
       // Thawani expects amount in baisas (smallest unit)
-      // amount is already in baisas from the kiosk app
       const amountInBaisas = Math.round(amount);
+
+      // Fetch category title for Thawani product name
+      const { data: catData } = await supabaseClient
+        .from('donation_categories')
+        .select('title, title_en, category_reference')
+        .eq('category_id', category)
+        .maybeSingle();
+
+      const categoryTitle = catData?.title_en || catData?.title || category;
+      const resolvedCategoryReference = categoryReference || catData?.category_reference || '';
 
       const sessionData = {
         client_reference_id: transactionId,
         mode: 'payment',
         products: [
           {
-            name: `Donation - ${category}`,
+            name: `Donation - ${categoryTitle}`,
             unit_amount: amountInBaisas,
             quantity: 1,
           },
         ],
-        success_url: successUrl || `${req.headers.get('origin')}/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryReference || ''}`,
+        success_url: successUrl || `${req.headers.get('origin')}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&catRef=${resolvedCategoryReference}`,
         cancel_url: cancelUrl || `${req.headers.get('origin')}/kiosk/error?category=${category}&amount=${amount}`,
         metadata: {
           kiosk_id: kioskId,
           category,
-          category_reference: categoryReference || '',
+          category_reference: resolvedCategoryReference,
           transaction_id: transactionId,
         },
       };
@@ -93,21 +109,20 @@ serve(async (req) => {
       const checkoutUrl = `${checkoutBaseUrl}/pay/${sessionId}?key=${THAWANI_PUBLISHABLE_KEY}`;
 
       // Create a pending transaction record
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      );
-
-      await supabaseClient.from('transactions').insert({
+      const { error: insertError } = await supabaseClient.from('transactions').insert({
         id: transactionId,
         kiosk_id: kioskId,
         category,
-        category_reference: categoryReference || null,
+        category_reference: resolvedCategoryReference,
         amount_baisas: amountInBaisas,
         status: 'pending',
         payment_method: 'thawani_gateway',
         payment_reference: sessionId,
       });
+
+      if (insertError) {
+        console.error('Transaction insert error:', insertError);
+      }
 
       return new Response(
         JSON.stringify({
@@ -121,16 +136,51 @@ serve(async (req) => {
     }
 
     if (action === 'check_session') {
-      const { sessionId } = body;
+      const { sessionId, transactionId } = body;
 
-      if (!sessionId) {
+      if (!sessionId && !transactionId) {
         return new Response(
-          JSON.stringify({ success: false, error: 'Missing session ID' }),
+          JSON.stringify({ success: false, error: 'Missing session ID or transaction ID' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
       }
 
-      const response = await fetch(`${baseUrl}/checkout/session/${sessionId}`, {
+      // If we have a transactionId, look up the session from the transaction record
+      let resolvedSessionId = sessionId;
+      if (!resolvedSessionId && transactionId) {
+        const { data: txData } = await supabaseClient
+          .from('transactions')
+          .select('payment_reference, status, reference_number')
+          .eq('id', transactionId)
+          .maybeSingle();
+
+        if (txData) {
+          // If already completed, return immediately
+          if (txData.status === 'completed') {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                already_completed: true,
+                transaction: {
+                  reference_number: txData.reference_number,
+                  status: 'completed',
+                },
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            );
+          }
+          resolvedSessionId = txData.payment_reference;
+        }
+      }
+
+      if (!resolvedSessionId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Could not resolve session ID' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      const response = await fetch(`${baseUrl}/checkout/session/${resolvedSessionId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -149,24 +199,39 @@ serve(async (req) => {
 
       // If payment is completed, update transaction
       if (result.data?.payment_status === 'paid') {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        );
-
-        await supabaseClient
+        const { data: updatedTx, error: updateError } = await supabaseClient
           .from('transactions')
           .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
             pos_response: result.data,
           })
-          .eq('payment_reference', sessionId);
+          .eq('payment_reference', resolvedSessionId)
+          .select('reference_number, id')
+          .maybeSingle();
+
+        if (updateError) {
+          console.error('Transaction update error:', updateError);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            payment_completed: true,
+            session: result.data,
+            transaction: {
+              reference_number: updatedTx?.reference_number || null,
+              id: updatedTx?.id || null,
+            },
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
       }
 
       return new Response(
         JSON.stringify({
           success: true,
+          payment_completed: false,
           session: result.data,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
