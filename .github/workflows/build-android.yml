@@ -245,7 +245,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC
+      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
         shell: bash
         run: |
           set -euxo pipefail
@@ -272,8 +272,11 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
+          # Register LamsaSDK Activity
+          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+              xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC)")
+          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
           PY
 
       - name: Grant execute permission for gradlew
