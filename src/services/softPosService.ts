@@ -139,13 +139,27 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
     return true;
   }
 
-  // LIVE MODE - Thawani Lamsa SDK
-  // This section will be enabled when SDK is integrated
-  console.warn('[SoftPOS] Live mode requires Thawani Lamsa SDK integration');
-  console.warn('[SoftPOS] Falling back to test mode');
-  currentMode = 'test';
-  isInitialized = true;
-  return true;
+  // LIVE MODE - Initialize via Thawani Lamsa Capacitor Plugin
+  try {
+    const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
+    const success = await thawaniLamsaService.initialize(config.authKey, config.isProduction);
+    if (success) {
+      console.log('[SoftPOS] Thawani Lamsa SDK initialized successfully');
+      isInitialized = true;
+      return true;
+    } else {
+      console.warn('[SoftPOS] Lamsa SDK init failed - falling back to test mode');
+      currentMode = 'test';
+      isInitialized = true;
+      return true;
+    }
+  } catch (error) {
+    console.error('[SoftPOS] Failed to initialize Lamsa SDK:', error);
+    console.warn('[SoftPOS] Falling back to test mode');
+    currentMode = 'test';
+    isInitialized = true;
+    return true;
+  }
 };
 
 // ============================================================================
@@ -344,10 +358,37 @@ export const startSoftPOSTransaction = async (
     // TEST MODE - Simulate payment
     result = await processTestPayment(amountBaisas, transactionId, remarks);
   } else {
-    // LIVE MODE - Thawani Lamsa SDK (placeholder for future implementation)
-    console.warn('[SoftPOS] Live mode not implemented - using test');
-    result = await processTestPayment(amountBaisas, transactionId, remarks);
-    result.isTest = true;
+    // LIVE MODE - Use Thawani Lamsa SDK via Capacitor plugin
+    try {
+      const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
+      const amountOMR = amountBaisas / 1000;
+      const lamsaResult = await thawaniLamsaService.startPayment(amountOMR, transactionId, remarks);
+      
+      result = {
+        success: lamsaResult.success,
+        transactionId: lamsaResult.transactionId,
+        thawaniReference: lamsaResult.thawaniReference,
+        approvalCode: lamsaResult.approvalCode,
+        cardType: lamsaResult.cardType,
+        cardLastFour: lamsaResult.cardLastFour,
+        responseCode: lamsaResult.responseCode,
+        responseMessage: lamsaResult.responseMessage,
+        timestamp: lamsaResult.timestamp,
+        error: lamsaResult.errorMessage,
+        errorCode: lamsaResult.errorCode,
+        isTest: false,
+      };
+    } catch (error: any) {
+      console.error('[SoftPOS] Lamsa SDK payment error:', error);
+      result = {
+        success: false,
+        transactionId,
+        error: error.message || 'Lamsa SDK payment failed',
+        errorCode: 'SDK_ERROR',
+        timestamp: new Date().toISOString(),
+        isTest: false,
+      };
+    }
   }
   
   // Trigger appropriate callback
@@ -403,7 +444,7 @@ export const getSoftPOSStatus = (): {
   return {
     isInitialized,
     config: currentConfig,
-    isNativeAvailable: false,
+    isNativeAvailable: typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.(),
     mode: currentMode,
   };
 };
@@ -421,39 +462,6 @@ export const cleanupSoftPOS = async (): Promise<void> => {
   currentMode = DEFAULT_MODE;
   
   console.log('[SoftPOS] Cleanup complete');
-};
-
-// ============================================================================
-// FUTURE: REAL THAWANI LAMSA SDK INTEGRATION (NOT IMPLEMENTED)
-// ============================================================================
-
-/**
- * Start a real Thawani Lamsa Soft POS transaction
- * 
- * IMPORTANT: This function is a placeholder for future SDK integration.
- * 
- * Thawani Lamsa SDK Parameters:
- * - amount: Double (amount to be paid)
- * - authKey: String (touchpoint/authorization key)
- * - remarks: String (optional)
- * - isProduction: Boolean (staging vs production)
- * - paymentOption: PaymentOptions (only for staging)
- * - autoCloseInMillis: Integer (optional auto-close delay)
- */
-export const startRealThawaniSoftPos = async (
-  amount: number,
-  authKey: string,
-  isProduction: boolean
-): Promise<SoftPOSTransactionResult> => {
-  console.warn('[SoftPOS] startRealThawaniSoftPos called but SDK is not available');
-  console.warn('[SoftPOS] This function will be implemented after SDK integration');
-  
-  return {
-    success: false,
-    error: 'Thawani Lamsa SDK is not available in test mode',
-    errorCode: 'SDK_NOT_AVAILABLE',
-    timestamp: new Date().toISOString(),
-  };
 };
 
 // ============================================================================

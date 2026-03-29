@@ -107,7 +107,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure Maven repositories (JitPack only)
+      - name: Ensure Maven repositories (JitPack + Thawani)
         shell: bash
         run: |
           set -euxo pipefail
@@ -130,18 +130,64 @@ jobs:
                   print(f"Patched {path}")
           groovy_snippets = [
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
           ]
           for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
               patch_file(Path(f), groovy_snippets)
           kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
           ]
           for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
               patch_file(Path(f), kts_snippets)
-          print("Maven repositories configured (JitPack)")
+          print("Maven repositories configured (JitPack + Thawani)")
           PY
 
-      - name: Copy Thawani stub plugin
+      - name: Add Lamsa SDK dependency and enable dataBinding
+        shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+        run: |
+          set -euxo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+          import re
+
+          # Patch app/build.gradle to add Lamsa SDK dependency
+          for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
+              p = Path(gradle_name)
+              if not p.exists():
+                  continue
+              text = p.read_text(encoding="utf-8")
+
+              # Add dataBinding if not present
+              if "dataBinding" not in text:
+                  text = re.sub(
+                      r"(buildFeatures\s*\{)",
+                      r"\1\n        dataBinding true",
+                      text
+                  )
+                  if "buildFeatures" not in text:
+                      text = re.sub(
+                          r"(android\s*\{)",
+                          r"\1\n    buildFeatures {\n        dataBinding true\n    }",
+                          text
+                  )
+
+              # Add Lamsa SDK dependency if not present
+              if "om.thawani" not in text:
+                  text = re.sub(
+                      r"(dependencies\s*\{)",
+                      r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")',
+                      text
+                  )
+
+              p.write_text(text, encoding="utf-8")
+              print(f"Patched {p} with Lamsa SDK dependency + dataBinding")
+          PY
+
+      - name: Copy Thawani Lamsa plugin (real SDK bridge)
         shell: bash
         run: |
           set -euxo pipefail
@@ -149,7 +195,7 @@ jobs:
           mkdir -p "$PLUGIN_DIR"
           if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
             cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
-            echo "Copied ThawaniLamsaPlugin.java (stub)"
+            echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
           fi
 
       - name: Register plugin in MainActivity
@@ -199,7 +245,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC
+      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
         shell: bash
         run: |
           set -euxo pipefail
@@ -226,8 +272,11 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
+          # Register LamsaSDK Activity
+          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+              xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC)")
+          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
           PY
 
       - name: Grant execute permission for gradlew
@@ -265,6 +314,9 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
@@ -318,4 +370,4 @@ jobs:
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
-            --notes "Awkaf Payment Kiosk APK - Hardware POS (USB OM-A880) + Soft POS (Test Mode) + NFC + Bilingual UI"
+            --notes "Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"
