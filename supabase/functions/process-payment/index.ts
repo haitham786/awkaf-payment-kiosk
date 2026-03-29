@@ -281,9 +281,9 @@ serve(async (req) => {
         pos_mid: posMID,
         pos_response_code: posResponseCode,
         // Card info
-        payment_method: cardType,
+        payment_method: resolvedPaymentMethod,
         card_last_four: cardLastFour,
-        payment_reference: posRRN, // Legacy field - also store RRN here for compatibility
+        payment_reference: thawaniReference || posRRN || null,
         pos_response: posResponse, // Full POS response for debugging
         completed_at: isSuccess ? new Date().toISOString() : null,
       })
