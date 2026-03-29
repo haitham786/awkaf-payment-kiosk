@@ -81,7 +81,7 @@ const MobileNumberPage = () => {
           <p className="text-sm text-gray-600">Enter Phone Number</p>
         </div>
 
-        <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
+        <Card className="p-4 liquid-glass-strong shadow-md border-0 rounded-2xl">
           <div className="space-y-3">
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700">+968</div>
