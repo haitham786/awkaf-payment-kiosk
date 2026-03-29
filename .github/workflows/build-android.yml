@@ -143,18 +143,25 @@ jobs:
           print("Maven repositories configured (JitPack + Thawani)")
           PY
 
-      - name: Add Lamsa SDK dependency and enable dataBinding
+      - name: Add dataBinding and optional Lamsa SDK dependency
         shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          python3 - << 'PY'
+          HAS_CREDS="false"
+          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
+            HAS_CREDS="true"
+          fi
+          echo "Thawani Maven credentials available: $HAS_CREDS"
+          python3 - "$HAS_CREDS" << 'PY'
+          import sys
           from pathlib import Path
           import re
 
-          # Patch app/build.gradle to add Lamsa SDK dependency
+          has_creds = sys.argv[1] == "true"
+
           for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
               p = Path(gradle_name)
               if not p.exists():
@@ -163,28 +170,32 @@ jobs:
 
               # Add dataBinding if not present
               if "dataBinding" not in text:
-                  text = re.sub(
-                      r"(buildFeatures\s*\{)",
-                      r"\1\n        dataBinding true",
-                      text
-                  )
-                  if "buildFeatures" not in text:
+                  if "buildFeatures" in text:
+                      text = re.sub(
+                          r"(buildFeatures\s*\{)",
+                          r"\1\n        dataBinding true",
+                          text
+                      )
+                  else:
                       text = re.sub(
                           r"(android\s*\{)",
                           r"\1\n    buildFeatures {\n        dataBinding true\n    }",
                           text
-                  )
+                      )
 
-              # Add Lamsa SDK dependency if not present
-              if "om.thawani" not in text:
+              # Add Lamsa SDK dependency only if Maven credentials are available
+              if has_creds and "om.thawani" not in text:
                   text = re.sub(
                       r"(dependencies\s*\{)",
                       r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")',
                       text
                   )
+                  print(f"Added Lamsa SDK dependency to {p}")
+              elif not has_creds:
+                  print(f"Skipping Lamsa SDK dependency (no Maven credentials) for {p}")
 
               p.write_text(text, encoding="utf-8")
-              print(f"Patched {p} with Lamsa SDK dependency + dataBinding")
+              print(f"Patched {p} with dataBinding")
           PY
 
       - name: Copy Thawani Lamsa plugin (real SDK bridge)
