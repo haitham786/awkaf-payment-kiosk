@@ -88,8 +88,8 @@ function validatePaymentInput(data: any) {
     errors.push('Amount cannot exceed 100,000 OMR');
   }
 
-  // Validate category
-  if (!data.category || !VALID_CATEGORIES.includes(data.category)) {
+  // Validate category (basic string check - full validation against DB happens later)
+  if (!data.category || typeof data.category !== 'string' || data.category.length > 100) {
     errors.push('Invalid category');
   }
 
