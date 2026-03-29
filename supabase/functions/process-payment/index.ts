@@ -243,7 +243,7 @@ serve(async (req) => {
 
     const kioskReference = kioskData?.reference_number || null;
 
-    // Extract POS data from request (sent by KIOSK app after OM-A880 POS returns final XML)
+    // Extract POS data from request (Soft POS or Payment Gateway)
     const posRRN = posResponse?.rrn || posResponse?.RRN || null;
     const posAuthCode = posResponse?.authCode || posResponse?.AuthCode || null;
     const posTID = posResponse?.tid || posResponse?.TID || null;
@@ -252,9 +252,13 @@ serve(async (req) => {
     const cardLastFour = posResponse?.cardLastFour || null;
     const cardType = posResponse?.cardType || null;
 
-    // Determine if transaction is successful based on POS response
-    // The KIOSK app only calls this function AFTER receiving successful final XML from POS
+    // Determine if transaction is successful
     const isSuccess = posResponseCode === '00' || posResponse?.success === true;
+    
+    // Determine payment method
+    const resolvedPaymentMethod = paymentType === 'soft_pos' 
+      ? (provider === 'thawani' ? 'thawani_lamsa' : 'soft_pos')
+      : cardType || 'card';
 
     console.log('POS Response Data:', { posRRN, posAuthCode, posTID, posMID, posResponseCode, isSuccess });
 
