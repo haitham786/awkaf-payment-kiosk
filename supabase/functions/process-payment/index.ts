@@ -157,7 +157,7 @@ serve(async (req) => {
       );
     }
 
-    const { transactionId, kioskId, amount, category, mobileNumber, posResponse } = requestData;
+    const { transactionId, kioskId, amount, category, mobileNumber, posResponse, paymentType, provider, thawaniReference } = requestData;
     
     // Check kiosk-based rate limit
     const kioskRateLimit = checkRateLimit(`kiosk:${kioskId}`, MAX_REQUESTS_PER_KIOSK);
