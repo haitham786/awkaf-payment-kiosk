@@ -370,4 +370,4 @@ jobs:
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
-            --notes "Awkaf Payment Kiosk APK - Hardware POS (USB OM-A880) + Soft POS (Test Mode) + NFC + Bilingual UI"
+            --notes "Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"
