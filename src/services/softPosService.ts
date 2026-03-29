@@ -139,13 +139,27 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
     return true;
   }
 
-  // LIVE MODE - Thawani Lamsa SDK
-  // This section will be enabled when SDK is integrated
-  console.warn('[SoftPOS] Live mode requires Thawani Lamsa SDK integration');
-  console.warn('[SoftPOS] Falling back to test mode');
-  currentMode = 'test';
-  isInitialized = true;
-  return true;
+  // LIVE MODE - Initialize via Thawani Lamsa Capacitor Plugin
+  try {
+    const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
+    const success = await thawaniLamsaService.initialize(config.authKey, config.isProduction);
+    if (success) {
+      console.log('[SoftPOS] Thawani Lamsa SDK initialized successfully');
+      isInitialized = true;
+      return true;
+    } else {
+      console.warn('[SoftPOS] Lamsa SDK init failed - falling back to test mode');
+      currentMode = 'test';
+      isInitialized = true;
+      return true;
+    }
+  } catch (error) {
+    console.error('[SoftPOS] Failed to initialize Lamsa SDK:', error);
+    console.warn('[SoftPOS] Falling back to test mode');
+    currentMode = 'test';
+    isInitialized = true;
+    return true;
+  }
 };
 
 // ============================================================================
