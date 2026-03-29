@@ -89,11 +89,30 @@ serve(async (req) => {
     }
 
     // Server-side verification: Check if transaction exists
-    const { data: transaction, error: txError } = await supabaseAdmin
+    // Try by reference_number first, then by transaction ID
+    let transaction = null;
+    let txError = null;
+
+    const { data: txByRef, error: refError } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, sms_status')
+      .select('id, reference_number, amount_baisas, status, sms_status, category')
       .eq('reference_number', reference_number)
       .maybeSingle();
+
+    if (txByRef) {
+      transaction = txByRef;
+    } else if (transaction_id) {
+      // Fallback: look up by transaction UUID
+      const { data: txById, error: idError } = await supabaseAdmin
+        .from('transactions')
+        .select('id, reference_number, amount_baisas, status, sms_status, category')
+        .eq('id', transaction_id)
+        .maybeSingle();
+      transaction = txById;
+      txError = idError;
+    } else {
+      txError = refError;
+    }
 
     if (txError) {
       console.error('Error fetching transaction:', txError);
@@ -104,7 +123,7 @@ serve(async (req) => {
     }
 
     if (!transaction) {
-      console.error('Transaction not found for reference:', reference_number);
+      console.error('Transaction not found for reference:', reference_number, 'or id:', transaction_id);
       return new Response(
         JSON.stringify({ success: false, error: 'Transaction not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
