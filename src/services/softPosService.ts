@@ -465,8 +465,11 @@ export const cleanupSoftPOS = async (): Promise<void> => {
 };
 
 // ============================================================================
-// FUTURE: REAL THAWANI LAMSA SDK INTEGRATION (NOT IMPLEMENTED)
+// LEGACY EXPORTS FOR BACKWARD COMPATIBILITY
 // ============================================================================
+
+export { checkNFCAvailability as activateNFCReader };
+export { checkNFCAvailability as deactivateNFCReader };
 
 /**
  * Start a real Thawani Lamsa Soft POS transaction
