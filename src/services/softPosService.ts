@@ -470,39 +470,3 @@ export const cleanupSoftPOS = async (): Promise<void> => {
 
 export { checkNFCAvailability as activateNFCReader };
 export { checkNFCAvailability as deactivateNFCReader };
-
-/**
- * Start a real Thawani Lamsa Soft POS transaction
- * 
- * IMPORTANT: This function is a placeholder for future SDK integration.
- * 
- * Thawani Lamsa SDK Parameters:
- * - amount: Double (amount to be paid)
- * - authKey: String (touchpoint/authorization key)
- * - remarks: String (optional)
- * - isProduction: Boolean (staging vs production)
- * - paymentOption: PaymentOptions (only for staging)
- * - autoCloseInMillis: Integer (optional auto-close delay)
- */
-export const startRealThawaniSoftPos = async (
-  amount: number,
-  authKey: string,
-  isProduction: boolean
-): Promise<SoftPOSTransactionResult> => {
-  console.warn('[SoftPOS] startRealThawaniSoftPos called but SDK is not available');
-  console.warn('[SoftPOS] This function will be implemented after SDK integration');
-  
-  return {
-    success: false,
-    error: 'Thawani Lamsa SDK is not available in test mode',
-    errorCode: 'SDK_NOT_AVAILABLE',
-    timestamp: new Date().toISOString(),
-  };
-};
-
-// ============================================================================
-// LEGACY EXPORTS FOR BACKWARD COMPATIBILITY
-// ============================================================================
-
-export { checkNFCAvailability as activateNFCReader };
-export { checkNFCAvailability as deactivateNFCReader };
