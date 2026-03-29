@@ -169,21 +169,17 @@ serve(async (req) => {
       minute: '2-digit' 
     });
 
-    // Translate category to Arabic
-    const categoryNames: Record<string, string> = {
-      ashura: 'عاشوراء',
-      ramadan: 'رمضان',
-      zakat: 'زكاة',
-      sadaqah: 'صدقة',
-      charity: 'خيرية',
-      mosque: 'مآتم',
-      orphans: 'أيتام',
-      education: 'تعليم',
-      donation: 'تبرع',
-      general: 'عام'
-    };
+    // Fetch category title from database for SMS message
+    const { data: catData } = await supabaseAdmin
+      .from('donation_categories')
+      .select('title')
+      .eq('category_id', transaction.category || category)
+      .maybeSingle();
 
-    const categoryArabic = categoryNames[category?.toLowerCase()] || category || 'عام';
+    const categoryArabic = catData?.title || category || 'عام';
+
+    // Use the system reference number from the transaction record
+    const smsReference = transaction.reference_number || reference_number;
 
     // Create SMS message in Arabic with BOTH references
     let smsMessage = `شكراً لتبرعكم!
