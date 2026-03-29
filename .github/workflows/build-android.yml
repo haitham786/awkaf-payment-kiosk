@@ -187,7 +187,7 @@ jobs:
               print(f"Patched {p} with Lamsa SDK dependency + dataBinding")
           PY
 
-      - name: Copy Thawani stub plugin
+      - name: Copy Thawani Lamsa plugin (real SDK bridge)
         shell: bash
         run: |
           set -euxo pipefail
@@ -195,7 +195,7 @@ jobs:
           mkdir -p "$PLUGIN_DIR"
           if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
             cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
-            echo "Copied ThawaniLamsaPlugin.java (stub)"
+            echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
           fi
 
       - name: Register plugin in MainActivity
