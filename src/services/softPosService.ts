@@ -444,7 +444,7 @@ export const getSoftPOSStatus = (): {
   return {
     isInitialized,
     config: currentConfig,
-    isNativeAvailable: false,
+    isNativeAvailable: typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.(),
     mode: currentMode,
   };
 };
