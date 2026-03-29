@@ -91,7 +91,7 @@ const MobileNumberPage = () => {
             <div className="grid grid-cols-3 gap-2">
               {keypadNumbers.map((row, rowIndex) =>
                 row.map((number, colIndex) => (
-                  <KioskButton key={`${rowIndex}-${colIndex}`} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(number)} disabled={!number} className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
+                  <KioskButton key={`${rowIndex}-${colIndex}`} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(number)} disabled={!number} className="aspect-square text-foreground border-0 text-xl font-bold">
                     {number}
                   </KioskButton>
                 ))
