@@ -122,7 +122,7 @@ const KioskButton = React.forwardRef<HTMLButtonElement, KioskButtonProps>(
         {ripples.map(ripple => (
           <span
             key={ripple.id}
-            className="absolute rounded-full bg-white/40 pointer-events-none animate-ripple"
+            className="absolute rounded-full bg-white/30 pointer-events-none animate-ripple z-[3]"
             style={{
               left: ripple.x,
               top: ripple.y,
