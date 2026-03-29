@@ -15,12 +15,11 @@ import AmountPage from "./pages/kiosk/AmountPage";
 import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
 import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
 import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
-import PaymentProcessingPage from "./pages/kiosk/PaymentProcessingPage";
 import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
+import ThawaniGatewayPage from "./pages/kiosk/ThawaniGatewayPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
 import MobileNumberPage from "./pages/kiosk/MobileNumberPage";
 import ErrorPage from "./pages/kiosk/ErrorPage";
-import POSDiagnosticsPage from "./pages/kiosk/POSDiagnosticsPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CategoriesManagement from "./pages/admin/CategoriesManagement";
 import KiosksManagement from "./pages/admin/KiosksManagement";
@@ -39,14 +38,12 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const { isAudioReady, showInitPrompt } = useAudioInitializer();
   
-  // Start background sync for offline transactions
   React.useEffect(() => {
     startBackgroundSync();
   }, []);
 
   return (
     <>
-      {/* Audio initialization overlay - invisible but captures first touch */}
       {showInitPrompt && (
         <div className="fixed inset-0 z-50 bg-black/5 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
           <div className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-lg pointer-events-auto">
@@ -72,12 +69,11 @@ const AppContent = () => {
             <Route path="/kiosk/amount" element={<AmountPage />} />
             <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
             <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
-            <Route path="/kiosk/payment-processing" element={<PaymentProcessingPage />} />
             <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
+            <Route path="/kiosk/thawani-gateway" element={<ThawaniGatewayPage />} />
             <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
             <Route path="/kiosk/mobile-number" element={<MobileNumberPage />} />
             <Route path="/kiosk/error" element={<ErrorPage />} />
-            <Route path="/kiosk/diagnostics" element={<POSDiagnosticsPage />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
@@ -89,7 +85,6 @@ const AppContent = () => {
             <Route path="/admin/statistics" element={<EnhancedStatistics />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
