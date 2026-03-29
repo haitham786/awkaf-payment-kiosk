@@ -213,12 +213,40 @@
     transform: scale(1.02);
   }
 
-  .kiosk-button:hover::before {
-    width: 300px;
-    height: 300px;
+  /* Liquid glass utility */
+  .liquid-glass {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 
+      0 4px 24px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.1);
   }
 
-  /* Static glare effect - no animation */
+  .liquid-glass-strong {
+    background: rgba(255, 255, 255, 0.28);
+    backdrop-filter: blur(24px) saturate(2);
+    -webkit-backdrop-filter: blur(24px) saturate(2);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .liquid-glass-tinted {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(200, 230, 255, 0.15));
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 
+      0 4px 20px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* Static glare effect */
   .glare-effect {
     position: relative;
     overflow: hidden;
