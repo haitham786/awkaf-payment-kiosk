@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Validation schemas
-const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education'] as const;
+// Categories are now dynamic - validated against the database instead of hardcoded list
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OMAN_MOBILE_REGEX = /^\+968[0-9]{8}$/;
 
