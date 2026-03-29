@@ -314,6 +314,9 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
