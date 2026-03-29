@@ -186,7 +186,7 @@ serve(async (req) => {
 الفئة: ${categoryArabic}
 المبلغ: ${formattedAmount}
 التاريخ: ${dateStr} ${timeStr}
-رقم المعاملة: ${reference_number}`;
+رقم المعاملة: ${smsReference}`;
 
     // Add POS/Bank reference if available
     if (pos_rrn) {
