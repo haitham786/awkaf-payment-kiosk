@@ -84,7 +84,7 @@ const NFCPaymentPage = () => {
       } catch (error: any) {
         queueTransaction(transactionData);
         toast.info('Payment saved. Will sync when online.');
-        navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
+        navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
       }
     } else {
       queueTransaction(transactionData);
