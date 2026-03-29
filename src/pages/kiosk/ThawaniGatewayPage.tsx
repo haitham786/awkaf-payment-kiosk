@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Loader2, ExternalLink } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
@@ -14,8 +13,7 @@ const ThawaniGatewayPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
 
-  const [stage, setStage] = useState<'creating' | 'redirecting' | 'polling' | 'success' | 'error'>('creating');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [stage, setStage] = useState<'creating' | 'redirecting' | 'error'>('creating');
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [categoryData, setCategoryData] = useState<any>(null);
@@ -47,7 +45,7 @@ const ThawaniGatewayPage = () => {
           transactionId,
           kioskId,
           categoryReference: categoryData?.category_reference || '',
-          successUrl: `${origin}/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`,
+          successUrl: `${origin}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&catRef=${categoryData?.category_reference || ''}`,
           cancelUrl: `${origin}/kiosk/error?category=${category}&amount=${amount}`,
         },
       });
@@ -55,7 +53,6 @@ const ThawaniGatewayPage = () => {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Failed to create session');
 
-      setSessionId(data.session_id);
       setCheckoutUrl(data.checkout_url);
       setStage('redirecting');
 

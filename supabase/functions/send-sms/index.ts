@@ -19,8 +19,7 @@ interface SMSRequest {
 // Validate Omani mobile number format (with or without country code)
 const OMAN_MOBILE_REGEX = /^(968)?[79]\d{7}$/;
 
-// Valid categories - expanded list
-const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education', 'donation', 'general'];
+// Categories are dynamic - no hardcoded validation needed
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -90,11 +89,30 @@ serve(async (req) => {
     }
 
     // Server-side verification: Check if transaction exists
-    const { data: transaction, error: txError } = await supabaseAdmin
+    // Try by reference_number first, then by transaction ID
+    let transaction = null;
+    let txError = null;
+
+    const { data: txByRef, error: refError } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, sms_status')
+      .select('id, reference_number, amount_baisas, status, sms_status, category')
       .eq('reference_number', reference_number)
       .maybeSingle();
+
+    if (txByRef) {
+      transaction = txByRef;
+    } else if (transaction_id) {
+      // Fallback: look up by transaction UUID
+      const { data: txById, error: idError } = await supabaseAdmin
+        .from('transactions')
+        .select('id, reference_number, amount_baisas, status, sms_status, category')
+        .eq('id', transaction_id)
+        .maybeSingle();
+      transaction = txById;
+      txError = idError;
+    } else {
+      txError = refError;
+    }
 
     if (txError) {
       console.error('Error fetching transaction:', txError);
@@ -105,7 +123,7 @@ serve(async (req) => {
     }
 
     if (!transaction) {
-      console.error('Transaction not found for reference:', reference_number);
+      console.error('Transaction not found for reference:', reference_number, 'or id:', transaction_id);
       return new Response(
         JSON.stringify({ success: false, error: 'Transaction not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -151,28 +169,24 @@ serve(async (req) => {
       minute: '2-digit' 
     });
 
-    // Translate category to Arabic
-    const categoryNames: Record<string, string> = {
-      ashura: 'عاشوراء',
-      ramadan: 'رمضان',
-      zakat: 'زكاة',
-      sadaqah: 'صدقة',
-      charity: 'خيرية',
-      mosque: 'مآتم',
-      orphans: 'أيتام',
-      education: 'تعليم',
-      donation: 'تبرع',
-      general: 'عام'
-    };
+    // Fetch category title from database for SMS message
+    const { data: catData } = await supabaseAdmin
+      .from('donation_categories')
+      .select('title')
+      .eq('category_id', transaction.category || category)
+      .maybeSingle();
 
-    const categoryArabic = categoryNames[category?.toLowerCase()] || category || 'عام';
+    const categoryArabic = catData?.title || category || 'عام';
+
+    // Use the system reference number from the transaction record
+    const smsReference = transaction.reference_number || reference_number;
 
     // Create SMS message in Arabic with BOTH references
     let smsMessage = `شكراً لتبرعكم!
 الفئة: ${categoryArabic}
 المبلغ: ${formattedAmount}
 التاريخ: ${dateStr} ${timeStr}
-رقم المعاملة: ${reference_number}`;
+رقم المعاملة: ${smsReference}`;
 
     // Add POS/Bank reference if available
     if (pos_rrn) {
