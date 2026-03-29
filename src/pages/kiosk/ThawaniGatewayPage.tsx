@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Loader2, ExternalLink } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";

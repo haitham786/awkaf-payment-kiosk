@@ -17,7 +17,7 @@ const ThankYouPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const paymentMethod = searchParams.get('paymentMethod') || '';
   const [referenceNumber, setReferenceNumber] = useState(searchParams.get('ref') || '');
-  const [countdown, setCountdown] = useState(10);
+  const [_countdown, setCountdown] = useState(10);
   const [verifying, setVerifying] = useState(false);
   const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => {
     const cached = sessionStorage.getItem(`category_${category}`);
