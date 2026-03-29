@@ -19,8 +19,7 @@ interface SMSRequest {
 // Validate Omani mobile number format (with or without country code)
 const OMAN_MOBILE_REGEX = /^(968)?[79]\d{7}$/;
 
-// Valid categories - expanded list
-const VALID_CATEGORIES = ['ashura', 'ramadan', 'zakat', 'sadaqah', 'charity', 'mosque', 'orphans', 'education', 'donation', 'general'];
+// Categories are dynamic - no hardcoded validation needed
 
 serve(async (req) => {
   // Handle CORS preflight requests
