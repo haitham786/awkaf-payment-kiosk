@@ -89,7 +89,7 @@ const NFCPaymentPage = () => {
     } else {
       queueTransaction(transactionData);
       toast.info('Payment saved offline. Will sync automatically.');
-      navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&catRef=${categoryData?.category_reference || ''}`);
+      navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
     }
   };
 
