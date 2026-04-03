@@ -49,56 +49,96 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch android/build.gradle — Thawani Maven using System.getenv
+      # ── Diagnostic: show all Gradle files so we know their exact structure ─
+      - name: Show Gradle file structure (diagnostic)
         run: |
-          FILE="android/build.gradle"
-          echo "--- Before patch ---"
-          cat "$FILE"
-          if grep -q "ThawaniMobile" "$FILE"; then
-            echo "Already patched — skipping"
-          else
-            python3 - "$FILE" << 'PYEOF'
-          import sys, re
+          echo "=== android/settings.gradle ==="
+          cat android/settings.gradle 2>/dev/null || echo "NOT FOUND"
+          echo ""
+          echo "=== android/build.gradle ==="
+          cat android/build.gradle 2>/dev/null || echo "NOT FOUND"
+          echo ""
+          echo "=== android/app/build.gradle (first 60 lines) ==="
+          head -60 android/app/build.gradle 2>/dev/null || echo "NOT FOUND"
+
+      # ── Patch settings.gradle — this is where Capacitor declares repos ────
+      # Capacitor 6/7 moves allprojects repositories into settings.gradle
+      # using dependencyResolutionManagement. We must patch BOTH files.
+      - name: Patch settings.gradle — inject Thawani Maven repo
+        env:
+          THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, re
           from pathlib import Path
-          p = Path(sys.argv[1])
-          text = p.read_text()
-          snippet = (
+
+          user  = os.environ.get("THAWANI_MAVEN_USER",  "")
+          token = os.environ.get("THAWANI_MAVEN_TOKEN", "")
+
+          print(f"Credentials present: user={bool(user)} token={bool(token)}")
+
+          thawani = (
               '\n        maven {\n'
               '            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n'
               '            credentials {\n'
-              '                username System.getenv("THAWANI_MAVEN_USER") ?: ""\n'
-              '                password System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n'
+              f'                username "{user}"\n'
+              f'                password "{token}"\n'
               '            }\n'
-              '        }\n'
-              '        maven { url "https://jitpack.io" }'
+              '        }'
           )
-          patched = re.sub(r'(repositories\s*\{)', r'\1' + snippet, text, count=1)
-          p.write_text(patched)
-          print("Patched " + sys.argv[1])
+
+          for fname in ["android/settings.gradle", "android/build.gradle"]:
+              p = Path(fname)
+              if not p.exists():
+                  print(f"  {fname} not found — skipping")
+                  continue
+              text = p.read_text()
+              if "ThawaniMobile" in text:
+                  print(f"  {fname} already patched")
+                  continue
+              # Insert into every repositories { } block
+              patched = re.sub(r'(repositories\s*\{)', r'\1' + thawani, text)
+              if patched != text:
+                  p.write_text(patched)
+                  print(f"  Patched {fname}")
+              else:
+                  print(f"  WARNING: no repositories block found in {fname}")
+
           PYEOF
-          fi
-          echo "--- After patch ---"
-          cat "$FILE"
 
       - name: Patch android/app/build.gradle — dataBinding + Lamsa dependency
         run: |
-          FILE="android/app/build.gradle"
-          python3 - "$FILE" << 'PYEOF'
-          import sys, re
+          python3 - << 'PYEOF'
+          import re
           from pathlib import Path
-          p = Path(sys.argv[1])
+
+          p    = Path("android/app/build.gradle")
           text = p.read_text()
+
           if "dataBinding" not in text:
               if "buildFeatures" in text:
                   text = re.sub(r'(buildFeatures\s*\{)', r'\1\n        dataBinding true', text, count=1)
               else:
                   text = re.sub(r'(android\s*\{)', r'\1\n    buildFeatures {\n        dataBinding true\n    }', text, count=1)
               print("Added dataBinding")
+
           if "om.thawani" not in text:
               text = re.sub(r'(dependencies\s*\{)', r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")', text, count=1)
               print("Added Lamsa SDK dependency")
+
           p.write_text(text)
+          print("android/app/build.gradle done")
           PYEOF
+
+      # ── Show patched files so we can verify in the log ────────────────────
+      - name: Show patched Gradle files (verify)
+        run: |
+          echo "=== android/settings.gradle (patched) ==="
+          cat android/settings.gradle 2>/dev/null || echo "NOT FOUND"
+          echo ""
+          echo "=== android/build.gradle (patched) ==="
+          cat android/build.gradle 2>/dev/null || echo "NOT FOUND"
 
       - name: Copy ThawaniLamsaPlugin.java
         run: |
@@ -109,25 +149,24 @@ jobs:
 
       - name: Register plugin in MainActivity
         run: |
-          python3 << 'PYEOF'
+          python3 - << 'PYEOF'
           import re, glob
           from pathlib import Path
-          for pattern in ["android/app/src/main/java/**/MainActivity.java"]:
-              for f in glob.glob(pattern, recursive=True):
-                  p = Path(f)
-                  text = p.read_text()
-                  if "ThawaniLamsaPlugin" in text:
-                      print(f"Already registered in {p}"); continue
-                  if "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;" not in text:
-                      text = re.sub(r"(import android\.os\.Bundle;)", r"\1\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", text, count=1)
-                  text = re.sub(r"(super\.onCreate\(savedInstanceState\);)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
-                  p.write_text(text)
-                  print(f"Registered in {p}")
+          for f in glob.glob("android/app/src/main/java/**/MainActivity.java", recursive=True):
+              p = Path(f)
+              text = p.read_text()
+              if "ThawaniLamsaPlugin" in text:
+                  print(f"Already registered in {p}"); continue
+              if "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;" not in text:
+                  text = re.sub(r"(import android\.os\.Bundle;)", r"\1\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", text, count=1)
+              text = re.sub(r"(super\.onCreate\(savedInstanceState\);)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
+              p.write_text(text)
+              print(f"Registered in {p}")
           PYEOF
 
       - name: Patch AndroidManifest.xml
         run: |
-          python3 << 'PYEOF'
+          python3 - << 'PYEOF'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
           xml = p.read_text()
@@ -166,7 +205,7 @@ jobs:
         run: |
           APK=$(find android/app/build/outputs -name "*.apk" | head -1)
           echo "path=$APK" >> $GITHUB_OUTPUT
-          echo "APK found: $APK"
+          echo "APK: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -183,14 +222,15 @@ jobs:
           body: |
             ## Awkaf Payment Kiosk APK
             Build ${{ github.run_number }} | Commit ${{ github.sha }}
-            - Thawani Lamsa NFC Soft POS integrated
-            - Admin Panel → Kiosk Settings → Soft POS → Mode live to activate
+            Thawani Lamsa NFC Soft POS integrated.
+            Admin Panel → Kiosk Settings → Soft POS → Mode: live to activate.
           files: ${{ steps.apk.outputs.path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Show error context on failure
+      - name: Show full Gradle files on failure
         if: failure()
         run: |
+          echo "=== android/settings.gradle ===" && cat android/settings.gradle || true
           echo "=== android/build.gradle ===" && cat android/build.gradle || true
           echo "=== android/app/build.gradle ===" && cat android/app/build.gradle || true
