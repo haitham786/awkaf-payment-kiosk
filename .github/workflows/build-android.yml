@@ -5,185 +5,182 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
       # ── 1. Checkout ───────────────────────────────────────────────────────
       - name: Checkout repository
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euxo pipefail
-          rm -rf ./* ./.??* || true
-          git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth 1 origin "${GITHUB_REF_NAME}"
-          git checkout -q FETCH_HEAD
-          git rev-parse --short HEAD
+        uses: actions/checkout@v4
 
-      # ── 2. Java 21 ───────────────────────────────────────────────────────
-      - name: Install Java 21
-        shell: bash
-        run: |
-          set -euxo pipefail
-          sudo apt-get update -q
-          sudo apt-get install -y openjdk-21-jdk
-          sudo update-alternatives --set java  /usr/lib/jvm/java-21-openjdk-amd64/bin/java  || true
-          sudo update-alternatives --set javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac || true
-          JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which javac)")")")"
-          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
-          echo "$JAVA_HOME/bin"       >> "$GITHUB_PATH"
-          java -version && javac -version
+      # ── 2. Java 17 (stable on ubuntu-22.04) ──────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-      # ── 3. Android SDK ───────────────────────────────────────────────────
-      - name: Ensure Android SDK is available
-        shell: bash
-        run: |
-          set -euxo pipefail
-          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$SDK_ROOT"     >> "$GITHUB_ENV"
-          SDKMAN="$(find "$SDK_ROOT" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
-          [ -x "$SDKMAN" ] || { echo "sdkmanager not found"; exit 1; }
-          echo "$(dirname "$SDKMAN")"        >> "$GITHUB_PATH"
-          echo "$SDK_ROOT/platform-tools"    >> "$GITHUB_PATH"
-          sdkmanager --version
+      # ── 3. Node 20 ────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-      # ── 4. Node / npm deps ───────────────────────────────────────────────
-      - name: Install Node dependencies
+      # ── 4. Install npm dependencies ───────────────────────────────────────
+      - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      # ── 5. Env file ──────────────────────────────────────────────────────
-      - name: Create .env
+      # ── 5. Create .env ────────────────────────────────────────────────────
+      - name: Create .env file
         run: |
-          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}"                                                       >> .env
-          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}"   >> .env
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}"                                                              >> .env
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}"           >> .env
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}"    >> .env
 
-      # ── 6. Build web assets ──────────────────────────────────────────────
+      # ── 6. Build web assets ───────────────────────────────────────────────
       - name: Build web assets (Vite)
         run: npm run build
         env:
           NODE_ENV: production
 
-      # ── 7. Capacitor Android platform ────────────────────────────────────
-      - name: Add & sync Android platform
+      # ── 7. Capacitor — add + sync Android ────────────────────────────────
+      - name: Add Android platform (if not present)
         run: |
-          [ -d android ] || npx cap add android
-          npx cap sync android
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
 
-      # ── 8. Patch Gradle repos — add Thawani Maven + JitPack ─────────────
+      - name: Sync Capacitor to Android
+        run: npx cap sync android
+
+      # ── 8. Patch Gradle — inject Thawani Maven repo ───────────────────────
       - name: Patch Gradle repositories (Thawani Maven + JitPack)
-        shell: bash
         env:
           THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
-          python3 - "$THAWANI_MAVEN_USER" "$THAWANI_MAVEN_TOKEN" << 'PY'
-          import sys, re
+          python3 << PYEOF
+          import os, re
           from pathlib import Path
 
-          user  = sys.argv[1]
-          token = sys.argv[2]
+          user  = os.environ.get("THAWANI_MAVEN_USER",  "")
+          token = os.environ.get("THAWANI_MAVEN_TOKEN", "")
 
-          groovy_thawani = f'''maven {{
-              url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"
-              credentials {{
-                  username "{user}"
-                  password "{token}"
-              }}
-          }}'''
-          groovy_jitpack = 'maven { url "https://jitpack.io" }'
+          thawani_groovy = """    maven {
+                  url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"
+                  credentials {
+                      username "${user}"
+                      password "${token}"
+                  }
+              }""".replace("${user}", user).replace("${token}", token)
 
-          kts_thawani = f'''maven {{
-              url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")
-              credentials {{
-                  username = "{user}"
-                  password = "{token}"
-              }}
-          }}'''
-          kts_jitpack = 'maven { url = uri("https://jitpack.io") }'
+          jitpack_groovy = '        maven { url "https://jitpack.io" }'
 
-          def patch(path, check, snippet):
-              p = Path(path)
-              if not p.exists(): return
+          thawani_kts = """    maven {
+                  url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")
+                  credentials {
+                      username = "{user}"
+                      password = "{token}"
+                  }
+              }""".replace("{user}", user).replace("{token}", token)
+
+          jitpack_kts = '        maven { url = uri("https://jitpack.io") }'
+
+          def patch(filepath, check_str, snippet):
+              p = Path(filepath)
+              if not p.exists():
+                  return
               text = p.read_text()
-              if check in text: return
-              patched = re.sub(r'(repositories\s*\{\s*\n)', r'\1        ' + snippet + '\n', text)
+              if check_str in text:
+                  print(f"  {filepath}: already has {check_str!r}")
+                  return
+              patched = re.sub(r'(repositories\s*\{)', r'\1\n' + snippet, text, count=1)
               if patched != text:
                   p.write_text(patched)
-                  print(f"Patched {path}")
+                  print(f"  Patched {filepath}")
 
+          print("Patching Groovy Gradle files...")
           for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
-              patch(f, "ThawaniMobile", groovy_thawani)
-              patch(f, "jitpack.io",    groovy_jitpack)
+              patch(f, "ThawaniMobile", thawani_groovy)
+              patch(f, "jitpack.io",    jitpack_groovy)
 
+          print("Patching KTS Gradle files...")
           for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
-              patch(f, "ThawaniMobile", kts_thawani)
-              patch(f, "jitpack.io",    kts_jitpack)
+              patch(f, "ThawaniMobile", thawani_kts)
+              patch(f, "jitpack.io",    jitpack_kts)
 
-          print("Maven repositories configured")
-          PY
+          print("Done.")
+          PYEOF
 
       # ── 9. Add dataBinding + Lamsa SDK dependency ─────────────────────────
       - name: Add dataBinding + Lamsa SDK dependency
-        shell: bash
         env:
           THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           HAS_CREDS="false"
-          [ -n "$THAWANI_MAVEN_USER" ] && [ -n "$THAWANI_MAVEN_TOKEN" ] && HAS_CREDS="true"
-          echo "Thawani Maven creds present: $HAS_CREDS"
+          if [ -n "$THAWANI_MAVEN_USER" ] && [ -n "$THAWANI_MAVEN_TOKEN" ]; then
+            HAS_CREDS="true"
+          fi
+          echo "Thawani Maven credentials present: $HAS_CREDS"
 
-          python3 - "$HAS_CREDS" << 'PY'
-          import sys, re
+          python3 << PYEOF
+          import os, re
           from pathlib import Path
 
-          has_creds = sys.argv[1] == "true"
+          has_creds = os.environ.get("THAWANI_MAVEN_USER", "") != ""
 
           for name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
               p = Path(name)
-              if not p.exists(): continue
+              if not p.exists():
+                  continue
               text = p.read_text()
 
-              # dataBinding
+              # Add dataBinding inside buildFeatures block or create one
               if "dataBinding" not in text:
                   if "buildFeatures" in text:
-                      text = re.sub(r'(buildFeatures\s*\{)', r'\1\n        dataBinding true', text)
+                      text = re.sub(
+                          r'(buildFeatures\s*\{)',
+                          r'\1\n        dataBinding true',
+                          text, count=1
+                      )
                   else:
-                      text = re.sub(r'(android\s*\{)', r'\1\n    buildFeatures {\n        dataBinding true\n    }', text)
+                      text = re.sub(
+                          r'(android\s*\{)',
+                          r'\1\n    buildFeatures {\n        dataBinding true\n    }',
+                          text, count=1
+                      )
+                  print(f"  Added dataBinding to {name}")
 
-              # Lamsa SDK dependency
+              # Add Lamsa SDK dependency
               if has_creds and "om.thawani" not in text:
-                  text = re.sub(r'(dependencies\s*\{)',
-                                r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")', text)
-                  print(f"Added Lamsa SDK to {name}")
+                  text = re.sub(
+                      r'(dependencies\s*\{)',
+                      r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")',
+                      text, count=1
+                  )
+                  print(f"  Added Lamsa SDK dependency to {name}")
               elif not has_creds:
-                  print(f"Skipping Lamsa SDK (no Maven credentials) for {name}")
+                  print(f"  Skipping Lamsa SDK (no credentials) for {name}")
 
               p.write_text(text)
-              print(f"Patched buildFeatures in {name}")
-          PY
 
-      # ── 10. Copy fixed Thawani plugin ─────────────────────────────────────
-      - name: Copy ThawaniLamsaPlugin.java (fixed bridge)
-        shell: bash
+          print("Done.")
+          PYEOF
+
+      # ── 10. Copy fixed ThawaniLamsaPlugin.java ────────────────────────────
+      - name: Copy ThawaniLamsaPlugin.java
         run: |
           PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
           mkdir -p "$PLUGIN_DIR"
           if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
             cp android-plugin/ThawaniLamsaPlugin.java "$PLUGIN_DIR/"
-            echo "ThawaniLamsaPlugin.java copied to $PLUGIN_DIR"
+            echo "Copied ThawaniLamsaPlugin.java to $PLUGIN_DIR"
           else
             echo "ERROR: android-plugin/ThawaniLamsaPlugin.java not found"
             exit 1
@@ -191,20 +188,23 @@ jobs:
 
       # ── 11. Register plugin in MainActivity ───────────────────────────────
       - name: Register ThawaniLamsaPlugin in MainActivity
-        shell: bash
         run: |
-          python3 - << 'PY'
-          from pathlib import Path
+          python3 << 'PYEOF'
           import re, glob
+          from pathlib import Path
 
-          for pattern in ["android/app/src/main/java/**/MainActivity.java",
-                          "android/app/src/main/java/**/MainActivity.kt"]:
+          for pattern in [
+              "android/app/src/main/java/**/MainActivity.java",
+              "android/app/src/main/java/**/MainActivity.kt",
+          ]:
               for f in glob.glob(pattern, recursive=True):
                   p    = Path(f)
                   text = p.read_text()
+
                   if "ThawaniLamsaPlugin" in text:
-                      print(f"Already registered in {p}")
+                      print(f"  Already registered in {p}")
                       continue
+
                   if f.endswith(".java"):
                       # Add import
                       if "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;" not in text:
@@ -213,15 +213,18 @@ jobs:
                               r"\1\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;",
                               text, count=1
                           )
-                      # Register plugin
+                      # Register plugin after super.onCreate
                       text = re.sub(
                           r"(super\.onCreate\(savedInstanceState\);)",
                           r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);",
                           text, count=1
                       )
+
                   p.write_text(text)
-                  print(f"Registered plugin in {p}")
-          PY
+                  print(f"  Registered ThawaniLamsaPlugin in {p}")
+
+          print("Done.")
+          PYEOF
 
       # ── 12. USB device filter XML ─────────────────────────────────────────
       - name: Create USB device filter XML
@@ -235,23 +238,22 @@ jobs:
               <usb-device vendor-id="3398" product-id="16385" />
               <usb-device vendor-id="7568" product-id="8218"  />
               <usb-device vendor-id="6790" product-id="29987" />
-              <usb-device class="2" subclass="2" protocol="1" />
+              <usb-device class="2"  subclass="2" protocol="1" />
           </resources>
           EOF
 
       # ── 13. Patch AndroidManifest ─────────────────────────────────────────
-      - name: Patch AndroidManifest.xml (NFC + USB + LamsaSDK activity)
-        shell: bash
+      - name: Patch AndroidManifest.xml (NFC + LamsaSDK activity)
         run: |
-          python3 - << 'PY'
-          from pathlib import Path
+          python3 << 'PYEOF'
           import re
+          from pathlib import Path
 
           p   = Path("android/app/src/main/AndroidManifest.xml")
           xml = p.read_text()
 
-          # NFC + USB permissions / features
-          if "android.hardware.nfc" not in xml:
+          # NFC permission + feature
+          if "android.permission.NFC" not in xml:
               xml = xml.replace(
                   "<application",
                   '<uses-permission android:name="android.permission.NFC" />\n'
@@ -260,115 +262,95 @@ jobs:
                   '    <application',
                   1
               )
+              print("  Added NFC + USB permissions")
 
-          # LamsaSDK activity (required by the SDK)
+          # LamsaSDK Activity (mandatory — SDK will crash without it)
           if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
               xml = xml.replace(
                   "</application>",
                   '        <activity\n'
                   '            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n'
-                  '            android:exported="false"\n'
-                  '            android:theme="@style/Theme.LamsaSDK" />\n'
+                  '            android:exported="false" />\n'
                   '    </application>',
                   1
               )
-
-          # USB intent filter on MainActivity
-          if "USB_DEVICE_ATTACHED" not in xml:
-              usb_block = (
-                  '\n                <intent-filter>\n'
-                  '                    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n'
-                  '                </intent-filter>\n'
-                  '                <meta-data\n'
-                  '                    android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n'
-                  '                    android:resource="@xml/device_filter" />\n'
-                  '        '
-              )
-              main_pat = re.compile(
-                  r'(<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)(</activity>)',
-                  re.S
-              )
-              m = main_pat.search(xml)
-              if m:
-                  xml = xml[:m.start()] + m.group(1) + m.group(2) + usb_block + m.group(3) + xml[m.end():]
+              print("  Registered LamsaSDK activity")
 
           p.write_text(xml)
-          print("AndroidManifest.xml patched")
-          PY
+          print("  AndroidManifest.xml patched")
+          PYEOF
 
-      # ── 14. gradlew permissions ───────────────────────────────────────────
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      # ── 15. Android SDK licences + packages ──────────────────────────────
-      - name: Accept SDK licences
-        run: |
-          set +o pipefail
-          yes | sdkmanager --licenses > /dev/null
-          set -o pipefail
+      # ── 14. Android SDK setup ─────────────────────────────────────────────
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
-            || sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Accept SDK licences
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      # ── 15. Build APK ─────────────────────────────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
       - name: Write local.properties
-        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
-      # ── 16. Build APK ────────────────────────────────────────────────────
       - name: Build Debug APK
         working-directory: android
         env:
           THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee ../gradle.log
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
-      # ── 17. Collect + upload APK ─────────────────────────────────────────
-      - name: List build outputs
-        if: always()
+      # ── 16. Upload APK ────────────────────────────────────────────────────
+      - name: Find APK
+        id: find_apk
         run: |
-          find android -name "*.apk" 2>/dev/null || true
-          [ -f gradle.log ] && tail -100 gradle.log || true
-
-      - name: Collect APK
-        run: |
-          mkdir -p release-apks
           APK=$(find android/app/build/outputs -name "*.apk" | head -1)
-          [ -n "$APK" ] && cp "$APK" release-apks/awkaf-kiosk.apk || (echo "APK not found"; exit 1)
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          echo "APK found: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: awkaf-kiosk-apk
-          path: release-apks/awkaf-kiosk.apk
+          path: ${{ steps.find_apk.outputs.apk_path }}
           retention-days: 30
 
-      # ── 18. GitHub Release ────────────────────────────────────────────────
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main'
+      # ── 17. GitHub Release ────────────────────────────────────────────────
+      - name: Upload Release APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Awkaf Kiosk v${{ github.run_number }} — Lamsa Soft POS"
+          body: |
+            ## Awkaf Payment Kiosk APK
+
+            ✅ Thawani Lamsa SDK (NFC Soft POS)
+            ✅ Fixed bridge: SDKInitOptions / result keys
+            ✅ Bilingual UI (Arabic / English)
+            ✅ Supabase admin panel integration
+            ✅ Offline payment queue
+
+            **Build:** #${{ github.run_number }} | **Commit:** ${{ github.sha }}
+
+            ### Install
+            Download `awkaf-kiosk-debug.apk` below and sideload onto your kiosk device.
+
+            ### Activate live payments
+            Admin Panel → Kiosk Settings → Soft POS → Mode: **live**
+          files: ${{ steps.find_apk.outputs.apk_path }}
+          draft: false
+          prerelease: false
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${GITHUB_RUN_NUMBER}"
-          gh release delete "$TAG" -y 2>/dev/null || true
-          gh release create "$TAG" release-apks/awkaf-kiosk.apk \
-            --title "Awkaf Kiosk $TAG — Lamsa Soft POS" \
-            --notes "## Awkaf Payment Kiosk
-          
-          ✅ Thawani Lamsa SDK bridge (fixed: SDKInitOptions key, result key, reflection)
-          ✅ NFC Soft POS — tap card on screen
-          ✅ Bilingual UI (Arabic / English)
-          ✅ Supabase admin panel integration
-          ✅ Offline payment queue
-          
-          **Build:** #${GITHUB_RUN_NUMBER} | **Commit:** ${GITHUB_SHA:0:7}
-          
-          ### ⚙️ To activate live payments
-          Set these GitHub Secrets:
-          - \`THAWANI_MAVEN_USER\` = \`ThawaniMobile\`
-          - \`THAWANI_MAVEN_TOKEN\` = \`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\`
-          
-          Then in your Kiosk admin panel → Kiosk Settings → Soft POS:
-          - Set **Mode** to \`live\`
-          - Set **Auth Key** to your Thawani Touchpoint key
-          - Set **Environment** to \`staging\` (test) or \`production\` (live)"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 18. Always show tail of Gradle log on failure ────────────────────
+      - name: Show Gradle log on failure
+        if: failure()
+        working-directory: android
+        run: ./gradlew assembleDebug --info --no-daemon 2>&1 | tail -200 || true
