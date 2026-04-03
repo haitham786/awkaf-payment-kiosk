@@ -49,34 +49,29 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # ── Diagnostic: show all Gradle files so we know their exact structure ─
-      - name: Show Gradle file structure (diagnostic)
-        run: |
-          echo "=== android/settings.gradle ==="
-          cat android/settings.gradle 2>/dev/null || echo "NOT FOUND"
-          echo ""
-          echo "=== android/build.gradle ==="
-          cat android/build.gradle 2>/dev/null || echo "NOT FOUND"
-          echo ""
-          echo "=== android/app/build.gradle (first 60 lines) ==="
-          head -60 android/app/build.gradle 2>/dev/null || echo "NOT FOUND"
+      # ── Show settings.gradle BEFORE patching so we know its exact structure ─
+      - name: Show android/settings.gradle (pre-patch)
+        run: cat android/settings.gradle
 
-      # ── Patch settings.gradle — this is where Capacitor declares repos ────
-      # Capacitor 6/7 moves allprojects repositories into settings.gradle
-      # using dependencyResolutionManagement. We must patch BOTH files.
-      - name: Patch settings.gradle — inject Thawani Maven repo
+      # ── Patch settings.gradle: add Thawani Maven + JitPack ───────────────
+      # IMPORTANT: Capacitor 7 uses dependencyResolutionManagement in settings.gradle
+      # with FAIL_ON_PROJECT_REPOS — repos MUST go here, not in build.gradle.
+      # JitPack is needed for capacitor-plugin-usb-serial (com.github.mik3y).
+      - name: Patch android/settings.gradle — Thawani Maven + JitPack
         env:
           THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
-          python3 - << 'PYEOF'
-          import os, re
+          python3 - "$THAWANI_MAVEN_USER" "$THAWANI_MAVEN_TOKEN" << 'PYEOF'
+          import sys, re
           from pathlib import Path
 
-          user  = os.environ.get("THAWANI_MAVEN_USER",  "")
-          token = os.environ.get("THAWANI_MAVEN_TOKEN", "")
+          user  = sys.argv[1]
+          token = sys.argv[2]
+          print(f"user present={bool(user)}, token present={bool(token)}")
 
-          print(f"Credentials present: user={bool(user)} token={bool(token)}")
+          p    = Path("android/settings.gradle")
+          text = p.read_text()
 
           thawani = (
               '\n        maven {\n'
@@ -87,27 +82,36 @@ jobs:
               '            }\n'
               '        }'
           )
+          jitpack = '\n        maven { url "https://jitpack.io" }'
 
-          for fname in ["android/settings.gradle", "android/build.gradle"]:
-              p = Path(fname)
-              if not p.exists():
-                  print(f"  {fname} not found — skipping")
-                  continue
-              text = p.read_text()
-              if "ThawaniMobile" in text:
-                  print(f"  {fname} already patched")
-                  continue
-              # Insert into every repositories { } block
-              patched = re.sub(r'(repositories\s*\{)', r'\1' + thawani, text)
-              if patched != text:
-                  p.write_text(patched)
-                  print(f"  Patched {fname}")
+          inject = ""
+          if "ThawaniMobile" not in text:
+              inject += thawani
+          if "jitpack.io" not in text:
+              inject += jitpack
+
+          if inject:
+              # Insert into the last repositories { } block (= dependencyResolutionManagement one)
+              # Find all occurrences and replace the last one
+              matches = list(re.finditer(r'repositories\s*\{', text))
+              if matches:
+                  m = matches[-1]
+                  pos = m.end()
+                  text = text[:pos] + inject + text[pos:]
+                  p.write_text(text)
+                  print("Patched settings.gradle")
               else:
-                  print(f"  WARNING: no repositories block found in {fname}")
-
+                  print("ERROR: no repositories block found in settings.gradle!")
+                  sys.exit(1)
+          else:
+              print("Already patched")
           PYEOF
 
-      - name: Patch android/app/build.gradle — dataBinding + Lamsa dependency
+      - name: Show android/settings.gradle (post-patch)
+        run: cat android/settings.gradle
+
+      # ── Patch app/build.gradle: dataBinding + Lamsa SDK dep ──────────────
+      - name: Patch android/app/build.gradle — dataBinding + Lamsa SDK
         run: |
           python3 - << 'PYEOF'
           import re
@@ -128,24 +132,14 @@ jobs:
               print("Added Lamsa SDK dependency")
 
           p.write_text(text)
-          print("android/app/build.gradle done")
           PYEOF
-
-      # ── Show patched files so we can verify in the log ────────────────────
-      - name: Show patched Gradle files (verify)
-        run: |
-          echo "=== android/settings.gradle (patched) ==="
-          cat android/settings.gradle 2>/dev/null || echo "NOT FOUND"
-          echo ""
-          echo "=== android/build.gradle (patched) ==="
-          cat android/build.gradle 2>/dev/null || echo "NOT FOUND"
 
       - name: Copy ThawaniLamsaPlugin.java
         run: |
           DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
           mkdir -p "$DIR"
           cp android-plugin/ThawaniLamsaPlugin.java "$DIR/"
-          echo "Copied plugin"
+          echo "Plugin copied"
 
       - name: Register plugin in MainActivity
         run: |
@@ -164,7 +158,7 @@ jobs:
               print(f"Registered in {p}")
           PYEOF
 
-      - name: Patch AndroidManifest.xml
+      - name: Patch AndroidManifest.xml — NFC + LamsaSDK activity
         run: |
           python3 - << 'PYEOF'
           from pathlib import Path
@@ -228,9 +222,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Show full Gradle files on failure
+      - name: Show Gradle files on failure
         if: failure()
         run: |
-          echo "=== android/settings.gradle ===" && cat android/settings.gradle || true
-          echo "=== android/build.gradle ===" && cat android/build.gradle || true
-          echo "=== android/app/build.gradle ===" && cat android/app/build.gradle || true
+          echo "=== settings.gradle ===" && cat android/settings.gradle || true
+          echo "=== app/build.gradle ===" && cat android/app/build.gradle || true
