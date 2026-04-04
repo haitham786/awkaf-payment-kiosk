@@ -88,6 +88,19 @@ jobs:
               print("Already patched")
           PYEOF
 
+      - name: Patch android/variables.gradle — set minSdkVersion 26 for Lamsa SDK
+        run: |
+          python3 - << 'PYEOF'
+          import re
+          from pathlib import Path
+          p = Path("android/variables.gradle")
+          text = p.read_text()
+          # Lamsa SDK requires minSdkVersion 26
+          text = re.sub(r'minSdkVersion\s*=\s*\d+', 'minSdkVersion = 26', text)
+          p.write_text(text)
+          print("Set minSdkVersion = 26")
+          PYEOF
+
       - name: Patch android/app/build.gradle — dataBinding + Lamsa SDK
         run: |
           python3 - << 'PYEOF'
@@ -134,10 +147,8 @@ jobs:
                   '<uses-permission android:name="android.permission.NFC" />\n'
                   '    <uses-feature android:name="android.hardware.nfc" android:required="false" />\n'
                   '    <application', 1)
-          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
-              xml = xml.replace("</application>",
-                  '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n'
-                  '    </application>', 1)
+          # Do NOT add LamsaSDK activity - the SDK's own manifest declares it.
+          # Adding it here with exported="false" conflicts with the SDK manifest merger.
           p.write_text(xml)
           print("AndroidManifest patched")
           PYEOF
@@ -163,7 +174,7 @@ jobs:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
-          ./gradlew assembleDebug --info --no-daemon 2>&1 | tee ../build-full.log; exit ${PIPESTATUS[0]}
+          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee ../build-full.log; exit ${PIPESTATUS[0]}
 
       - name: Upload full build log (always)
         if: always()
