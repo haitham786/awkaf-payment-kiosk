@@ -162,7 +162,16 @@ jobs:
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        run: |
+          ./gradlew assembleDebug --info --no-daemon 2>&1 | tee ../build-full.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload full build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-full-log
+          path: build-full.log
+          retention-days: 7
 
       - name: Find APK
         id: apk
