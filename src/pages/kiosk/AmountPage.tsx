@@ -58,79 +58,81 @@ const AmountPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-2xl mx-auto space-y-3 pb-16">
-        <div className="text-center mb-1">
-          <div className="flex flex-col items-center justify-center gap-2">
+      <div className="w-full max-w-sm mx-auto flex flex-col h-full pb-10">
+        {/* Category header */}
+        <div className="text-center mb-1 shrink-0">
+          <div className="flex flex-col items-center justify-center gap-0.5">
             {categoryData?.icon_url && (
-              <img src={categoryData.icon_url} alt={categoryData.title} className="w-16 h-16 object-contain" loading="eager" />
+              <img src={categoryData.icon_url} alt={categoryData.title} className="w-10 h-10 object-contain" loading="eager" />
             )}
-            <h1 className="text-2xl font-bold text-gray-900 drop-shadow-sm">
+            <h1 className="text-base font-bold text-gray-900 drop-shadow-sm leading-tight">
               {categoryData?.title || "أدخل مبلغ التبرع"}
             </h1>
             {categoryData?.title_en && (
-              <p className="text-base text-gray-600">{categoryData.title_en}</p>
+              <p className="text-xs text-gray-600 leading-tight">{categoryData.title_en}</p>
             )}
             {!categoryData?.title && (
-              <p className="text-base text-gray-600">Enter Donation Amount</p>
+              <p className="text-xs text-gray-600">Enter Donation Amount</p>
             )}
           </div>
         </div>
 
-        {/* Rial Field */}
-        <div
-          className={`backdrop-blur-sm shadow-md rounded-xl cursor-pointer transition-all p-2.5 ${
-            activeField === "rial" ? "bg-emerald-50/90 border-2 border-emerald-500" : "bg-white/60 border-2 border-gray-200"
-          }`}
-          onClick={() => setActiveField("rial")}
-        >
-          <div className="text-center text-2xl font-bold text-emerald-600 flex items-center justify-center gap-2">
-            <CurrencyLogo className="h-5" />
-            {rialAmount || "0"}
+        {/* Amount fields */}
+        <div className="space-y-1.5 shrink-0">
+          {/* Rial Field */}
+          <div
+            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 ${
+              activeField === "rial" ? "bg-emerald-50/90 border-2 border-emerald-500" : "bg-white/60 border-2 border-gray-200"
+            }`}
+            onClick={() => setActiveField("rial")}
+          >
+            <div className="text-center text-xl font-bold text-emerald-600 flex items-center justify-center gap-1.5">
+              <CurrencyLogo className="h-4" />
+              {rialAmount || "0"}
+            </div>
+            <p className="text-center text-[0.6rem] text-gray-600">ریال عماني / Omani Rial</p>
           </div>
-          <p className="text-center text-xs text-gray-600 mt-0.5">ریال عماني</p>
-          <p className="text-center text-[0.6rem] text-gray-400">Omani Rial</p>
-        </div>
 
-        {/* Baisa Field */}
-        <div
-          className={`backdrop-blur-sm shadow-md rounded-xl cursor-pointer transition-all p-2.5 ${
-            activeField === "baisa" ? "bg-blue-50/90 border-2 border-blue-500" : "bg-white/60 border-2 border-gray-200"
-          }`}
-          onClick={() => setActiveField("baisa")}
-        >
-          <div className="text-center text-2xl font-bold text-blue-600">
-            {baisaAmount || "0"}
+          {/* Baisa Field */}
+          <div
+            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 ${
+              activeField === "baisa" ? "bg-blue-50/90 border-2 border-blue-500" : "bg-white/60 border-2 border-gray-200"
+            }`}
+            onClick={() => setActiveField("baisa")}
+          >
+            <div className="text-center text-xl font-bold text-blue-600">
+              {baisaAmount || "0"}
+            </div>
+            <p className="text-center text-[0.6rem] text-gray-600">بيسة / Baisa</p>
           </div>
-          <p className="text-center text-xs text-gray-600 mt-0.5">بيسة</p>
-          <p className="text-center text-[0.6rem] text-gray-400">Baisa</p>
         </div>
 
         {/* Number Pad */}
-        <div className="grid grid-cols-3 gap-2 mt-1">
+        <div className="grid grid-cols-3 gap-1.5 mt-2 flex-1 min-h-0">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
             <KioskButton
               key={num}
               variant="keypad"
               soundEffect="keypad"
-              className="w-full h-12 text-xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
+              className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
               onClick={() => handleNumberClick(num.toString())}
             >
               {num}
             </KioskButton>
           ))}
 
-          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-12 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={handleBackspace}>
-            <Delete className="w-5 h-5" />
+          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-10 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={handleBackspace}>
+            <Delete className="w-4 h-4" />
           </KioskButton>
 
-          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-12 text-xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={() => handleNumberClick("0")}>
+          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={() => handleNumberClick("0")}>
             0
           </KioskButton>
 
           <KioskButton
             variant="keypad"
             soundEffect="keypad"
-            className="w-full h-12 text-xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-xl shadow-none hover:shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
             onClick={() => activeField === "rial" && handleNumberClick(".")}
             disabled={activeField === "baisa"}
           >
@@ -139,17 +141,17 @@ const AmountPage = () => {
         </div>
 
         {/* Confirm Button */}
-        <div className="flex justify-start pt-1 pl-2">
+        <div className="flex justify-start pt-1.5 shrink-0">
           <KioskButton
             variant="confirm"
-            size="lg"
+            size="sm"
             soundEffect="navigation"
             onClick={handleConfirm}
             disabled={(!rialAmount || parseFloat(rialAmount) <= 0) && (!baisaAmount || parseInt(baisaAmount) <= 0)}
-            className="px-6 py-2 text-base font-bold bg-emerald-500/80 hover:bg-emerald-600/80 backdrop-blur-sm text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-md rounded-xl flex flex-col items-center"
+            className="px-5 py-1.5 text-sm font-bold bg-emerald-500/80 hover:bg-emerald-600/80 backdrop-blur-sm text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-md rounded-lg flex flex-col items-center"
           >
             <span>تأكيد</span>
-            <span className="text-xs opacity-80">Confirm</span>
+            <span className="text-[0.6rem] opacity-80">Confirm</span>
           </KioskButton>
         </div>
       </div>
