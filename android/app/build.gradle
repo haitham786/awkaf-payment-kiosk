@@ -4,6 +4,15 @@ android {
     buildFeatures {
         dataBinding true
     }
+
+    signingConfigs {
+        release {
+            storeFile file("../../awkaf-kiosk.keystore")
+            storePassword "awkaf2024"
+            keyAlias "awkaf-kiosk"
+            keyPassword "awkaf2024"
+        }
+    }
     namespace "app.lovable.awkafpaymentkiosk"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -23,6 +32,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
