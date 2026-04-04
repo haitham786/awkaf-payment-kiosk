@@ -1,9 +1,12 @@
-name: Build Android APK — Thawani Lamsa Soft POS
+name: Build Android APK with USB Support
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -13,23 +16,73 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
+      - name: Checkout code (git clone - avoids action download timeouts)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y openjdk-21-jdk
-          sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java || true
-          sudo update-alternatives --set javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac || true
-          echo "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> $GITHUB_ENV
-          java -version
+          set -euxo pipefail
+          rm -rf ./* ./.??* || true
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth 1 origin "${GITHUB_REF_NAME}"
+          git checkout -q FETCH_HEAD
+          git rev-parse --short HEAD
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Show toolchain (preinstalled)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          node -v
+          npm -v
+          which sdkmanager || true
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}" 
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+
+      - name: Install Java 21 (APT)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y openjdk-21-jdk
+          if [ -x /usr/lib/jvm/java-21-openjdk-amd64/bin/java ]; then
+            sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-21-openjdk-amd64/bin/javac
+          fi
+          java -version
+          javac -version
+          JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which javac)")")")"
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Ensure Android SDK is available
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -d "/usr/local/lib/android/sdk" ]; then
+            echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+            echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+            ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+          fi
+          if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "ERROR: ANDROID_SDK_ROOT is not set"
+            exit 1
+          fi
+          if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER_DIR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin"
+          else
+            SDKMANAGER_PATH="$(find "$ANDROID_SDK_ROOT" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+            SDKMANAGER_DIR="$(dirname "${SDKMANAGER_PATH:-}")"
+          fi
+          if [ -z "${SDKMANAGER_DIR:-}" ] || [ ! -x "$SDKMANAGER_DIR/sdkmanager" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+          export PATH="$SDKMANAGER_DIR:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          echo "$SDKMANAGER_DIR" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          which sdkmanager
+          sdkmanager --version
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -37,69 +90,295 @@ jobs:
       - name: Create .env file
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
           echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
 
       - name: Build web assets
         run: npm run build
         env:
           NODE_ENV: production
 
-      # Sync web assets into the committed android/ folder
-      - name: Sync Capacitor web assets
+      - name: Add Android platform (if needed)
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
+      - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Ensure Maven repositories (JitPack + Thawani)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+          import re
+          def patch_repositories_block(text, snippets):
+              patched = text
+              for snippet in snippets:
+                  if snippet["check"] not in patched:
+                      patched = re.sub(r"(repositories\s*\{\s*\n)", r"\1        " + snippet["code"] + "\n", patched)
+              return patched
+          def patch_file(path, snippets):
+              if not path.exists():
+                  return
+              original = path.read_text(encoding="utf-8")
+              patched = patch_repositories_block(original, snippets)
+              if patched != original:
+                  path.write_text(patched, encoding="utf-8")
+                  print(f"Patched {path}")
+          groovy_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
+          ]
+          for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
+              patch_file(Path(f), groovy_snippets)
+          kts_snippets = [
+              {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
+              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
+          ]
+          for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
+              patch_file(Path(f), kts_snippets)
+          print("Maven repositories configured (JitPack + Thawani)")
+          PY
 
-      - name: Install Android SDK 35
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Accept SDK licences
-        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Write local.properties
-        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-
-      - name: Build Debug APK
-        working-directory: android
+      - name: Add dataBinding and optional Lamsa SDK dependency
+        shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
-
-      - name: Find APK
-        id: apk
         run: |
-          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          [ -z "$APK" ] && APK=$(find android/app/build/outputs -name "*.apk" | head -1)
-          echo "path=$APK" >> $GITHUB_OUTPUT
-          echo "APK found: $APK"
+          set -euxo pipefail
+          HAS_CREDS="false"
+          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
+            HAS_CREDS="true"
+          fi
+          echo "Thawani Maven credentials available: $HAS_CREDS"
+          python3 - "$HAS_CREDS" << 'PY'
+          import sys
+          from pathlib import Path
+          import re
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+          has_creds = sys.argv[1] == "true"
+
+          for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
+              p = Path(gradle_name)
+              if not p.exists():
+                  continue
+              text = p.read_text(encoding="utf-8")
+
+              # Add dataBinding if not present
+              if "dataBinding" not in text:
+                  if "buildFeatures" in text:
+                      text = re.sub(
+                          r"(buildFeatures\s*\{)",
+                          r"\1\n        dataBinding true",
+                          text
+                      )
+                  else:
+                      text = re.sub(
+                          r"(android\s*\{)",
+                          r"\1\n    buildFeatures {\n        dataBinding true\n    }",
+                          text
+                      )
+
+              # Add Lamsa SDK dependency only if Maven credentials are available
+              if has_creds and "om.thawani" not in text:
+                  text = re.sub(
+                      r"(dependencies\s*\{)",
+                      r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")',
+                      text
+                  )
+                  print(f"Added Lamsa SDK dependency to {p}")
+              elif not has_creds:
+                  print(f"Skipping Lamsa SDK dependency (no Maven credentials) for {p}")
+
+              p.write_text(text, encoding="utf-8")
+              print(f"Patched {p} with dataBinding")
+          PY
+
+      - name: Copy Thawani Lamsa plugin (real SDK bridge)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
+          mkdir -p "$PLUGIN_DIR"
+          if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
+            cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
+            echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
+          fi
+
+      - name: Register plugin in MainActivity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+          import re, glob
+
+          for pattern in ["android/app/src/main/java/**/MainActivity.java", "android/app/src/main/java/**/MainActivity.kt"]:
+              for f in glob.glob(pattern, recursive=True):
+                  p = Path(f)
+                  text = p.read_text(encoding="utf-8")
+                  if "ThawaniLamsaPlugin" in text:
+                      print(f"Plugin already registered in {p}")
+                      continue
+                  if f.endswith(".java"):
+                      if "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;" not in text:
+                          text = text.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", 1)
+                          if "import android.os.Bundle;" not in text:
+                              text = re.sub(r"(package [^;]+;)", r"\1\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", text, count=1)
+                      text = re.sub(r"(super\.onCreate\(savedInstanceState\);)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
+                      if "super.onCreate" not in text:
+                          text = re.sub(r"(onCreate\([^)]*\)\s*\{)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
+                  p.write_text(text, encoding="utf-8")
+                  print(f"Registered ThawaniLamsaPlugin in {p}")
+          PY
+
+      - name: Create USB device filter XML
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/device_filter.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <usb-device vendor-id="1478" product-id="36923" />
+              <usb-device vendor-id="1478" product-id="36945" />
+              <usb-device vendor-id="1478" product-id="36946" />
+              <usb-device vendor-id="3398" product-id="16385" />
+              <usb-device vendor-id="3398" product-id="16386" />
+              <usb-device vendor-id="7568" product-id="8218" />
+              <usb-device vendor-id="6790" product-id="29987" />
+              <usb-device vendor-id="1659" product-id="8963" />
+              <usb-device vendor-id="1027" product-id="24577" />
+              <usb-device vendor-id="4292" product-id="60000" />
+              <usb-device class="2" subclass="2" protocol="1" />
+          </resources>
+          EOF
+
+      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          if not p.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+          xml = p.read_text(encoding="utf-8")
+          if "android.hardware.usb.host" not in xml:
+              xml = xml.replace("<application", '<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <uses-feature android:name="android.hardware.nfc" android:required="false" />\n    <uses-permission android:name="android.permission.NFC" />\n    <application', 1)
+          if "android.hardware.usb.action.USB_DEVICE_ATTACHED" not in xml:
+              inject = '\n                <intent-filter>\n                    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n                </intent-filter>\n                <meta-data\n                    android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n                    android:resource="@xml/device_filter" />\n        '
+              pattern_main = r'(<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)(</activity>)'
+              m = re.search(pattern_main, xml, flags=re.S)
+              if not m:
+                  pattern_any = r'(<activity\b[^>]*>)(.*?)(</activity>)'
+                  for mi in re.finditer(pattern_any, xml, flags=re.S):
+                      block = mi.group(0)
+                      if "android.intent.action.MAIN" in block and "android.intent.category.LAUNCHER" in block:
+                          m = mi
+                          break
+              if m:
+                  head, body, tail = m.group(1), m.group(2), m.group(3)
+                  xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
+          # Register LamsaSDK Activity
+          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+              xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
+          p.write_text(xml, encoding="utf-8")
+          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
+          PY
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Verify Android SDK tools + accept licenses
+        shell: bash
+        run: |
+          set -euxo pipefail
+          which sdkmanager
+          sdkmanager --version
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"; then
+            echo "Installed Android SDK 35"
+          else
+            sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+            if [ -f android/variables.gradle ]; then
+              perl -pi -e 's/(compileSdkVersion\s*=\s*)\d+/${1}34/g; s/(targetSdkVersion\s*=\s*)\d+/${1}34/g' android/variables.gradle || true
+            fi
+          fi
+
+      - name: Ensure Android SDK path (local.properties)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
+
+      - name: Build Debug APK
+        working-directory: android
+        shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+        run: |
+          set -euxo pipefail
+          ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+
+      - name: List Android build outputs (always)
+        if: always()
+        shell: bash
+        run: |
+          find android -maxdepth 8 -type f \( -name "*.apk" -o -name "*.log" \) 2>/dev/null || true
+          if [ -f android-gradle.log ]; then
+            tail -n 200 android-gradle.log || true
+          fi
+
+      - name: Collect APK
+        if: success()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p release-apks
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            APK_PATH=$(find android/app/build/outputs -type f -name "*.apk" 2>/dev/null | head -n 1 || true)
+          fi
+          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
+            cp "$APK_PATH" release-apks/awkaf-kiosk-usb.apk
+          else
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+
+      - name: Upload APK as workflow artifact
+        if: success()
+        uses: actions/upload-artifact@v5
         with:
-          name: awkaf-kiosk-release-apk
-          path: ${{ steps.apk.outputs.path }}
+          name: awkaf-kiosk-usb-apk
+          path: release-apks/awkaf-kiosk-usb.apk
           retention-days: 30
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: "Awkaf Kiosk v${{ github.run_number }} — Lamsa Soft POS"
-          body: |
-            ## Awkaf Payment Kiosk APK
-            Build ${{ github.run_number }} | Commit ${{ github.sha }}
-            Thawani Lamsa NFC Soft POS integrated.
-            Admin Panel → Kiosk Settings → Soft POS → Mode: live to activate.
-          files: ${{ steps.apk.outputs.path }}
+      - name: Create GitHub Release with APK
+        if: success() && github.ref == 'refs/heads/main'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Show build log on failure
-        if: failure()
-        run: find android -name "*.log" -exec tail -100 {} \; 2>/dev/null || true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y gh
+          fi
+          TAG="v${GITHUB_RUN_NUMBER}"
+          gh release delete "$TAG" -y || true
+          gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
+            --title "Release $TAG" \
+            --notes "Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"

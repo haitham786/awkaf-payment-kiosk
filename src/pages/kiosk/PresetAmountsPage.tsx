@@ -79,16 +79,16 @@ const PresetAmountsPage = () => {
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden liquid-glass border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group rounded-2xl"
+              className="p-0 overflow-hidden bg-white/70 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group"
             >
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-row items-center justify-center py-3 gap-1.5 border-0 rounded-2xl min-h-0 p-3"
+                className="w-full h-full flex flex-row items-center justify-center py-3 gap-1.5 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
                 onClick={() => handleAmountSelect(amount)}
               >
                 <CurrencyLogo className="h-4" />
-                <div className="text-xl font-bold text-foreground group-hover:text-emerald-700 transition-colors">
+                <div className="text-xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                   {amount}
                 </div>
               </KioskButton>
@@ -102,11 +102,11 @@ const PresetAmountsPage = () => {
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-4 py-1.5 text-xs font-bold text-foreground border-0"
+            className="px-4 py-1.5 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
           >
             إدخال مبلغ مختلف
           </KioskButton>
-          <span className="text-xs text-muted-foreground">Enter a different amount</span>
+          <span className="text-xs text-gray-500">Enter a different amount</span>
         </div>
       </div>
     </KioskLayout>
