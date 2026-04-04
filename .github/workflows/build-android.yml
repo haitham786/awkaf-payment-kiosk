@@ -42,110 +42,9 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Add Android platform (always fresh)
-        run: |
-          rm -rf android
-          npx cap add android
-
-      - name: Sync Capacitor
+      # Sync web assets into the committed android/ folder
+      - name: Sync Capacitor web assets
         run: npx cap sync android
-
-      - name: Patch android/build.gradle — Thawani Maven + JitPack
-        env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: |
-          python3 - "$THAWANI_MAVEN_USER" "$THAWANI_MAVEN_TOKEN" << 'PYEOF'
-          import sys, re
-          from pathlib import Path
-          user  = sys.argv[1]
-          token = sys.argv[2]
-          print(f"user present={bool(user)}, token present={bool(token)}")
-          p    = Path("android/build.gradle")
-          text = p.read_text()
-          thawani = (
-              '\n        maven {\n'
-              '            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n'
-              '            credentials {\n'
-              f'                username "{user}"\n'
-              f'                password "{token}"\n'
-              '            }\n'
-              '        }'
-          )
-          jitpack = '\n        maven { url "https://jitpack.io" }'
-          inject = ""
-          if "ThawaniMobile" not in text: inject += thawani
-          if "jitpack.io"    not in text: inject += jitpack
-          if inject:
-              matches = list(re.finditer(r'allprojects\s*\{[^}]*repositories\s*\{', text, re.DOTALL))
-              if matches:
-                  pos = matches[-1].end()
-                  text = text[:pos] + inject + text[pos:]
-                  p.write_text(text)
-                  print("Patched allprojects repositories block")
-              else:
-                  print("ERROR: allprojects repositories not found"); sys.exit(1)
-          else:
-              print("Already patched")
-          PYEOF
-
-      - name: Restore variables.gradle (minSdkVersion=26 for Lamsa SDK)
-        run: |
-          cp android-config/variables.gradle android/variables.gradle
-          echo "Restored variables.gradle:"
-          cat android/variables.gradle
-
-      - name: Patch android/app/build.gradle — dataBinding + Lamsa SDK
-        run: |
-          python3 - << 'PYEOF'
-          import re
-          from pathlib import Path
-          p    = Path("android/app/build.gradle")
-          text = p.read_text()
-          if "dataBinding" not in text:
-              if "buildFeatures" in text:
-                  text = re.sub(r'(buildFeatures\s*\{)', r'\1\n        dataBinding true', text, count=1)
-              else:
-                  text = re.sub(r'(android\s*\{)', r'\1\n    buildFeatures {\n        dataBinding true\n    }', text, count=1)
-              print("Added dataBinding")
-          if "om.thawani" not in text:
-              text = re.sub(r'(dependencies\s*\{)', r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")', text, count=1)
-              print("Added Lamsa SDK dependency")
-          p.write_text(text)
-          PYEOF
-
-      - name: Copy ThawaniLamsaPlugin.java
-        run: |
-          DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
-          mkdir -p "$DIR"
-          cp android-plugin/ThawaniLamsaPlugin.java "$DIR/"
-          echo "Plugin copied"
-
-      # Replace MainActivity entirely — the original is empty (no onCreate),
-      # so regex patching never worked. We replace it with a proper one.
-      - name: Replace MainActivity.java with plugin-registering version
-        run: |
-          DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
-          cp android-plugin/MainActivity.java "$DIR/MainActivity.java"
-          echo "MainActivity.java replaced"
-          cat "$DIR/MainActivity.java"
-
-      - name: Patch AndroidManifest.xml — NFC + LamsaSDK activity
-        run: |
-          python3 - << 'PYEOF'
-          from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          xml = p.read_text()
-          if "android.permission.NFC" not in xml:
-              xml = xml.replace("<application",
-                  '<uses-permission android:name="android.permission.NFC" />\n'
-                  '    <uses-feature android:name="android.hardware.nfc" android:required="false" />\n'
-                  '    <application', 1)
-          # Do NOT add LamsaSDK activity - the SDK's own manifest declares it.
-          # Adding it here with exported="false" conflicts with the SDK manifest merger.
-          p.write_text(xml)
-          print("AndroidManifest patched")
-          PYEOF
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -167,23 +66,14 @@ jobs:
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: |
-          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee ../build-full.log; exit ${PIPESTATUS[0]}
-
-      - name: Upload full build log (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-full-log
-          path: build-full.log
-          retention-days: 7
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Find APK
         id: apk
         run: |
           APK=$(find android/app/build/outputs -name "*.apk" | head -1)
           echo "path=$APK" >> $GITHUB_OUTPUT
-          echo "APK: $APK"
+          echo "APK found: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -206,9 +96,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Show Gradle error on failure
+      - name: Show build log on failure
         if: failure()
-        run: |
-          echo "=== app/build.gradle ===" && cat android/app/build.gradle || true
-          echo "=== MainActivity.java ===" && cat android/app/src/main/java/app/lovable/awkafpaymentkiosk/MainActivity.java || true
-          find android/app/build -name "*.log" -exec tail -50 {} \; 2>/dev/null || true
+        run: find android -name "*.log" -exec tail -100 {} \; 2>/dev/null || true
