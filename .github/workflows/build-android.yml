@@ -42,9 +42,10 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Add Android platform
+      - name: Add Android platform (always fresh)
         run: |
-          if [ ! -d android ]; then npx cap add android; fi
+          rm -rf android
+          npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -88,18 +89,11 @@ jobs:
               print("Already patched")
           PYEOF
 
-      - name: Patch android/variables.gradle — set minSdkVersion 26 for Lamsa SDK
+      - name: Restore variables.gradle (minSdkVersion=26 for Lamsa SDK)
         run: |
-          python3 - << 'PYEOF'
-          import re
-          from pathlib import Path
-          p = Path("android/variables.gradle")
-          text = p.read_text()
-          # Lamsa SDK requires minSdkVersion 26
-          text = re.sub(r'minSdkVersion\s*=\s*\d+', 'minSdkVersion = 26', text)
-          p.write_text(text)
-          print("Set minSdkVersion = 26")
-          PYEOF
+          cp android-config/variables.gradle android/variables.gradle
+          echo "Restored variables.gradle:"
+          cat android/variables.gradle
 
       - name: Patch android/app/build.gradle — dataBinding + Lamsa SDK
         run: |
