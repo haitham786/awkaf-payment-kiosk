@@ -55,27 +55,27 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-xl mx-auto space-y-1.5 pt-1 pb-24">
-        <div className="text-center">
-          <div className="flex flex-col items-center justify-center gap-1 mb-1 min-h-[85px]">
-            <div className="w-14 h-14 flex items-center justify-center">
+      <div className="w-full max-w-md mx-auto flex flex-col h-full pb-10">
+        <div className="text-center shrink-0">
+          <div className="flex flex-col items-center justify-center gap-0.5 mb-1 min-h-[60px]">
+            <div className="w-10 h-10 flex items-center justify-center">
               {categoryData?.icon_url && isReady && (
-                <img src={categoryData.icon_url} alt={categoryData.title} className="w-14 h-14 object-contain" />
+                <img src={categoryData.icon_url} alt={categoryData.title} className="w-10 h-10 object-contain" />
               )}
             </div>
-            <h1 className="text-lg font-bold text-gray-900 drop-shadow-sm">
+            <h1 className="text-base font-bold text-gray-900 drop-shadow-sm leading-tight">
               {categoryData?.title || "اختر مبلغ التبرع"}
             </h1>
             {categoryData?.title_en && (
-              <p className="text-sm text-gray-600">{categoryData.title_en}</p>
+              <p className="text-xs text-gray-600 leading-tight">{categoryData.title_en}</p>
             )}
             {!categoryData?.title && (
-              <p className="text-sm text-gray-600">Select Donation Amount</p>
+              <p className="text-xs text-gray-600">Select Donation Amount</p>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 max-w-md mx-auto">
+        <div className="grid grid-cols-3 gap-1.5 max-w-sm mx-auto flex-1 min-h-0">
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
@@ -84,11 +84,11 @@ const PresetAmountsPage = () => {
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-row items-center justify-center py-3 gap-1.5 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
+                className="w-full h-full flex flex-row items-center justify-center py-2 gap-1 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
                 onClick={() => handleAmountSelect(amount)}
               >
-                <CurrencyLogo className="h-4" />
-                <div className="text-xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                <CurrencyLogo className="h-3.5" />
+                <div className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
                   {amount}
                 </div>
               </KioskButton>
@@ -96,17 +96,17 @@ const PresetAmountsPage = () => {
           ))}
         </div>
 
-        <div className="flex flex-col items-center mt-4 pt-2 gap-0.5">
+        <div className="flex flex-col items-center mt-2 gap-0.5 shrink-0">
           <KioskButton
             variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-4 py-1.5 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
+            className="px-3 py-1 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
           >
             إدخال مبلغ مختلف
           </KioskButton>
-          <span className="text-xs text-gray-500">Enter a different amount</span>
+          <span className="text-[0.6rem] text-gray-500">Enter a different amount</span>
         </div>
       </div>
     </KioskLayout>

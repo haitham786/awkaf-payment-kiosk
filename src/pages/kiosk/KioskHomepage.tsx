@@ -8,7 +8,6 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 
-// Cache for preloaded images
 const imageCache = new Map<string, boolean>();
 
 const KioskHomepage = () => {
@@ -141,41 +140,41 @@ const KioskHomepage = () => {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-2 right-2 z-50 w-10 h-10 rounded-full bg-white border border-gray-300 hover:bg-gray-100"
+        className="fixed top-2 right-2 z-50 w-8 h-8 rounded-full bg-white border border-gray-300 hover:bg-gray-100"
         onClick={() => navigate('/kiosk/setup')}
       >
-        <Settings className="w-5 h-5 text-gray-700" />
+        <Settings className="w-4 h-4 text-gray-700" />
       </Button>
 
       {kioskStatus !== 'active' && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-8">
-          <Card className="max-w-2xl w-full p-12 text-center bg-white shadow-2xl">
-            <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
-              {kioskStatus === 'unregistered' ? <Settings className="w-16 h-16 text-white" /> : <AlertTriangle className="w-16 h-16 text-white" />}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+          <Card className="max-w-sm w-full p-6 text-center bg-white shadow-2xl">
+            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
+              {kioskStatus === 'unregistered' ? <Settings className="w-10 h-10 text-white" /> : <AlertTriangle className="w-10 h-10 text-white" />}
             </div>
-            <h2 className="text-4xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">
               {statusMessages[kioskStatus]?.ar || 'غير متاح حالياً'}
             </h2>
-            <p className="text-2xl text-gray-500 mb-6">
+            <p className="text-lg text-gray-500 mb-3">
               {statusMessages[kioskStatus]?.en || 'Currently Unavailable'}
             </p>
-            <p className="text-2xl text-gray-700 leading-relaxed mb-2">
+            <p className="text-base text-gray-700 leading-relaxed mb-1">
               {kioskMessage}
             </p>
-            <p className="text-xl text-gray-500 leading-relaxed mb-8">
+            <p className="text-sm text-gray-500 leading-relaxed mb-4">
               {statusMessageEn[kioskMessage] || ''}
             </p>
             {kioskStatus === 'unregistered' && (
-              <Button size="lg" className="text-lg px-6 py-4 max-w-xs w-full bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
-                <Settings className="w-5 h-5 ml-2 flex-shrink-0" />
-                <span className="truncate">فتح لوحة الإعدادات</span>
-                <span className="text-sm ml-1 opacity-80 truncate">Open Settings</span>
+              <Button size="default" className="text-sm px-4 py-2 max-w-[250px] w-full bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
+                <Settings className="w-4 h-4 ml-1 flex-shrink-0" />
+                <span className="truncate">فتح الإعدادات</span>
+                <span className="text-xs ml-1 opacity-80">Settings</span>
               </Button>
             )}
             {kioskStatus !== 'unregistered' && (
-              <div className="mt-4">
-                <p className="text-lg text-gray-600">نشكر لكم تفهمكم</p>
-                <p className="text-base text-gray-400">Thank you for your understanding</p>
+              <div className="mt-2">
+                <p className="text-sm text-gray-600">نشكر لكم تفهمكم</p>
+                <p className="text-xs text-gray-400">Thank you for your understanding</p>
               </div>
             )}
           </Card>
@@ -183,73 +182,73 @@ const KioskHomepage = () => {
       )}
       
       <div
-        className="w-full max-w-6xl mx-auto"
+        className="w-full max-w-6xl mx-auto flex flex-col h-full"
         style={{
           opacity: kioskStatus !== 'active' ? 0.5 : 1,
           pointerEvents: kioskStatus !== 'active' ? 'none' : 'auto'
         }}
       >
-        <div className="text-center mb-6">
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-md border-0 mb-4">
-            <p className="text-xl font-bold text-gray-800 leading-relaxed">
+        <div className="text-center mb-2 shrink-0">
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-2 shadow-md border-0 mb-2">
+            <p className="text-sm font-bold text-gray-800 leading-relaxed">
               "{quranicVerse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"}"
             </p>
-            <p className="text-sm text-emerald-700 mt-2 font-semibold">
+            <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
               القرآن الكريم - سورة البقرة
             </p>
-            <p className="text-xs text-emerald-600 mt-0.5">
+            <p className="text-[0.6rem] text-emerald-600">
               The Holy Quran - Surah Al-Baqarah
             </p>
           </div>
 
-          <h1 className="text-2xl font-bold mb-1 text-gray-900 drop-shadow-lg">نظام التبرعات الرقمي</h1>
-          <p className="text-base text-gray-600 mb-2">Digital Donation System</p>
-          <p className="text-lg text-gray-900 font-semibold drop-shadow">
+          <h1 className="text-lg font-bold mb-0.5 text-gray-900 drop-shadow-lg">نظام التبرعات الرقمي</h1>
+          <p className="text-xs text-gray-600 mb-1">Digital Donation System</p>
+          <p className="text-sm text-gray-900 font-semibold drop-shadow">
             اختر نوع التبرع الذي ترغب في المساهمة به
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-xs text-gray-600">
             Choose the type of donation you would like to contribute
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0">
           {loading || !imagesPreloaded ? (
-            <div className="col-span-2 text-center text-lg text-white/90">
+            <div className="col-span-2 text-center text-base text-white/90">
               جاري التحميل...
-              <p className="text-sm text-white/70">Loading...</p>
+              <p className="text-xs text-white/70">Loading...</p>
             </div>
           ) : categories.length === 0 ? (
-            <div className="col-span-2 text-center text-lg text-white/80">
+            <div className="col-span-2 text-center text-base text-white/80">
               لا توجد فئات متاحة حالياً
-              <p className="text-sm text-white/60">No categories available</p>
+              <p className="text-xs text-white/60">No categories available</p>
             </div>
           ) : (
             categories.map((category) => (
               <Card
                 key={category.id}
-                className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative min-h-[160px]"
+                className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative"
               >
                 {(category.info_text || category.description) && (
-                  <div className="absolute top-2 right-2 z-10">
+                  <div className="absolute top-1 right-1 z-10">
                     <CategoryInfoDialog title={category.title} description={category.description} infoText={category.info_text} />
                   </div>
                 )}
                 <KioskButton
                   variant="donation"
                   soundEffect="category"
-                  className="w-full h-full flex flex-col items-center justify-center space-y-1 border-0 rounded-xl bg-transparent hover:bg-emerald-50/60"
+                  className="w-full h-full flex flex-col items-center justify-center py-2 space-y-0.5 border-0 rounded-xl bg-transparent hover:bg-emerald-50/60"
                   onClick={() => handleCategorySelect(category.category_id)}
                 >
-                  <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
+                  <div className="w-10 h-10 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
                     {category.icon_url && (
                       <img src={category.icon_url} alt={category.title} className="w-full h-full object-contain" />
                     )}
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                  <h3 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-tight">
                     {category.title}
                   </h3>
                   {category.title_en && (
-                    <p className="text-sm text-gray-600 group-hover:text-emerald-600 transition-colors">
+                    <p className="text-xs text-gray-600 group-hover:text-emerald-600 transition-colors leading-tight">
                       {category.title_en}
                     </p>
                   )}
@@ -259,11 +258,11 @@ const KioskHomepage = () => {
           )}
         </div>
 
-        <div className="text-center">
-          <p className="text-white/90 text-base font-semibold drop-shadow">
+        <div className="text-center shrink-0 pb-1">
+          <p className="text-white/90 text-xs font-semibold drop-shadow">
             المس الشاشة لاختيار نوع التبرع
           </p>
-          <p className="text-white/70 text-sm">
+          <p className="text-white/70 text-[0.6rem]">
             Touch the screen to select a donation type
           </p>
         </div>

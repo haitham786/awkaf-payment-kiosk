@@ -12,11 +12,9 @@ interface KioskLayoutProps {
 export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProps) => {
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(() => {
-    // Initialize from localStorage to prevent flashing
     return localStorage.getItem('kiosk_background_url') || "";
   });
   const [logoImage, setLogoImage] = useState<string>(() => {
-    // Initialize from localStorage to prevent flashing
     return localStorage.getItem('kiosk_logo_url') || "";
   });
   const [imagesPreloaded, setImagesPreloaded] = useState(false);
@@ -39,7 +37,6 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
         const bgUrl = data.background_image_url || "";
         const logoUrl = data.logo_url || "";
         
-        // Preload images before setting them
         const promises = [];
         
         if (bgUrl) {
@@ -66,7 +63,6 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
         
         await Promise.all(promises);
         
-        // Store in localStorage for instant access on next load
         if (bgUrl) {
           localStorage.setItem('kiosk_background_url', bgUrl);
           setBackgroundImage(bgUrl);
@@ -86,7 +82,7 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-start p-6 relative islamic-pattern"
+      className="h-screen flex flex-col items-center justify-start p-3 relative islamic-pattern overflow-hidden"
       style={{
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: 'cover',
@@ -96,33 +92,33 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
       }}
     >
 
-      {/* Logo at top center - Always reserve space for stability */}
-      <div className="relative z-10 w-full flex justify-center pt-4 pb-2 min-h-[72px]">
+      {/* Logo at top center */}
+      <div className="relative z-10 w-full flex justify-center pt-1 pb-1 min-h-[48px] shrink-0">
         {logoImage && (
           <img 
             src={logoImage} 
             alt="Organization Logo" 
-            className="h-14 w-auto object-contain max-w-[200px]"
+            className="h-10 w-auto object-contain max-w-[160px]"
           />
         )}
       </div>
       
-      {/* Content - proper spacing below logo */}
-      <div className="relative z-10 w-full max-w-6xl flex-1 flex items-center justify-center pt-2">
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-6xl flex-1 flex items-center justify-center overflow-hidden">
         {children}
       </div>
 
       {/* Home Button */}
       {showHomeButton && (
-        <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 z-20">
+        <div className="fixed bottom-3 left-1/2 transform -translate-x-1/2 z-20">
           <KioskButton
             variant="ghost"
-            size="lg"
+            size="sm"
             soundEffect="navigation"
             onClick={() => navigate("/kiosk")}
-            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
+            className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-2"
           >
-            <Home className="w-8 h-8 text-white drop-shadow-lg" />
+            <Home className="w-6 h-6 text-white drop-shadow-lg" />
           </KioskButton>
         </div>
       )}
