@@ -69,19 +69,20 @@ jobs:
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Find APK
         id: apk
         run: |
-          APK=$(find android/app/build/outputs -name "*.apk" | head -1)
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          [ -z "$APK" ] && APK=$(find android/app/build/outputs -name "*.apk" | head -1)
           echo "path=$APK" >> $GITHUB_OUTPUT
           echo "APK found: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: awkaf-kiosk-apk
+          name: awkaf-kiosk-release-apk
           path: ${{ steps.apk.outputs.path }}
           retention-days: 30
 
