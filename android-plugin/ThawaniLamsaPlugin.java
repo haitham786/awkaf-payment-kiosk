@@ -227,6 +227,7 @@ public class ThawaniLamsaPlugin extends Plugin {
 
     // ── Activity result callback ─────────────────────────────────────────────
 
+    @SuppressWarnings("deprecation")
     @ActivityCallback
     private void handlePaymentResult(PluginCall call, ActivityResult activityResult) {
         if (call == null) {
