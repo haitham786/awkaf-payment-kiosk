@@ -19,11 +19,13 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
-        maven {
-            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"
-            credentials {
-                username System.getenv("THAWANI_MAVEN_USER") ?: ""
-                password System.getenv("THAWANI_MAVEN_TOKEN") ?: ""
+        if (System.getenv("THAWANI_MAVEN_USER")?.trim()) {
+            maven {
+                url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"
+                credentials {
+                    username System.getenv("THAWANI_MAVEN_USER") ?: ""
+                    password System.getenv("THAWANI_MAVEN_TOKEN") ?: ""
+                }
             }
         }
         maven { url "https://jitpack.io" }
