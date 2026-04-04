@@ -2,6 +2,7 @@ package app.lovable.awkafpaymentkiosk;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
+import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
