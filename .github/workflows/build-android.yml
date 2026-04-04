@@ -49,15 +49,13 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # ── Show settings.gradle BEFORE patching so we know its exact structure ─
-      - name: Show android/settings.gradle (pre-patch)
-        run: cat android/settings.gradle
+      - name: Show android/build.gradle (pre-patch)
+        run: cat android/build.gradle
 
-      # ── Patch settings.gradle: add Thawani Maven + JitPack ───────────────
-      # IMPORTANT: Capacitor 7 uses dependencyResolutionManagement in settings.gradle
-      # with FAIL_ON_PROJECT_REPOS — repos MUST go here, not in build.gradle.
-      # JitPack is needed for capacitor-plugin-usb-serial (com.github.mik3y).
-      - name: Patch android/settings.gradle — Thawani Maven + JitPack
+      # ── Patch android/build.gradle — allprojects repositories block ───────
+      # Capacitor 7 does NOT use dependencyResolutionManagement.
+      # Repositories go in allprojects { repositories { } } in build.gradle.
+      - name: Patch android/build.gradle — Thawani Maven + JitPack
         env:
           THAWANI_MAVEN_USER:  ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
@@ -70,7 +68,7 @@ jobs:
           token = sys.argv[2]
           print(f"user present={bool(user)}, token present={bool(token)}")
 
-          p    = Path("android/settings.gradle")
+          p    = Path("android/build.gradle")
           text = p.read_text()
 
           thawani = (
@@ -84,33 +82,47 @@ jobs:
           )
           jitpack = '\n        maven { url "https://jitpack.io" }'
 
-          inject = ""
-          if "ThawaniMobile" not in text:
-              inject += thawani
-          if "jitpack.io" not in text:
-              inject += jitpack
+          # Target the allprojects { repositories { } } block specifically.
+          # We find "allprojects" then the repositories block inside it.
+          if "ThawaniMobile" not in text or "jitpack.io" not in text:
+              inject = ""
+              if "ThawaniMobile" not in text:
+                  inject += thawani
+              if "jitpack.io" not in text:
+                  inject += jitpack
 
-          if inject:
-              # Insert into the last repositories { } block (= dependencyResolutionManagement one)
-              # Find all occurrences and replace the last one
-              matches = list(re.finditer(r'repositories\s*\{', text))
-              if matches:
-                  m = matches[-1]
-                  pos = m.end()
-                  text = text[:pos] + inject + text[pos:]
-                  p.write_text(text)
-                  print("Patched settings.gradle")
+              # Find allprojects block and the repositories { inside it
+              # Pattern: allprojects { ... repositories { <INSERT HERE>
+              patched = re.sub(
+                  r'(allprojects\s*\{[^}]*repositories\s*\{)',
+                  r'\1' + inject,
+                  text,
+                  flags=re.DOTALL
+              )
+
+              if patched == text:
+                  # Fallback: insert into last repositories { block
+                  matches = list(re.finditer(r'repositories\s*\{', text))
+                  if matches:
+                      m = matches[-1]
+                      pos = m.end()
+                      text = text[:pos] + inject + text[pos:]
+                      p.write_text(text)
+                      print("Patched via fallback (last repositories block)")
+                  else:
+                      print("ERROR: no repositories block found!")
+                      sys.exit(1)
               else:
-                  print("ERROR: no repositories block found in settings.gradle!")
-                  sys.exit(1)
+                  p.write_text(patched)
+                  print("Patched allprojects repositories block")
           else:
               print("Already patched")
           PYEOF
 
-      - name: Show android/settings.gradle (post-patch)
-        run: cat android/settings.gradle
+      - name: Show android/build.gradle (post-patch)
+        run: cat android/build.gradle
 
-      # ── Patch app/build.gradle: dataBinding + Lamsa SDK dep ──────────────
+      # ── Patch android/app/build.gradle — dataBinding + Lamsa SDK ─────────
       - name: Patch android/app/build.gradle — dataBinding + Lamsa SDK
         run: |
           python3 - << 'PYEOF'
@@ -132,6 +144,7 @@ jobs:
               print("Added Lamsa SDK dependency")
 
           p.write_text(text)
+          print("android/app/build.gradle done")
           PYEOF
 
       - name: Copy ThawaniLamsaPlugin.java
@@ -225,5 +238,5 @@ jobs:
       - name: Show Gradle files on failure
         if: failure()
         run: |
-          echo "=== settings.gradle ===" && cat android/settings.gradle || true
+          echo "=== build.gradle ===" && cat android/build.gradle || true
           echo "=== app/build.gradle ===" && cat android/app/build.gradle || true
