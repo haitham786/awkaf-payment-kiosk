@@ -12,24 +12,24 @@ serve(async (req) => {
   }
 
   try {
-    const THAWANI_API_KEY = Deno.env.get('THAWANI_API_KEY');
-    const THAWANI_PUBLISHABLE_KEY = Deno.env.get('THAWANI_PUBLISHABLE_KEY');
-    const THAWANI_ENV = Deno.env.get('THAWANI_ENV') || 'test';
+    const resolveThawaniConfig = (mode?: string) => {
+      const normalizedMode = mode === 'live' ? 'live' : 'test';
+      const fallbackEnv = Deno.env.get('THAWANI_ENV') === 'live' ? 'live' : 'test';
+      const activeMode = mode ? normalizedMode : fallbackEnv;
+      const isLive = activeMode === 'live';
 
-    if (!THAWANI_API_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Thawani API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-
-    const baseUrl = THAWANI_ENV === 'live'
-      ? 'https://checkout.thawani.om/api/v1'
-      : 'https://uatcheckout.thawani.om/api/v1';
-
-    const checkoutBaseUrl = THAWANI_ENV === 'live'
-      ? 'https://checkout.thawani.om'
-      : 'https://uatcheckout.thawani.om';
+      return {
+        env: activeMode,
+        apiKey: isLive
+          ? Deno.env.get('THAWANI_LIVE_API_KEY') || Deno.env.get('THAWANI_API_KEY')
+          : Deno.env.get('THAWANI_TEST_API_KEY') || Deno.env.get('THAWANI_API_KEY'),
+        publishableKey: isLive
+          ? Deno.env.get('THAWANI_LIVE_PUBLISHABLE_KEY') || Deno.env.get('THAWANI_PUBLISHABLE_KEY')
+          : Deno.env.get('THAWANI_TEST_PUBLISHABLE_KEY') || Deno.env.get('THAWANI_PUBLISHABLE_KEY'),
+        baseUrl: isLive ? 'https://checkout.thawani.om/api/v1' : 'https://uatcheckout.thawani.om/api/v1',
+        checkoutBaseUrl: isLive ? 'https://checkout.thawani.om' : 'https://uatcheckout.thawani.om',
+      };
+    };
 
     // Use service role key for DB operations (needed for UPDATE which requires admin RLS)
     const supabaseClient = createClient(
@@ -42,12 +42,20 @@ serve(async (req) => {
     const { action } = body;
 
     if (action === 'create_session') {
-      const { amount, category, transactionId, kioskId, successUrl, cancelUrl, categoryReference } = body;
+      const { amount, category, transactionId, kioskId, successUrl, cancelUrl, categoryReference, gatewayMode } = body;
+      const thawaniConfig = resolveThawaniConfig(gatewayMode);
 
       if (!amount || !category || !transactionId) {
         return new Response(
           JSON.stringify({ success: false, error: 'Missing required fields' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      if (!thawaniConfig.apiKey || !thawaniConfig.publishableKey) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Thawani gateway keys are not configured for the selected environment' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         );
       }
 
@@ -84,13 +92,13 @@ serve(async (req) => {
         },
       };
 
-      console.log('Creating Thawani session:', { transactionId, amount: amountInBaisas, category });
+      console.log('Creating Thawani session:', { transactionId, amount: amountInBaisas, category, gatewayMode: thawaniConfig.env });
 
-      const response = await fetch(`${baseUrl}/checkout/session`, {
+      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'thawani-api-key': THAWANI_API_KEY,
+          'thawani-api-key': thawaniConfig.apiKey,
         },
         body: JSON.stringify(sessionData),
       });
@@ -100,13 +108,13 @@ serve(async (req) => {
       if (!response.ok || !result.success) {
         console.error('Thawani session creation failed:', result);
         return new Response(
-          JSON.stringify({ success: false, error: result.description || 'Failed to create payment session' }),
+          JSON.stringify({ success: false, error: result.detail || result.description || 'Failed to create payment session' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
       }
 
       const sessionId = result.data?.session_id;
-      const checkoutUrl = `${checkoutBaseUrl}/pay/${sessionId}?key=${THAWANI_PUBLISHABLE_KEY}`;
+      const checkoutUrl = `${thawaniConfig.checkoutBaseUrl}/pay/${sessionId}?key=${thawaniConfig.publishableKey}`;
 
       // Create a pending transaction record
       const { error: insertError } = await supabaseClient.from('transactions').insert({
@@ -129,7 +137,7 @@ serve(async (req) => {
           success: true,
           session_id: sessionId,
           checkout_url: checkoutUrl,
-          publishable_key: THAWANI_PUBLISHABLE_KEY,
+          publishable_key: thawaniConfig.publishableKey,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -137,6 +145,14 @@ serve(async (req) => {
 
     if (action === 'check_session') {
       const { sessionId, transactionId } = body;
+      const thawaniConfig = resolveThawaniConfig(body.gatewayMode);
+
+      if (!thawaniConfig.apiKey) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Thawani API key not configured for the selected environment' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
 
       if (!sessionId && !transactionId) {
         return new Response(
@@ -180,11 +196,11 @@ serve(async (req) => {
         );
       }
 
-      const response = await fetch(`${baseUrl}/checkout/session/${resolvedSessionId}`, {
+      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session/${resolvedSessionId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'thawani-api-key': THAWANI_API_KEY,
+          'thawani-api-key': thawaniConfig.apiKey,
         },
       });
 
