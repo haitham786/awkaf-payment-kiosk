@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Info, Globe, FlaskConical } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -401,7 +401,6 @@ const KiosksManagement = () => {
                       <Smartphone className="w-4 h-4" />
                       <div>
                         <p className="font-medium">Soft POS (Thawani Lamsa)</p>
-                        <p className="text-xs text-muted-foreground">NFC contactless payments via Thawani Lamsa SDK</p>
                       </div>
                     </Label>
                   </div>
@@ -412,7 +411,6 @@ const KiosksManagement = () => {
                       <Globe className="w-4 h-4" />
                       <div>
                         <p className="font-medium">Payment Gateway (Thawani Checkout)</p>
-                        <p className="text-xs text-muted-foreground">Online card payment via Thawani eCommerce gateway</p>
                       </div>
                     </Label>
                   </div>
@@ -423,7 +421,6 @@ const KiosksManagement = () => {
                       <FlaskConical className="w-4 h-4" />
                       <div>
                         <p className="font-medium">Testing Mode</p>
-                        <p className="text-xs text-muted-foreground">Simulate successful payments and record them in transactions and statistics</p>
                       </div>
                     </Label>
                   </div>
@@ -437,15 +434,6 @@ const KiosksManagement = () => {
                     <Smartphone className="w-4 h-4" />
                     Thawani Lamsa Soft POS Configuration
                   </h4>
-                  
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Thawani Lamsa requires an Auth Key (touchpoint key). Register at <a href="https://merchant.thawani.om/" target="_blank" rel="noopener noreferrer" className="underline">merchant.thawani.om</a>.
-                      </p>
-                    </div>
-                  </div>
 
                   <div>
                     <Label htmlFor="auth_key">Auth Key (Touchpoint Key)</Label>
@@ -503,15 +491,6 @@ const KiosksManagement = () => {
                     <Globe className="w-4 h-4" />
                     Thawani Payment Gateway Configuration
                   </h4>
-                  
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
-                        Thawani Payment Gateway uses checkout sessions to process card payments securely. API keys are configured as environment secrets (THAWANI_API_KEY, THAWANI_PUBLISHABLE_KEY).
-                      </p>
-                    </div>
-                  </div>
 
                   <div>
                     <Label>Gateway Mode</Label>
@@ -531,11 +510,6 @@ const KiosksManagement = () => {
                     </RadioGroup>
                   </div>
 
-                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                      <strong>How it works:</strong> Donors will be redirected to Thawani's secure checkout page to enter card details (card number, holder name, expiry, CVC). No card data is processed by the kiosk app.
-                    </p>
-                  </div>
                 </div>
               )}
 
@@ -545,12 +519,6 @@ const KiosksManagement = () => {
                     <FlaskConical className="w-4 h-4" />
                     Testing Mode Configuration
                   </h4>
-
-                  <div className="p-3 rounded-lg border bg-accent/30 border-border">
-                    <p className="text-xs text-foreground">
-                      <strong>How it works:</strong> the kiosk skips Thawani entirely, marks the payment as successful, and creates a completed transaction so it appears in billing and statistics.
-                    </p>
-                  </div>
                 </div>
               )}
 
