@@ -284,14 +284,10 @@ jobs:
       - name: Patch AndroidManifest.xml for USB + NFC + conditional Lamsa
         shell: bash
         env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="false"
-          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            HAS_CREDS="true"
-          fi
+          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
           python3 - "$HAS_CREDS" << 'PY'
           import sys
           from pathlib import Path
@@ -361,10 +357,10 @@ jobs:
         working-directory: android
         shell: bash
         env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
         run: |
           set -euxo pipefail
+          echo "Building with Thawani SDK package access: ${HAS_THAWANI_PACKAGE_ACCESS:-false}"
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)
