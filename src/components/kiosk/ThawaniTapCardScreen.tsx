@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const imageCache = new Map<string, boolean>();
 
@@ -21,11 +22,8 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(() => localStorage.getItem('kiosk_background_url') || "");
   const [logoImage, setLogoImage] = useState<string>(() => localStorage.getItem('kiosk_logo_url') || "");
-  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => {
-    const cached = sessionStorage.getItem(`category_${category}`);
-    return cached ? JSON.parse(cached) : null;
-  });
-  const [isReady, setIsReady] = useState(() => !!sessionStorage.getItem(`category_${category}`));
+  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
+  const [isReady, setIsReady] = useState(() => !!readCachedCategory(category));
   const [countdown, setCountdown] = useState(15);
 
   useEffect(() => {
@@ -42,11 +40,11 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
   useEffect(() => {
     const loadCategory = async () => {
       if (!category) { setIsReady(true); return; }
-      const cached = sessionStorage.getItem(`category_${category}`);
-      if (cached) { setCategoryData(JSON.parse(cached)); setIsReady(true); return; }
+      const cached = readCachedCategory(category);
+      if (cached) { setCategoryData(cached); setIsReady(true); return; }
       const { data } = await supabase.from('donation_categories').select('title, title_en, icon_url').eq('category_id', category).maybeSingle();
       if (data) {
-        sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
+        storeCategoryInCache({ ...data, category_id: category });
         if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
           img.onload = () => { imageCache.set(data.icon_url!, true); setCategoryData(data); setIsReady(true); };
@@ -77,8 +75,8 @@ export const ThawaniTapCardScreen: React.FC<ThawaniTapCardScreenProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden" style={{ backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: '#f5f5f5' }}>
-      <div className="w-full flex justify-center pt-4 pb-2 min-h-[72px]">
-        {logoImage && <img src={logoImage} alt="Organization Logo" className="h-14 w-auto object-contain max-w-[200px]" />}
+      <div className="w-full flex justify-center items-center pt-2 pb-2 min-h-[64px]">
+        {logoImage && <img src={logoImage} alt="Organization Logo" className="h-12 w-auto object-contain max-w-[220px]" />}
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6">

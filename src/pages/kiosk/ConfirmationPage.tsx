@@ -6,18 +6,28 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(null);
+  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
 
   useEffect(() => {
     const loadCategory = async () => {
+      const cached = readCachedCategory(category);
+      if (cached) {
+        setCategoryData(cached);
+        return;
+      }
+
       const { data } = await supabase.from('donation_categories').select('title, title_en, icon_url').eq('category_id', category).maybeSingle();
-      if (data) setCategoryData(data);
+      if (data) {
+        storeCategoryInCache({ ...data, category_id: category });
+        setCategoryData(data);
+      }
     };
     loadCategory();
   }, [category]);
@@ -93,13 +103,13 @@ const ConfirmationPage = () => {
           </div>
         </Card>
 
-        <div className="flex justify-center space-x-4 mt-4 pb-20">
+        <div className="flex justify-center gap-4 mt-4 pb-20">
           <KioskButton
             variant="outline"
             size="xl"
             soundEffect="navigation"
             onClick={handleBack}
-            className="min-w-[160px] ml-4 bg-white/40 backdrop-blur-sm border-0 hover:bg-gray-100/60 text-gray-900"
+            className="min-w-[160px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
             <ArrowRight className="w-5 h-5 ml-2" />
             <span className="flex flex-col items-start">
@@ -109,15 +119,15 @@ const ConfirmationPage = () => {
           </KioskButton>
           
           <KioskButton
-            variant="confirm"
+            variant="outline"
             size="xl"
             soundEffect="navigation"
             onClick={handleConfirm}
-            className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+            className="min-w-[160px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
             <span className="flex flex-col items-end">
               <span>التأكيد و الدفع</span>
-              <span className="text-xs text-white/80">Confirm & Pay</span>
+              <span className="text-xs text-gray-500">Confirm & Pay</span>
             </span>
             <ArrowLeft className="w-5 h-5 mr-2" />
           </KioskButton>

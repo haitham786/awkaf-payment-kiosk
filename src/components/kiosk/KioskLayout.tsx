@@ -93,12 +93,12 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
     >
 
       {/* Logo at top center */}
-      <div className="relative z-10 w-full flex justify-center pt-1 pb-1 min-h-[48px] shrink-0">
+      <div className="relative z-10 w-full flex justify-center items-center pt-2 pb-2 min-h-[64px] shrink-0">
         {logoImage && (
           <img 
             src={logoImage} 
             alt="Organization Logo" 
-            className="h-10 w-auto object-contain max-w-[160px]"
+            className="h-12 w-auto object-contain max-w-[220px]"
           />
         )}
       </div>
