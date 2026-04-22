@@ -127,7 +127,9 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
+    font-family: 'Times New Roman', Times, serif;
+    font-weight: 700;
   }
 
   /* RTL support for Arabic content */
