@@ -131,6 +131,8 @@ jobs:
         shell: bash
         env:
           HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
           HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
@@ -358,6 +360,8 @@ jobs:
         shell: bash
         env:
           HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
           echo "Building with Thawani SDK package access: ${HAS_THAWANI_PACKAGE_ACCESS:-false}"
