@@ -107,13 +107,23 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure Maven repositories (JitPack + Thawani)
+      - name: Ensure Maven repositories (JitPack + conditional Thawani)
         shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          python3 - << 'PY'
+          HAS_CREDS="false"
+          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
+            HAS_CREDS="true"
+          fi
+          echo "Thawani Maven credentials available: $HAS_CREDS"
+          python3 - "$HAS_CREDS" << 'PY'
+          import sys
           from pathlib import Path
           import re
+          has_creds = sys.argv[1] == "true"
           def patch_repositories_block(text, snippets):
               patched = text
               for snippet in snippets:
@@ -130,17 +140,20 @@ jobs:
                   print(f"Patched {path}")
           groovy_snippets = [
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
-              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
           ]
-          for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
-              patch_file(Path(f), groovy_snippets)
           kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
-              {"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'},
           ]
+          if has_creds:
+              groovy_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'})
+              kts_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'})
+          else:
+              print("Skipping Thawani Maven repository (no credentials)")
+          for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
+              patch_file(Path(f), groovy_snippets)
           for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
               patch_file(Path(f), kts_snippets)
-          print("Maven repositories configured (JitPack + Thawani)")
+          print("Maven repositories configured")
           PY
 
       - name: Add dataBinding and optional Lamsa SDK dependency
