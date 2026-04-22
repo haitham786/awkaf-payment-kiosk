@@ -152,6 +152,7 @@ const KiosksManagement = () => {
         payment_mode: config.payment_mode || 'soft_pos',
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
+        test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
       }
     });
@@ -178,6 +179,7 @@ const KiosksManagement = () => {
         payment_mode: 'soft_pos',
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
+        test_payment: { auto_approve: true },
         sound_enabled: true,
       }
     });
@@ -278,6 +280,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
+    if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
 
