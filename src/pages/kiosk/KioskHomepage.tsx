@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
-import { CATEGORY_CACHE_KEY, primeCategoryCache, readCachedCategories, preloadCategoryImages } from "@/lib/kioskCategoryCache";
+import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 

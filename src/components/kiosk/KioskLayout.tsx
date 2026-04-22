@@ -17,8 +17,6 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
   const [logoImage, setLogoImage] = useState<string>(() => {
     return localStorage.getItem('kiosk_logo_url') || "";
   });
-  const [imagesPreloaded, setImagesPreloaded] = useState(false);
-
   useEffect(() => {
     preloadImages();
   }, []);
@@ -72,11 +70,9 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
           setLogoImage(logoUrl);
         }
         
-        setImagesPreloaded(true);
       }
     } catch (error) {
       console.error("Error preloading images:", error);
-      setImagesPreloaded(true);
     }
   };
 
