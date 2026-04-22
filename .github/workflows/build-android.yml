@@ -269,13 +269,22 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
+      - name: Patch AndroidManifest.xml for USB + NFC + conditional Lamsa
         shell: bash
+        env:
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          python3 - << 'PY'
+          HAS_CREDS="false"
+          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
+            HAS_CREDS="true"
+          fi
+          python3 - "$HAS_CREDS" << 'PY'
+          import sys
           from pathlib import Path
           import re
+          has_creds = sys.argv[1] == "true"
           p = Path("android/app/src/main/AndroidManifest.xml")
           if not p.exists():
               raise SystemExit("AndroidManifest.xml not found")
@@ -296,11 +305,12 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          # Register LamsaSDK Activity
-          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+          if has_creds and "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
               xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
+          elif not has_creds:
+              print("Skipping LamsaSDK activity registration (no credentials)")
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
+          print("AndroidManifest.xml patched (USB + NFC" + (" + Lamsa" if has_creds else "") + ")")
           PY
 
       - name: Grant execute permission for gradlew
