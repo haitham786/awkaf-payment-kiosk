@@ -1,0 +1,1 @@
+ALTER TABLE public.kiosk_settings ADD COLUMN quranic_verse_surah text DEFAULT 'البقرة';

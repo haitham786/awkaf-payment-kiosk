@@ -67,6 +67,7 @@ export type Database = {
           logo_url: string | null
           pos_type: string | null
           quranic_verse: string | null
+          quranic_verse_surah: string | null
           soft_pos_config: Json | null
           updated_at: string | null
         }
@@ -77,6 +78,7 @@ export type Database = {
           logo_url?: string | null
           pos_type?: string | null
           quranic_verse?: string | null
+          quranic_verse_surah?: string | null
           soft_pos_config?: Json | null
           updated_at?: string | null
         }
@@ -87,6 +89,7 @@ export type Database = {
           logo_url?: string | null
           pos_type?: string | null
           quranic_verse?: string | null
+          quranic_verse_surah?: string | null
           soft_pos_config?: Json | null
           updated_at?: string | null
         }
