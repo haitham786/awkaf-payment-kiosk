@@ -10,6 +10,7 @@ const corsHeaders = {
 // Categories are now dynamic - validated against the database instead of hardcoded list
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OMAN_MOBILE_REGEX = /^\+968[0-9]{8}$/;
+const ALLOWED_TRANSACTION_CATEGORIES = new Set(['donation', 'zakat', 'sadaqah', 'general']);
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
@@ -101,6 +102,10 @@ function validatePaymentInput(data: any) {
   return errors;
 }
 
+function normalizeTransactionCategory(category: string) {
+  return ALLOWED_TRANSACTION_CATEGORIES.has(category) ? category : 'general';
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -136,7 +141,8 @@ serve(async (req) => {
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     const requestData = await req.json();
@@ -158,6 +164,7 @@ serve(async (req) => {
     }
 
     const { transactionId, kioskId, amount, category, mobileNumber, posResponse, softPosResult, paymentType, provider, thawaniReference } = requestData;
+    const normalizedCategory = normalizeTransactionCategory(category);
     
     // Check kiosk-based rate limit
     const kioskRateLimit = checkRateLimit(`kiosk:${kioskId}`, MAX_REQUESTS_PER_KIOSK);
@@ -234,6 +241,12 @@ serve(async (req) => {
 
     const categoryReference = categoryData?.category_reference || null;
 
+    const { data: generatedReference, error: referenceError } = await supabaseClient.rpc('generate_reference_number');
+    if (referenceError) {
+      console.error('Reference generation error:', referenceError);
+      throw referenceError;
+    }
+
     // Fetch kiosk reference
     const { data: kioskData } = await supabaseClient
       .from('kiosks')
@@ -272,7 +285,7 @@ serve(async (req) => {
       .insert({
         id: transactionId,
         kiosk_id: kioskId,
-        category,
+         category: normalizedCategory,
         category_reference: categoryReference,
         amount_baisas: amount,
         mobile_number: mobileNumber,
@@ -287,6 +300,7 @@ serve(async (req) => {
         payment_method: resolvedPaymentMethod,
         card_last_four: cardLastFour,
         payment_reference: thawaniReference || posRRN || null,
+         reference_number: generatedReference,
         pos_response: paymentResponse, // Full POS response for debugging
         completed_at: isSuccess ? new Date().toISOString() : null,
       })

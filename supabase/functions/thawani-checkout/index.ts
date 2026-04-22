@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const ALLOWED_TRANSACTION_CATEGORIES = new Set(['donation', 'zakat', 'sadaqah', 'general']);
+
+const normalizeTransactionCategory = (category: string) => (
+  ALLOWED_TRANSACTION_CATEGORIES.has(category) ? category : 'general'
+);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -43,6 +49,7 @@ serve(async (req) => {
 
     if (action === 'create_session') {
       const { amount, category, transactionId, kioskId, successUrl, cancelUrl, categoryReference, gatewayMode } = body;
+      const normalizedCategory = normalizeTransactionCategory(category);
       const thawaniConfig = resolveThawaniConfig(gatewayMode);
 
       if (!amount || !category || !transactionId) {
@@ -117,15 +124,22 @@ serve(async (req) => {
       const checkoutUrl = `${thawaniConfig.checkoutBaseUrl}/pay/${sessionId}?key=${thawaniConfig.publishableKey}`;
 
       // Create a pending transaction record
+      const { data: generatedReference, error: referenceError } = await supabaseClient.rpc('generate_reference_number');
+
+      if (referenceError) {
+        console.error('Reference generation error:', referenceError);
+      }
+
       const { error: insertError } = await supabaseClient.from('transactions').insert({
         id: transactionId,
         kiosk_id: kioskId,
-        category,
+        category: normalizedCategory,
         category_reference: resolvedCategoryReference,
         amount_baisas: amountInBaisas,
         status: 'pending',
         payment_method: 'thawani_gateway',
         payment_reference: sessionId,
+        reference_number: generatedReference || null,
       });
 
       if (insertError) {
@@ -215,16 +229,57 @@ serve(async (req) => {
 
       // If payment is completed, update transaction
       if (result.data?.payment_status === 'paid') {
-        const { data: updatedTx, error: updateError } = await supabaseClient
+        const metadata = result.data?.metadata || {};
+        const normalizedCategory = normalizeTransactionCategory(metadata.category || 'general');
+        const { data: existingTx } = await supabaseClient
           .from('transactions')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            pos_response: result.data,
-          })
+          .select('id, reference_number')
           .eq('payment_reference', resolvedSessionId)
-          .select('reference_number, id')
           .maybeSingle();
+
+        let updatedTx = existingTx;
+        let updateError = null;
+
+        if (existingTx) {
+          const response = await supabaseClient
+            .from('transactions')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              pos_response: result.data,
+              payment_method: 'thawani_gateway',
+              pos_response_code: '00',
+            })
+            .eq('id', existingTx.id)
+            .select('reference_number, id')
+            .maybeSingle();
+
+          updatedTx = response.data;
+          updateError = response.error;
+        } else {
+          const { data: generatedReference } = await supabaseClient.rpc('generate_reference_number');
+          const response = await supabaseClient
+            .from('transactions')
+            .insert({
+              id: metadata.transaction_id || transactionId,
+              kiosk_id: metadata.kiosk_id || null,
+              category: normalizedCategory,
+              category_reference: metadata.category_reference || null,
+              amount_baisas: Number(result.data?.amount ?? 0),
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              pos_response: result.data,
+              payment_method: 'thawani_gateway',
+              payment_reference: resolvedSessionId,
+              reference_number: generatedReference || null,
+              pos_response_code: '00',
+            })
+            .select('reference_number, id')
+            .single();
+
+          updatedTx = response.data;
+          updateError = response.error;
+        }
 
         if (updateError) {
           console.error('Transaction update error:', updateError);
