@@ -33,7 +33,7 @@ const KioskSetupPanel = () => {
     isAvailable: boolean; isEnabled: boolean; checking: boolean; tested: boolean;
   }>({ isAvailable: false, isEnabled: false, checking: false, tested: false });
   
-  const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway'>('soft_pos');
+  const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment'>('soft_pos');
 
   useEffect(() => { checkAuth(); }, []);
 
@@ -50,7 +50,7 @@ const KioskSetupPanel = () => {
   const applyKioskConfig = (configRaw: unknown) => {
     const config = configRaw as Record<string, unknown> | null | undefined;
     if (!config) return;
-    setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway') || 'soft_pos');
+    setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment') || 'soft_pos');
     if (config.soft_pos && typeof config.soft_pos === 'object') {
       const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
       setSoftPosConfig({ authKey: sp.auth_key || '', isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' });
@@ -256,10 +256,13 @@ const KioskSetupPanel = () => {
                 <div className={`p-3 rounded-lg flex items-center gap-2 ${
                   kioskPaymentMode === 'soft_pos' ? 'bg-emerald-50 border border-emerald-200' :
                   kioskPaymentMode === 'payment_gateway' ? 'bg-blue-50 border border-blue-200' :
+                  kioskPaymentMode === 'test_payment' ? 'bg-amber-50 border border-amber-200' :
                   'bg-gray-50 border border-gray-200'
                 }`}>
                   {kioskPaymentMode === 'soft_pos' ? (
                     <><Smartphone className="w-4 h-4 text-emerald-600" /><span className="text-sm font-medium text-emerald-700">Soft POS Active - Thawani Lamsa NFC</span></>
+                  ) : kioskPaymentMode === 'test_payment' ? (
+                    <><Info className="w-4 h-4 text-amber-600" /><span className="text-sm font-medium text-amber-700">Testing Mode Active - Simulated Successful Payments</span></>
                   ) : (
                     <><Globe className="w-4 h-4 text-blue-600" /><span className="text-sm font-medium text-blue-700">Payment Gateway Active - Thawani Checkout</span></>
                   )}
@@ -325,6 +328,20 @@ const KioskSetupPanel = () => {
                         <p className="text-xs font-semibold text-blue-900">Thawani Payment Gateway</p>
                         <p className="text-[10px] text-blue-700 mt-1">
                           Donors will be redirected to Thawani's secure checkout page to enter card details.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {kioskPaymentMode === 'test_payment' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-900">Standalone Testing Mode</p>
+                        <p className="text-[10px] text-amber-700 mt-1">
+                          Donations are recorded as successful transactions without launching Thawani services.
                         </p>
                       </div>
                     </div>

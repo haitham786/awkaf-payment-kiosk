@@ -37,7 +37,7 @@ import { startBackgroundSync } from "./services/offlineQueueService";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { isAudioReady, showInitPrompt } = useAudioInitializer();
+  const { showInitPrompt } = useAudioInitializer();
   
   React.useEffect(() => {
     startBackgroundSync();
