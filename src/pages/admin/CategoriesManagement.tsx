@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Info, Upload, X, GripVertical } from "lucide-react";
+import { ArrowLeft, Upload, X } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QURAN_SURAHS } from "@/data/quranSurahs";
