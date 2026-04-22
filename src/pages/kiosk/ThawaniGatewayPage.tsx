@@ -17,6 +17,7 @@ const ThawaniGatewayPage = () => {
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [categoryData, setCategoryData] = useState<any>(null);
+  const [gatewayMode, setGatewayMode] = useState<'test' | 'live'>('test');
 
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
@@ -29,6 +30,27 @@ const ThawaniGatewayPage = () => {
         .then(({ data }) => { if (data) { sessionStorage.setItem(`category_${category}`, JSON.stringify(data)); setCategoryData(data); } });
     }
   }, [category]);
+
+  useEffect(() => {
+    const loadGatewayMode = async () => {
+      if (!kioskId) return;
+
+      try {
+        const { data } = await supabase
+          .from('kiosks')
+          .select('configuration')
+          .eq('id', kioskId)
+          .maybeSingle();
+
+        const config = data?.configuration as any;
+        setGatewayMode(config?.payment_gateway?.mode === 'live' ? 'live' : 'test');
+      } catch (error) {
+        console.error('Error loading gateway mode:', error);
+      }
+    };
+
+    loadGatewayMode();
+  }, [kioskId]);
 
   const createSession = useCallback(async () => {
     if (!kioskId) { setErrorMessage('Kiosk is not registered.'); setStage('error'); return; }
@@ -44,6 +66,7 @@ const ThawaniGatewayPage = () => {
           category,
           transactionId,
           kioskId,
+          gatewayMode,
           categoryReference: categoryData?.category_reference || '',
           successUrl: `${origin}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&catRef=${categoryData?.category_reference || ''}`,
           cancelUrl: `${origin}/kiosk/error?category=${category}&amount=${amount}`,
@@ -60,10 +83,10 @@ const ThawaniGatewayPage = () => {
       window.location.href = data.checkout_url;
     } catch (err: any) {
       console.error('Thawani session error:', err);
-      setErrorMessage(err.message || 'Failed to create payment session');
+      setErrorMessage(err.message || 'Failed to create payment session. Please verify the gateway environment and API keys.');
       setStage('error');
     }
-  }, [kioskId, amount, category, transactionId, categoryData]);
+  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode]);
 
   useEffect(() => {
     createSession();

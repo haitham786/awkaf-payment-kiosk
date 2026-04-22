@@ -6,11 +6,24 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
+const readCachedCategory = (categoryId: string | null) => {
+  if (!categoryId) return null;
+
+  const cached = sessionStorage.getItem(`category_${categoryId}`);
+  if (!cached) return null;
+
+  try {
+    return JSON.parse(cached) as { title: string; title_en: string | null; icon_url: string | null; category_id: string };
+  } catch {
+    return null;
+  }
+};
+
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get("category");
-  const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(null);
+  const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(() => readCachedCategory(categoryId));
 
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200];
 
@@ -24,7 +37,14 @@ const PresetAmountsPage = () => {
           .eq("category_id", categoryId)
           .single();
         if (error) throw error;
-        if (data) setCategoryData(data);
+        if (data) {
+          sessionStorage.setItem(`category_${categoryId}`, JSON.stringify(data));
+          if (data.icon_url) {
+            const img = new Image();
+            img.src = data.icon_url;
+          }
+          setCategoryData(data);
+        }
       } catch (error) { console.error("Error loading category data:", error); }
     };
     loadCategoryData();
@@ -61,16 +81,16 @@ const PresetAmountsPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 max-w-sm mx-auto flex-1 min-h-0">
+        <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 max-w-sm mx-auto flex-1 min-h-0 content-center place-items-stretch auto-rows-fr">
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square"
+              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square w-full"
             >
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-row items-center justify-center gap-1 border-0 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm"
+                className="w-full h-full min-h-0 flex flex-row items-center justify-center gap-1 border-0 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm p-0"
                 onClick={() => handleAmountSelect(amount)}
               >
                 <CurrencyLogo className="h-3.5" />
