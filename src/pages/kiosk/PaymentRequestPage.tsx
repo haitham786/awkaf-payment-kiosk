@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,11 @@ const PaymentRequestPage = () => {
         
         const config = (kioskData?.configuration as any);
         const paymentMode = config?.payment_mode;
+
+        if (paymentMode === 'test_payment') {
+          navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
+          return;
+        }
         
         if (paymentMode === 'payment_gateway') {
           // Route to Thawani Payment Gateway

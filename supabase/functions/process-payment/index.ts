@@ -157,7 +157,7 @@ serve(async (req) => {
       );
     }
 
-    const { transactionId, kioskId, amount, category, mobileNumber, posResponse, paymentType, provider, thawaniReference } = requestData;
+    const { transactionId, kioskId, amount, category, mobileNumber, posResponse, softPosResult, paymentType, provider, thawaniReference } = requestData;
     
     // Check kiosk-based rate limit
     const kioskRateLimit = checkRateLimit(`kiosk:${kioskId}`, MAX_REQUESTS_PER_KIOSK);
@@ -243,22 +243,25 @@ serve(async (req) => {
 
     const kioskReference = kioskData?.reference_number || null;
 
-    // Extract POS data from request (Soft POS or Payment Gateway)
-    const posRRN = posResponse?.rrn || posResponse?.RRN || null;
-    const posAuthCode = posResponse?.authCode || posResponse?.AuthCode || null;
-    const posTID = posResponse?.tid || posResponse?.TID || null;
-    const posMID = posResponse?.mid || posResponse?.MID || null;
-    const posResponseCode = posResponse?.responseCode || '00';
-    const cardLastFour = posResponse?.cardLastFour || null;
-    const cardType = posResponse?.cardType || null;
+    // Extract POS data from request (Soft POS, test mode, or Payment Gateway)
+    const paymentResponse = posResponse || softPosResult || {};
+    const posRRN = paymentResponse?.rrn || paymentResponse?.RRN || paymentResponse?.paymentId || null;
+    const posAuthCode = paymentResponse?.authCode || paymentResponse?.AuthCode || paymentResponse?.approvalCode || null;
+    const posTID = paymentResponse?.tid || paymentResponse?.TID || null;
+    const posMID = paymentResponse?.mid || paymentResponse?.MID || null;
+    const posResponseCode = paymentResponse?.responseCode || '00';
+    const cardLastFour = paymentResponse?.cardLastFour || null;
+    const cardType = paymentResponse?.cardType || null;
 
     // Determine if transaction is successful
-    const isSuccess = posResponseCode === '00' || posResponse?.success === true;
+    const isSuccess = posResponseCode === '00' || paymentResponse?.success === true;
     
     // Determine payment method
-    const resolvedPaymentMethod = paymentType === 'soft_pos' 
+    const resolvedPaymentMethod = paymentType === 'soft_pos'
       ? (provider === 'thawani' ? 'thawani_lamsa' : 'soft_pos')
-      : cardType || 'card';
+      : paymentType === 'test_payment'
+        ? 'test_payment'
+        : cardType || 'card';
 
     console.log('POS Response Data:', { posRRN, posAuthCode, posTID, posMID, posResponseCode, isSuccess });
 
@@ -284,7 +287,7 @@ serve(async (req) => {
         payment_method: resolvedPaymentMethod,
         card_last_four: cardLastFour,
         payment_reference: thawaniReference || posRRN || null,
-        pos_response: posResponse, // Full POS response for debugging
+        pos_response: paymentResponse, // Full POS response for debugging
         completed_at: isSuccess ? new Date().toISOString() : null,
       })
       .select()

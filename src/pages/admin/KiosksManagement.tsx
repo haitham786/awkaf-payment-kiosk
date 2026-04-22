@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Loader2, CheckCircle, XCircle, CreditCard, Info, Globe } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Info, Globe, FlaskConical } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment';
 
 interface KioskConfiguration {
   payment_mode: PaymentMode;
@@ -23,6 +23,9 @@ interface KioskConfiguration {
   };
   payment_gateway?: {
     mode: 'test' | 'live';
+  };
+  test_payment?: {
+    auto_approve?: boolean;
   };
   sound_enabled?: boolean;
 }
@@ -149,6 +152,7 @@ const KiosksManagement = () => {
         payment_mode: config.payment_mode || 'soft_pos',
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
+        test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
       }
     });
@@ -175,6 +179,7 @@ const KiosksManagement = () => {
         payment_mode: 'soft_pos',
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
+        test_payment: { auto_approve: true },
         sound_enabled: true,
       }
     });
@@ -275,6 +280,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
+    if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
 
@@ -410,6 +416,17 @@ const KiosksManagement = () => {
                       </div>
                     </Label>
                   </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="test_payment" id="test_payment" />
+                    <Label htmlFor="test_payment" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <FlaskConical className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Testing Mode</p>
+                        <p className="text-xs text-muted-foreground">Simulate successful payments and record them in transactions and statistics</p>
+                      </div>
+                    </Label>
+                  </div>
                 </RadioGroup>
               </div>
 
@@ -517,6 +534,21 @@ const KiosksManagement = () => {
                   <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
                     <p className="text-xs text-emerald-700 dark:text-emerald-300">
                       <strong>How it works:</strong> Donors will be redirected to Thawani's secure checkout page to enter card details (card number, holder name, expiry, CVC). No card data is processed by the kiosk app.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {formData.configuration.payment_mode === 'test_payment' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4" />
+                    Testing Mode Configuration
+                  </h4>
+
+                  <div className="p-3 rounded-lg border bg-accent/30 border-border">
+                    <p className="text-xs text-foreground">
+                      <strong>How it works:</strong> the kiosk skips Thawani entirely, marks the payment as successful, and creates a completed transaction so it appears in billing and statistics.
                     </p>
                   </div>
                 </div>
