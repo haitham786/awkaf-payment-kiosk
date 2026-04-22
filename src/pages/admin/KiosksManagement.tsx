@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Loader2, CheckCircle, XCircle, CreditCard, Info, Globe } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Upload, X, Smartphone, Loader2, CheckCircle, XCircle, CreditCard, Info, Globe, FlaskConical } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment';
 
 interface KioskConfiguration {
   payment_mode: PaymentMode;
@@ -23,6 +23,9 @@ interface KioskConfiguration {
   };
   payment_gateway?: {
     mode: 'test' | 'live';
+  };
+  test_payment?: {
+    auto_approve?: boolean;
   };
   sound_enabled?: boolean;
 }
