@@ -65,11 +65,11 @@ const PresetAmountsPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 max-w-[18.75rem] mx-auto flex-1 min-h-0 content-center justify-items-center auto-rows-max">
+        <div className="grid grid-cols-3 gap-2.5 w-full max-w-[20rem] mx-auto flex-1 min-h-0 content-center justify-items-center auto-rows-max">
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square w-full max-w-[5.75rem]"
+              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square w-full max-w-[6.25rem]"
             >
               <KioskButton
                 variant="donation"
