@@ -8,12 +8,45 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 
+const CATEGORY_CACHE_KEY = "kiosk_home_categories";
+const SETTINGS_CACHE_KEY = "kiosk_home_settings";
+
+const readCachedCategories = () => {
+  const cached = sessionStorage.getItem(CATEGORY_CACHE_KEY);
+  if (!cached) return [] as any[];
+
+  try {
+    return JSON.parse(cached) as any[];
+  } catch {
+    return [] as any[];
+  }
+};
+
+const readCachedSettings = () => {
+  const cached = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+  if (!cached) return null as { quranic_verse?: string; quranic_verse_surah?: string } | null;
+
+  try {
+    return JSON.parse(cached) as { quranic_verse?: string; quranic_verse_surah?: string };
+  } catch {
+    return null;
+  }
+};
+
+const preloadCategoryImages = (items: Array<{ icon_url?: string | null }>) => {
+  items.forEach((item) => {
+    if (!item.icon_url) return;
+    const img = new Image();
+    img.src = item.icon_url;
+  });
+};
+
 const KioskHomepage = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [quranicVerse, setQuranicVerse] = useState<string>("");
-  const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>("");
+  const [categories, setCategories] = useState<any[]>(() => readCachedCategories());
+  const [loading, setLoading] = useState(() => readCachedCategories().length === 0);
+  const [quranicVerse, setQuranicVerse] = useState<string>(() => readCachedSettings()?.quranic_verse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
+  const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>(() => readCachedSettings()?.quranic_verse_surah || "البقرة");
   const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
     const kioskId = localStorage.getItem('kiosk_id');
     return kioskId ? 'active' : 'unregistered';
@@ -84,12 +117,19 @@ const KioskHomepage = () => {
       ]);
 
       if (catResult.error) throw catResult.error;
-      setCategories(catResult.data || []);
+      const nextCategories = catResult.data || [];
+      setCategories(nextCategories);
+      sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(nextCategories));
+      preloadCategoryImages(nextCategories);
 
-      if (settingsResult.data?.quranic_verse) setQuranicVerse(settingsResult.data.quranic_verse);
-      else setQuranicVerse("وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
-      
-      setQuranicVerseSurah((settingsResult.data as any)?.quranic_verse_surah || "البقرة");
+      const nextSettings = {
+        quranic_verse: settingsResult.data?.quranic_verse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ",
+        quranic_verse_surah: (settingsResult.data as any)?.quranic_verse_surah || "البقرة",
+      };
+
+      setQuranicVerse(nextSettings.quranic_verse);
+      setQuranicVerseSurah(nextSettings.quranic_verse_surah);
+      sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(nextSettings));
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -189,7 +229,7 @@ const KioskHomepage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0">
+        <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0 content-start">
           {loading ? (
             <div className="col-span-2 text-center text-base text-white/90">
               جاري التحميل...
@@ -219,7 +259,7 @@ const KioskHomepage = () => {
                 >
                   <div className="w-10 h-10 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
                     {category.icon_url && (
-                      <img src={category.icon_url} alt={category.title} className="w-full h-full object-contain" />
+                      <img src={category.icon_url} alt={category.title} className="w-full h-full object-contain" loading="eager" />
                     )}
                   </div>
                   <h3 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-tight">
@@ -236,14 +276,6 @@ const KioskHomepage = () => {
           )}
         </div>
 
-        <div className="text-center shrink-0 pb-1">
-          <p className="text-white/90 text-xs font-semibold drop-shadow">
-            المس الشاشة لاختيار نوع التبرع
-          </p>
-          <p className="text-white/70 text-[0.6rem]">
-            Touch the screen to select a donation type
-          </p>
-        </div>
       </div>
     </KioskLayout>
   );
