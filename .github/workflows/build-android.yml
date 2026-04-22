@@ -156,21 +156,27 @@ jobs:
               if patched != original:
                   path.write_text(patched, encoding="utf-8")
                   print(f"Patched {path}")
-          groovy_snippets = [
+          common_groovy_snippets = [
               {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
           ]
-          kts_snippets = [
+          common_kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
           ]
+          thawani_groovy_snippets = []
+          thawani_kts_snippets = []
           if has_creds:
-              groovy_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven { url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'})
-              kts_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n        }'})
+              thawani_groovy_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'})
+              thawani_kts_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'})
           else:
               print("Skipping Thawani Maven repository (no credentials)")
-          for f in ["android/settings.gradle", "android/build.gradle", "android/app/build.gradle"]:
-              patch_file(Path(f), groovy_snippets)
-          for f in ["android/settings.gradle.kts", "android/build.gradle.kts", "android/app/build.gradle.kts"]:
-              patch_file(Path(f), kts_snippets)
+          for f in ["android/settings.gradle", "android/build.gradle"]:
+              patch_file(Path(f), common_groovy_snippets)
+          for f in ["android/settings.gradle.kts", "android/build.gradle.kts"]:
+              patch_file(Path(f), common_kts_snippets)
+          for f in ["android/app/build.gradle"]:
+              patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
+          for f in ["android/app/build.gradle.kts"]:
+              patch_file(Path(f), common_kts_snippets + thawani_kts_snippets)
           print("Maven repositories configured")
           PY
 
@@ -358,6 +364,7 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         shell: bash
+        timeout-minutes: 8
         env:
           HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
