@@ -18,6 +18,20 @@ serve(async (req) => {
   }
 
   try {
+    const createSessionWithConfig = async (thawaniConfig: ReturnType<typeof resolveThawaniConfig>, sessionData: Record<string, unknown>) => {
+      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'thawani-api-key': thawaniConfig.apiKey || '',
+        },
+        body: JSON.stringify(sessionData),
+      });
+
+      const result = await response.json();
+      return { response, result };
+    };
+
     const resolveThawaniConfig = (mode?: string) => {
       const normalizedMode = mode === 'live' ? 'live' : 'test';
       const fallbackEnv = Deno.env.get('THAWANI_ENV') === 'live' ? 'live' : 'test';
@@ -101,16 +115,23 @@ serve(async (req) => {
 
       console.log('Creating Thawani session:', { transactionId, amount: amountInBaisas, category, gatewayMode: thawaniConfig.env });
 
-      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'thawani-api-key': thawaniConfig.apiKey,
-        },
-        body: JSON.stringify(sessionData),
-      });
+      let activeConfig = thawaniConfig;
+      let { response, result } = await createSessionWithConfig(activeConfig, sessionData);
 
-      const result = await response.json();
+      if ((!response.ok || !result.success) && (result?.detail === 'Api key invalid' || result?.description === 'Api key invalid')) {
+        const alternateConfig = resolveThawaniConfig(activeConfig.env === 'live' ? 'test' : 'live');
+
+        if (alternateConfig.apiKey && alternateConfig.publishableKey) {
+          console.warn('Retrying Thawani session creation with alternate environment', { original: activeConfig.env, fallback: alternateConfig.env });
+          const retryResult = await createSessionWithConfig(alternateConfig, sessionData);
+          response = retryResult.response;
+          result = retryResult.result;
+
+          if (response.ok && result.success) {
+            activeConfig = alternateConfig;
+          }
+        }
+      }
 
       if (!response.ok || !result.success) {
         console.error('Thawani session creation failed:', result);
@@ -121,7 +142,7 @@ serve(async (req) => {
       }
 
       const sessionId = result.data?.session_id;
-      const checkoutUrl = `${thawaniConfig.checkoutBaseUrl}/pay/${sessionId}?key=${thawaniConfig.publishableKey}`;
+      const checkoutUrl = `${activeConfig.checkoutBaseUrl}/pay/${sessionId}?key=${activeConfig.publishableKey}`;
 
       // Create a pending transaction record
       const { data: generatedReference, error: referenceError } = await supabaseClient.rpc('generate_reference_number');
@@ -140,6 +161,7 @@ serve(async (req) => {
         payment_method: 'thawani_gateway',
         payment_reference: sessionId,
         reference_number: generatedReference || null,
+        pos_response: { gateway_mode: activeConfig.env },
       });
 
       if (insertError) {
@@ -151,7 +173,8 @@ serve(async (req) => {
           success: true,
           session_id: sessionId,
           checkout_url: checkoutUrl,
-          publishable_key: thawaniConfig.publishableKey,
+          publishable_key: activeConfig.publishableKey,
+          gateway_mode: activeConfig.env,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -159,7 +182,7 @@ serve(async (req) => {
 
     if (action === 'check_session') {
       const { sessionId, transactionId } = body;
-      const thawaniConfig = resolveThawaniConfig(body.gatewayMode);
+      let thawaniConfig = resolveThawaniConfig(body.gatewayMode);
 
       if (!thawaniConfig.apiKey) {
         return new Response(
@@ -200,6 +223,11 @@ serve(async (req) => {
             );
           }
           resolvedSessionId = txData.payment_reference;
+
+          const storedGatewayMode = (txData as any)?.pos_response?.gateway_mode;
+          if (storedGatewayMode === 'live' || storedGatewayMode === 'test') {
+            thawaniConfig = resolveThawaniConfig(storedGatewayMode);
+          }
         }
       }
 

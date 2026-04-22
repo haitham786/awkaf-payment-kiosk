@@ -17,6 +17,7 @@ const ThankYouPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const transactionId = searchParams.get('transactionId') || '';
   const paymentMethod = searchParams.get('paymentMethod') || '';
+  const gatewayMode = searchParams.get('gatewayMode') || undefined;
   const [referenceNumber, setReferenceNumber] = useState(searchParams.get('ref') || '');
   const [_countdown, setCountdown] = useState(10);
   const [verifying, setVerifying] = useState(false);
@@ -50,7 +51,7 @@ const ThankYouPage = () => {
       setVerifying(true);
       try {
         const { data, error } = await supabase.functions.invoke('thawani-checkout', {
-          body: { action: 'check_session', transactionId },
+          body: { action: 'check_session', transactionId, gatewayMode },
         });
 
         if (error) {
@@ -68,7 +69,7 @@ const ThankYouPage = () => {
     };
 
     verifyGatewayPayment();
-  }, [paymentMethod, transactionId]);
+  }, [paymentMethod, transactionId, gatewayMode]);
 
   // Countdown timer
   useEffect(() => {

@@ -69,7 +69,7 @@ const ThawaniGatewayPage = () => {
           kioskId,
           gatewayMode,
           categoryReference: categoryData?.category_reference || '',
-          successUrl: `${origin}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&catRef=${categoryData?.category_reference || ''}`,
+          successUrl: `${origin}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&gatewayMode=${gatewayMode}&catRef=${categoryData?.category_reference || ''}`,
           cancelUrl: `${origin}/kiosk/error?category=${category}&amount=${amount}`,
         },
       });
