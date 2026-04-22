@@ -14,6 +14,7 @@ import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { Wifi, WifiOff, AlertTriangle, Loader2 } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -26,7 +27,7 @@ const NFCPaymentPage = () => {
   const [stage, setStage] = useState<PaymentStage>('waiting');
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
-  const [categoryData, setCategoryData] = useState<any>(null);
+  const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isNativeMode, setIsNativeMode] = useState(false);
   
@@ -36,8 +37,17 @@ const NFCPaymentPage = () => {
 
   useEffect(() => {
     const fetchCategory = async () => {
+      const cached = readCachedCategory(category);
+      if (cached) {
+        setCategoryData(cached);
+        return;
+      }
+
       const { data } = await supabase.from('donation_categories').select('*').eq('category_id', category).maybeSingle();
-      setCategoryData(data);
+      if (data) {
+        storeCategoryInCache(data);
+        setCategoryData(data);
+      }
     };
     fetchCategory();
     const handleOnline = () => setIsOnlineStatus(true);
