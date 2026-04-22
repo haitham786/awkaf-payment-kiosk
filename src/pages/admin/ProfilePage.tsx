@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, User } from "lucide-react";
+import { ArrowLeft, Lock, Save, User } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 
 const ProfilePage = () => {
@@ -15,11 +15,16 @@ const ProfilePage = () => {
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [profile, setProfile] = useState({
     email: '',
     full_name: '',
     mobile_number: '',
     profile_picture_url: ''
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    newPassword: '',
+    confirmPassword: ''
   });
 
   useEffect(() => {
@@ -149,6 +154,52 @@ const ProfilePage = () => {
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (passwordForm.newPassword.length < 8) {
+      toast({
+        title: "Password too short",
+        description: "The new password must be at least 8 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Passwords do not match",
+        description: "Please make sure both password fields are identical.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword,
+      });
+
+      if (error) throw error;
+
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating password",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-2xl mx-auto">
@@ -264,6 +315,55 @@ const ProfilePage = () => {
             <Button type="submit" disabled={loading} className="w-full">
               <Save className="w-4 h-4 mr-2" />
               {loading ? 'Saving...' : 'Save Profile'}
+            </Button>
+          </form>
+        </Card>
+
+        <Card className="p-6 mt-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 rounded-full bg-primary/20">
+              <Lock className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Change Password</h2>
+              <p className="text-sm text-muted-foreground">Set a new password for your account</p>
+            </div>
+          </div>
+
+          <form onSubmit={handlePasswordChange} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="new_password">New Password</Label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="Enter new password"
+                  className="mt-2"
+                  minLength={8}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="confirm_password">Confirm New Password</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="Confirm new password"
+                  className="mt-2"
+                  minLength={8}
+                  required
+                />
+              </div>
+            </div>
+
+            <Button type="submit" disabled={passwordLoading} className="w-full">
+              <Lock className="w-4 h-4 mr-2" />
+              {passwordLoading ? 'Updating Password...' : 'Update Password'}
             </Button>
           </form>
         </Card>

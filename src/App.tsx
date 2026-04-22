@@ -36,6 +36,10 @@ import { startBackgroundSync } from "./services/offlineQueueService";
 
 const queryClient = new QueryClient();
 
+const AdminPanelLayout = ({ children }: { children: React.ReactNode }) => {
+  return <div className="admin-panel">{children}</div>;
+};
+
 const AppContent = () => {
   const { showInitPrompt } = useAudioInitializer();
   
@@ -78,14 +82,14 @@ const AppContent = () => {
             <Route path="/kiosk/error" element={<ErrorPage />} />
             
             {/* Admin Routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/categories" element={<CategoriesManagement />} />
-            <Route path="/admin/kiosks" element={<KiosksManagement />} />
-            <Route path="/admin/admins" element={<AdminsManagement />} />
-            <Route path="/admin/add-admin" element={<AddAdminPage />} />
-            <Route path="/admin/sms-settings" element={<SMSSettings />} />
-            <Route path="/admin/statistics" element={<EnhancedStatistics />} />
-            <Route path="/admin/profile" element={<ProfilePage />} />
+            <Route path="/admin" element={<AdminPanelLayout><AdminDashboard /></AdminPanelLayout>} />
+            <Route path="/admin/categories" element={<AdminPanelLayout><CategoriesManagement /></AdminPanelLayout>} />
+            <Route path="/admin/kiosks" element={<AdminPanelLayout><KiosksManagement /></AdminPanelLayout>} />
+            <Route path="/admin/admins" element={<AdminPanelLayout><AdminsManagement /></AdminPanelLayout>} />
+            <Route path="/admin/add-admin" element={<AdminPanelLayout><AddAdminPage /></AdminPanelLayout>} />
+            <Route path="/admin/sms-settings" element={<AdminPanelLayout><SMSSettings /></AdminPanelLayout>} />
+            <Route path="/admin/statistics" element={<AdminPanelLayout><EnhancedStatistics /></AdminPanelLayout>} />
+            <Route path="/admin/profile" element={<AdminPanelLayout><ProfilePage /></AdminPanelLayout>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
