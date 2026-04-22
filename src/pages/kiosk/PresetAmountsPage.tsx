@@ -6,21 +6,17 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
-const imageCache = new Map<string, string>();
-
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get("category");
   const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(null);
-  const [isReady, setIsReady] = useState(false);
 
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200];
 
   useEffect(() => {
     const loadCategoryData = async () => {
-      if (!categoryId) { setIsReady(true); return; }
-      const cachedIcon = imageCache.get(categoryId);
+      if (!categoryId) return;
       try {
         const { data, error } = await supabase
           .from("donation_categories")
@@ -28,18 +24,8 @@ const PresetAmountsPage = () => {
           .eq("category_id", categoryId)
           .single();
         if (error) throw error;
-        if (data) {
-          if (cachedIcon || !data.icon_url) {
-            setCategoryData(data);
-            setIsReady(true);
-          } else {
-            const img = new Image();
-            img.src = data.icon_url;
-            img.onload = () => { imageCache.set(categoryId, data.icon_url!); setCategoryData(data); setIsReady(true); };
-            img.onerror = () => { setCategoryData(data); setIsReady(true); };
-          }
-        } else { setIsReady(true); }
-      } catch (error) { console.error("Error loading category data:", error); setIsReady(true); }
+        if (data) setCategoryData(data);
+      } catch (error) { console.error("Error loading category data:", error); }
     };
     loadCategoryData();
   }, [categoryId]);
@@ -59,7 +45,7 @@ const PresetAmountsPage = () => {
         <div className="text-center shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5 mb-1 min-h-[60px]">
             <div className="w-10 h-10 flex items-center justify-center">
-              {categoryData?.icon_url && isReady && (
+              {categoryData?.icon_url && (
                 <img src={categoryData.icon_url} alt={categoryData.title} className="w-10 h-10 object-contain" />
               )}
             </div>
@@ -79,12 +65,12 @@ const PresetAmountsPage = () => {
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white/70 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group"
+              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square"
             >
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full flex flex-row items-center justify-center py-2 gap-1 border-0 rounded-xl bg-white/70 hover:bg-white/80 backdrop-blur-sm"
+                className="w-full h-full flex flex-row items-center justify-center gap-1 border-0 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm"
                 onClick={() => handleAmountSelect(amount)}
               >
                 <CurrencyLogo className="h-3.5" />
@@ -96,17 +82,17 @@ const PresetAmountsPage = () => {
           ))}
         </div>
 
-        <div className="flex flex-col items-center mt-2 gap-0.5 shrink-0">
+        <div className="flex items-center justify-center mt-2 shrink-0">
           <KioskButton
             variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-3 py-1 text-xs font-bold bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0"
+            className="px-4 py-1.5 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-row items-center gap-2"
           >
-            إدخال مبلغ مختلف
+            <span>إدخال مبلغ مختلف</span>
+            <span className="text-gray-500">Enter a different amount</span>
           </KioskButton>
-          <span className="text-[0.6rem] text-gray-500">Enter a different amount</span>
         </div>
       </div>
     </KioskLayout>

@@ -8,34 +8,17 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 
-const imageCache = new Map<string, boolean>();
-
 const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [imagesPreloaded, setImagesPreloaded] = useState(false);
   const [quranicVerse, setQuranicVerse] = useState<string>("");
+  const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>("");
   const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
     const kioskId = localStorage.getItem('kiosk_id');
     return kioskId ? 'active' : 'unregistered';
   });
   const [kioskMessage, setKioskMessage] = useState('');
-
-  const preloadImages = async (cats: any[]) => {
-    const imagePromises = cats
-      .filter(cat => cat.icon_url && !imageCache.has(cat.icon_url))
-      .map(cat => {
-        return new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => { imageCache.set(cat.icon_url, true); resolve(); };
-          img.onerror = () => { imageCache.set(cat.icon_url, false); resolve(); };
-          img.src = cat.icon_url;
-        });
-      });
-    await Promise.all(imagePromises);
-    setImagesPreloaded(true);
-  };
 
   useEffect(() => {
     checkKioskStatus();
@@ -95,18 +78,18 @@ const KioskHomepage = () => {
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('donation_categories')
-        .select('*')
-        .eq('is_visible', true)
-        .order('display_order', { ascending: true });
-      if (error) throw error;
-      if (data && data.length > 0) await preloadImages(data);
-      setCategories(data || []);
+      const [catResult, settingsResult] = await Promise.all([
+        supabase.from('donation_categories').select('*').eq('is_visible', true).order('display_order', { ascending: true }),
+        supabase.from('kiosk_settings').select('quranic_verse, quranic_verse_surah').limit(1).maybeSingle()
+      ]);
 
-      const { data: settings } = await supabase.from('kiosk_settings').select('quranic_verse').limit(1).maybeSingle();
-      if (settings?.quranic_verse) setQuranicVerse(settings.quranic_verse);
+      if (catResult.error) throw catResult.error;
+      setCategories(catResult.data || []);
+
+      if (settingsResult.data?.quranic_verse) setQuranicVerse(settingsResult.data.quranic_verse);
       else setQuranicVerse("وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
+      
+      setQuranicVerseSurah((settingsResult.data as any)?.quranic_verse_surah || "البقرة");
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -189,30 +172,25 @@ const KioskHomepage = () => {
         }}
       >
         <div className="text-center mb-2 shrink-0">
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-2 shadow-md border-0 mb-2">
-            <p className="text-sm font-bold text-gray-800 leading-relaxed">
+          <div className="rounded-xl p-2 mb-2">
+            <p className="text-sm font-bold text-gray-800 leading-relaxed drop-shadow-sm">
               "{quranicVerse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"}"
             </p>
             <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
-              القرآن الكريم - سورة البقرة
-            </p>
-            <p className="text-[0.6rem] text-emerald-600">
-              The Holy Quran - Surah Al-Baqarah
+              سورة {quranicVerseSurah || "البقرة"}
             </p>
           </div>
 
-          <h1 className="text-lg font-bold mb-0.5 text-gray-900 drop-shadow-lg">نظام التبرعات الرقمي</h1>
-          <p className="text-xs text-gray-600 mb-1">Digital Donation System</p>
-          <p className="text-sm text-gray-900 font-semibold drop-shadow">
+          <p className="text-base text-gray-900 font-bold drop-shadow mb-0.5">
             اختر نوع التبرع الذي ترغب في المساهمة به
           </p>
-          <p className="text-xs text-gray-600">
+          <p className="text-sm text-gray-600 font-bold">
             Choose the type of donation you would like to contribute
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0">
-          {loading || !imagesPreloaded ? (
+          {loading ? (
             <div className="col-span-2 text-center text-base text-white/90">
               جاري التحميل...
               <p className="text-xs text-white/70">Loading...</p>
@@ -226,7 +204,7 @@ const KioskHomepage = () => {
             categories.map((category) => (
               <Card
                 key={category.id}
-                className="p-0 overflow-hidden bg-white/60 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative"
+                className="p-0 overflow-hidden bg-white/40 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative"
               >
                 {(category.info_text || category.description) && (
                   <div className="absolute top-1 right-1 z-10">
