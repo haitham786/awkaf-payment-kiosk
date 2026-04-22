@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ExternalLink } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const ThawaniGatewayPage = () => {
   const navigate = useNavigate();
@@ -23,11 +24,11 @@ const ThawaniGatewayPage = () => {
   const kioskId = localStorage.getItem('kiosk_id') || "";
 
   useEffect(() => {
-    const cached = sessionStorage.getItem(`category_${category}`);
-    if (cached) setCategoryData(JSON.parse(cached));
+    const cached = readCachedCategory(category);
+    if (cached) setCategoryData(cached);
     else {
       supabase.from('donation_categories').select('title, title_en, icon_url, category_reference').eq('category_id', category).maybeSingle()
-        .then(({ data }) => { if (data) { sessionStorage.setItem(`category_${category}`, JSON.stringify(data)); setCategoryData(data); } });
+        .then(({ data }) => { if (data) { storeCategoryInCache({ ...data, category_id: category }); setCategoryData(data); } });
     }
   }, [category]);
 
