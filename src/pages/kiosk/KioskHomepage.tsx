@@ -7,20 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
+import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
 
-const CATEGORY_CACHE_KEY = "kiosk_home_categories";
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
-
-const readCachedCategories = () => {
-  const cached = sessionStorage.getItem(CATEGORY_CACHE_KEY);
-  if (!cached) return [] as any[];
-
-  try {
-    return JSON.parse(cached) as any[];
-  } catch {
-    return [] as any[];
-  }
-};
 
 const readCachedSettings = () => {
   const cached = sessionStorage.getItem(SETTINGS_CACHE_KEY);
@@ -31,14 +20,6 @@ const readCachedSettings = () => {
   } catch {
     return null;
   }
-};
-
-const preloadCategoryImages = (items: Array<{ icon_url?: string | null }>) => {
-  items.forEach((item) => {
-    if (!item.icon_url) return;
-    const img = new Image();
-    img.src = item.icon_url;
-  });
 };
 
 const KioskHomepage = () => {
@@ -119,8 +100,7 @@ const KioskHomepage = () => {
       if (catResult.error) throw catResult.error;
       const nextCategories = catResult.data || [];
       setCategories(nextCategories);
-      sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(nextCategories));
-      preloadCategoryImages(nextCategories);
+      primeCategoryCache(nextCategories);
 
       const nextSettings = {
         quranic_verse: settingsResult.data?.quranic_verse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ",

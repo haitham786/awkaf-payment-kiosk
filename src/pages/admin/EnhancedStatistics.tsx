@@ -138,7 +138,7 @@ const EnhancedStatistics = () => {
     
     // Group by category
     const categoryData = transactions.reduce((acc: any, t) => {
-      const category = t.category || 'unknown';
+      const category = t.category_title || t.category || 'unknown';
       if (!acc[category]) {
         acc[category] = { name: category, value: 0, count: 0 };
       }

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Home, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const imageCache = new Map<string, boolean>();
 
@@ -16,23 +17,21 @@ const ThankYouPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const transactionId = searchParams.get('transactionId') || '';
   const paymentMethod = searchParams.get('paymentMethod') || '';
+  const gatewayMode = searchParams.get('gatewayMode') || undefined;
   const [referenceNumber, setReferenceNumber] = useState(searchParams.get('ref') || '');
   const [_countdown, setCountdown] = useState(10);
   const [verifying, setVerifying] = useState(false);
-  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => {
-    const cached = sessionStorage.getItem(`category_${category}`);
-    return cached ? JSON.parse(cached) : null;
-  });
-  const [isReady, setIsReady] = useState(() => !!sessionStorage.getItem(`category_${category}`));
+  const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
+  const [isReady, setIsReady] = useState(() => !!readCachedCategory(category));
 
   // Load category data
   useEffect(() => {
     const loadCategory = async () => {
-      const cached = sessionStorage.getItem(`category_${category}`);
-      if (cached) { setCategoryData(JSON.parse(cached)); setIsReady(true); return; }
+      const cached = readCachedCategory(category);
+      if (cached) { setCategoryData(cached); setIsReady(true); return; }
       const { data } = await supabase.from('donation_categories').select('title, title_en, icon_url').eq('category_id', category).maybeSingle();
       if (data) {
-        sessionStorage.setItem(`category_${category}`, JSON.stringify(data));
+        storeCategoryInCache({ ...data, category_id: category });
         if (data.icon_url && !imageCache.has(data.icon_url)) {
           const img = new Image();
           img.onload = () => { imageCache.set(data.icon_url!, true); setCategoryData(data); setIsReady(true); };
@@ -52,7 +51,7 @@ const ThankYouPage = () => {
       setVerifying(true);
       try {
         const { data, error } = await supabase.functions.invoke('thawani-checkout', {
-          body: { action: 'check_session', transactionId },
+          body: { action: 'check_session', transactionId, gatewayMode },
         });
 
         if (error) {
@@ -70,7 +69,7 @@ const ThankYouPage = () => {
     };
 
     verifyGatewayPayment();
-  }, [paymentMethod, transactionId]);
+  }, [paymentMethod, transactionId, gatewayMode]);
 
   // Countdown timer
   useEffect(() => {

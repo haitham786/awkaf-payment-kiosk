@@ -5,6 +5,7 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { Delete } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const AmountPage = () => {
   const [rialAmount, setRialAmount] = useState("");
@@ -13,19 +14,28 @@ const AmountPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const categoryId = searchParams.get("category");
-  const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(null);
+  const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(() => readCachedCategory(categoryId));
 
   useEffect(() => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
       try {
+        const cached = readCachedCategory(categoryId);
+        if (cached) {
+          setCategoryData(cached);
+          return;
+        }
+
         const { data, error } = await supabase
           .from("donation_categories")
           .select("title, title_en, icon_url, category_id")
           .eq("category_id", categoryId)
           .single();
         if (error) throw error;
-        if (data) setCategoryData(data);
+        if (data) {
+          storeCategoryInCache(data);
+          setCategoryData(data);
+        }
       } catch (error) { console.error("Error loading category data:", error); }
     };
     loadCategoryData();

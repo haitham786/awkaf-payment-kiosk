@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { toast } from "sonner";
+import { readCachedCategory } from "@/lib/kioskCategoryCache";
 
 const TestPaymentPage = () => {
   const navigate = useNavigate();
@@ -19,9 +20,9 @@ const TestPaymentPage = () => {
 
   useEffect(() => {
     const loadCategory = async () => {
-      const cached = sessionStorage.getItem(`category_${category}`);
+      const cached = readCachedCategory(category);
       if (cached) {
-        const parsed = JSON.parse(cached);
+        const parsed = cached;
         setCategoryReference(parsed?.category_reference || "");
         return;
       }

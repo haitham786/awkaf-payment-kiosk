@@ -5,19 +5,7 @@ import { Card } from "@/components/ui/card";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
-
-const readCachedCategory = (categoryId: string | null) => {
-  if (!categoryId) return null;
-
-  const cached = sessionStorage.getItem(`category_${categoryId}`);
-  if (!cached) return null;
-
-  try {
-    return JSON.parse(cached) as { title: string; title_en: string | null; icon_url: string | null; category_id: string };
-  } catch {
-    return null;
-  }
-};
+import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
@@ -38,11 +26,7 @@ const PresetAmountsPage = () => {
           .single();
         if (error) throw error;
         if (data) {
-          sessionStorage.setItem(`category_${categoryId}`, JSON.stringify(data));
-          if (data.icon_url) {
-            const img = new Image();
-            img.src = data.icon_url;
-          }
+          storeCategoryInCache(data);
           setCategoryData(data);
         }
       } catch (error) { console.error("Error loading category data:", error); }
@@ -81,16 +65,16 @@ const PresetAmountsPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 max-w-sm mx-auto flex-1 min-h-0 content-center place-items-stretch auto-rows-fr">
+        <div className="grid grid-cols-3 gap-2 max-w-[18.75rem] mx-auto flex-1 min-h-0 content-center justify-items-center auto-rows-max">
           {presetAmounts.map((amount) => (
             <Card
               key={amount}
-              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square w-full"
+              className="p-0 overflow-hidden bg-white/50 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] group aspect-square w-full max-w-[5.75rem]"
             >
               <KioskButton
                 variant="donation"
                 soundEffect="keypad"
-                className="w-full h-full min-h-0 flex flex-row items-center justify-center gap-1 border-0 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm p-0"
+                className="w-full h-full min-h-0 aspect-square flex flex-row items-center justify-center gap-1 border-0 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm p-0"
                 onClick={() => handleAmountSelect(amount)}
               >
                 <CurrencyLogo className="h-3.5" />
