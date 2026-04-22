@@ -107,18 +107,36 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Ensure Maven repositories (JitPack + conditional Thawani)
+      - name: Verify Thawani SDK package access
         shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="false"
+          HAS_ACCESS="false"
           if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            HAS_CREDS="true"
+            STATUS_CODE="$(curl -sS -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/0.0.22/lamsa.sdk-0.0.22.pom || true)"
+            if [ "$STATUS_CODE" = "200" ]; then
+              HAS_ACCESS="true"
+            else
+              echo "Thawani SDK package access check failed with HTTP ${STATUS_CODE}; building APK in stub mode."
+            fi
+          else
+            echo "Thawani SDK credentials not provided; building APK in stub mode."
           fi
-          echo "Thawani Maven credentials available: $HAS_CREDS"
+          echo "HAS_THAWANI_PACKAGE_ACCESS=$HAS_ACCESS" >> "$GITHUB_ENV"
+
+      - name: Ensure Maven repositories (JitPack + conditional Thawani)
+        shell: bash
+        env:
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
+          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+        run: |
+          set -euxo pipefail
+          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
+          echo "Thawani SDK package access: $HAS_CREDS"
           python3 - "$HAS_CREDS" << 'PY'
           import sys
           from pathlib import Path
@@ -159,15 +177,11 @@ jobs:
       - name: Add dataBinding and optional Lamsa SDK dependency
         shell: bash
         env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="false"
-          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            HAS_CREDS="true"
-          fi
-          echo "Thawani Maven credentials available: $HAS_CREDS"
+          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
+          echo "Thawani SDK package access: $HAS_CREDS"
           python3 - "$HAS_CREDS" << 'PY'
           import sys
           from pathlib import Path
@@ -272,14 +286,10 @@ jobs:
       - name: Patch AndroidManifest.xml for USB + NFC + conditional Lamsa
         shell: bash
         env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="false"
-          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            HAS_CREDS="true"
-          fi
+          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
           python3 - "$HAS_CREDS" << 'PY'
           import sys
           from pathlib import Path
@@ -349,10 +359,12 @@ jobs:
         working-directory: android
         shell: bash
         env:
+          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
           THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
+          echo "Building with Thawani SDK package access: ${HAS_THAWANI_PACKAGE_ACCESS:-false}"
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)
