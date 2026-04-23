@@ -51,6 +51,32 @@ const CategoriesManagement = () => {
   const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>('البقرة');
   const [savingVerse, setSavingVerse] = useState(false);
 
+  const generateCategoryId = (titleEn: string, title: string) => {
+    const baseText = (titleEn || title || 'category')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const fallbackBase = baseText || 'category';
+    const existingIds = new Set(categories.map((category) => category.category_id));
+
+    if (!existingIds.has(fallbackBase)) {
+      return fallbackBase;
+    }
+
+    let counter = 2;
+    let candidate = `${fallbackBase}-${counter}`;
+    while (existingIds.has(candidate)) {
+      counter += 1;
+      candidate = `${fallbackBase}-${counter}`;
+    }
+
+    return candidate;
+  };
+
   useEffect(() => {
     checkAuth();
     loadCategories();
@@ -111,18 +137,32 @@ const CategoriesManagement = () => {
     e.preventDefault();
     if (categories.length >= 8 && !editingId) { toast({ title: "Maximum categories reached", description: "You can only have up to 8 categories.", variant: "destructive" }); return; }
     try {
+      const existingCategory = editingId ? categories.find((category) => category.id === editingId) : null;
+      const categoryId = existingCategory?.category_id || generateCategoryId(formData.title_en, formData.title);
       let iconUrl = formData.icon_url;
       if (iconFile) {
-        const fileName = `${formData.category_id}-${Date.now()}.${iconFile.name.split('.').pop()}`;
+        const fileName = `${categoryId}-${Date.now()}.${iconFile.name.split('.').pop()}`;
         const { error: uploadError } = await supabase.storage.from('category-icons').upload(fileName, iconFile, { upsert: true });
         if (uploadError) throw uploadError;
         const { data: { publicUrl } } = supabase.storage.from('category-icons').getPublicUrl(fileName);
         iconUrl = publicUrl;
       }
-      const dataToSave = { ...formData, icon_url: iconUrl };
+      const dataToSave = { ...formData, category_id: categoryId, icon_url: iconUrl };
       if (editingId) {
         const { error } = await supabase.from('donation_categories').update(dataToSave).eq('id', editingId);
         if (error) throw error;
+
+        if (existingCategory?.category_reference !== formData.category_reference) {
+          const { error: transactionsError } = await supabase
+            .from('transactions')
+            .update({ category_reference: formData.category_reference || null })
+            .eq('category_reference', existingCategory?.category_reference || '');
+
+          if (transactionsError && existingCategory?.category_reference) {
+            throw transactionsError;
+          }
+        }
+
         toast({ title: "Category updated successfully" });
       } else {
         const { error } = await supabase.from('donation_categories').insert([dataToSave] as any);
@@ -232,10 +272,6 @@ const CategoriesManagement = () => {
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">{editingId ? 'Edit Category' : 'Add New Category'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="category_id">Category ID (English)</Label>
-                <Input id="category_id" value={formData.category_id} onChange={(e) => setFormData({ ...formData, category_id: e.target.value })} required disabled={!!editingId} placeholder="e.g., zakat, sadaqah" />
-              </div>
               <div>
                 <Label htmlFor="category_reference">Category Reference (for reports)</Label>
                 <Input id="category_reference" value={formData.category_reference} onChange={(e) => setFormData({ ...formData, category_reference: e.target.value })} placeholder="e.g., ZKT-001, SDQ-002" />
