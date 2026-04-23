@@ -86,6 +86,7 @@ const AdminDashboard = () => {
       const filtered = transactions.filter(txn =>
         txn.reference_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         txn.payment_reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        txn.category_reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         txn.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         txn.kiosks?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         txn.kiosks?.reference_number?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -480,7 +481,7 @@ const AdminDashboard = () => {
                                 <div className="text-muted-foreground text-xs">{txn.kiosks?.reference_number || ''}</div>
                               </div>
                             </TableCell>
-                            <TableCell className="capitalize">{txn.category}</TableCell>
+                            <TableCell>{txn.category_reference || txn.category || '-'}</TableCell>
                             <TableCell>{formatAmount(txn.amount_baisas)}</TableCell>
                             <TableCell>{getStatusBadge(txn.status)}</TableCell>
                           </TableRow>
