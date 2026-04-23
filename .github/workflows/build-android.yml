@@ -11,6 +11,10 @@ env:
 permissions:
   contents: write
 
+concurrency:
+  group: android-apk-${{ github.workflow }}-${{ github.ref_name || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -25,7 +29,7 @@ jobs:
           rm -rf ./* ./.??* || true
           git init
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth 1 origin "${GITHUB_REF_NAME}"
+          git fetch --depth 1 origin "${GITHUB_SHA}" || git fetch --depth 1 origin "${GITHUB_REF_NAME:-main}"
           git checkout -q FETCH_HEAD
           git rev-parse --short HEAD
 
@@ -409,7 +413,7 @@ jobs:
           retention-days: 30
 
       - name: Create GitHub Release with APK
-        if: success() && github.ref == 'refs/heads/main'
+        if: success() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
