@@ -95,22 +95,37 @@ const EnhancedStatistics = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Load categories for mapping
       const { data: categoriesData } = await supabase
         .from('donation_categories')
-        .select('category_reference, title, category_id')
-        .eq('is_visible', true);
-      
-      // Create a map of category references to titles
-      const categoryMap = new Map(
-        categoriesData?.map(c => [c.category_reference, c.title]) || []
+        .select('category_reference, title, category_id');
+
+      const categoryReferenceMap = new Map(
+        (categoriesData || [])
+          .filter((category) => category.category_reference)
+          .map((category) => [category.category_reference, category.title])
       );
 
-      // Enrich transactions with category titles
-      const enrichedTransactions = (data || []).map(t => ({
-        ...t,
-        category_title: categoryMap.get(t.category_reference) || t.category
-      }));
+      const categoryIdMap = new Map(
+        (categoriesData || []).map((category) => [category.category_id, {
+          title: category.title,
+          category_reference: category.category_reference,
+        }])
+      );
+
+      const enrichedTransactions = (data || []).map((transaction) => {
+        const categoryById = categoryIdMap.get(transaction.category);
+
+        return {
+          ...transaction,
+          category_title:
+            categoryReferenceMap.get(transaction.category_reference) ||
+            categoryById?.title ||
+            transaction.category,
+          category_reference:
+            categoryById?.category_reference ||
+            transaction.category_reference,
+        };
+      });
 
       setTransactions(enrichedTransactions);
 
