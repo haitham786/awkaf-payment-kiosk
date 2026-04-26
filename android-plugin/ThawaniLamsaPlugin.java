@@ -303,6 +303,35 @@ public class ThawaniLamsaPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        if (waitingForLamsaToOpen) {
+            lamsaActivityOpened = true;
+            Log.d(TAG, "Host activity paused after Lamsa launch request");
+        }
+    }
+
+    private void resolveIfLamsaDidNotOpen(String transactionId) {
+        if (!waitingForLamsaToOpen || lamsaActivityOpened || pendingLaunchCallbackId == null) {
+            return;
+        }
+        Log.e(TAG, "LamsaSDK did not open after launch request");
+        PluginCall savedCall = bridge.getSavedCall(pendingLaunchCallbackId);
+        waitingForLamsaToOpen = false;
+        pendingLaunchCallbackId = null;
+        if (savedCall != null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("transactionId", transactionId);
+            result.put("errorCode", "LAUNCH_TIMEOUT");
+            result.put("errorMessage", "Thawani Lamsa interface did not appear after launch request.");
+            result.put("timestamp", String.valueOf(System.currentTimeMillis()));
+            savedCall.resolve(result);
+            bridge.releaseCall(savedCall);
+        }
+    }
+
     @PluginMethod
     public void cancelPayment(PluginCall call) {
         Log.d(TAG, "cancelPayment called");
