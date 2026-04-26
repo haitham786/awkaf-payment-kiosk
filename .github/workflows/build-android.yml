@@ -224,11 +224,12 @@ jobs:
                       text = re.sub(r"(buildFeatures\s*\{)", r"\1\n        dataBinding true", text)
                   else:
                       text = re.sub(r"(android\s*\{)", r"\1\n    buildFeatures {\n        dataBinding true\n    }", text)
-              # Replace any existing om.thawani implementation line, then add the current version
+              # Replace any existing Lamsa/Kotlin implementation lines, then add the current versions
               text = re.sub(r'\n\s*implementation\(?["\']om\.thawani:lamsa\.sdk:[^"\']+["\']\)?', '', text)
+              text = re.sub(r'\n\s*implementation\(?["\']org\.jetbrains\.kotlin:kotlin-stdlib:[^"\']+["\']\)?', '', text)
               text = re.sub(
                   r"(dependencies\s*\{)",
-                  rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")',
+                  rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")',
                   text
               )
               p.write_text(text, encoding="utf-8")
