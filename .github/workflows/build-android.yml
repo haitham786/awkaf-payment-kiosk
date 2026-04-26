@@ -187,7 +187,7 @@ jobs:
           print("Maven repositories configured")
           PY
 
-      - name: Add dataBinding and Lamsa SDK dependency
+      - name: Add dataBinding, minSdk 26, and Lamsa SDK dependency
         shell: bash
         env:
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
@@ -197,11 +197,21 @@ jobs:
           import sys, re
           from pathlib import Path
           version = sys.argv[1]
+          for vars_name in ["android/variables.gradle", "android/variables.gradle.kts"]:
+              vp = Path(vars_name)
+              if not vp.exists():
+                  continue
+              text = vp.read_text(encoding="utf-8")
+              text = re.sub(r'(minSdkVersion\s*=\s*)\d+', r'\g<1>26', text)
+              vp.write_text(text, encoding="utf-8")
+              print(f"Patched {vp} with minSdkVersion 26 for Lamsa SDK")
           for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
               p = Path(gradle_name)
               if not p.exists():
                   continue
               text = p.read_text(encoding="utf-8")
+              text = re.sub(r'(minSdkVersion\s+)\d+', r'\g<1>26', text)
+              text = re.sub(r'(minSdk\s*=\s*)\d+', r'\g<1>26', text)
               if "dataBinding" not in text:
                   if "buildFeatures" in text:
                       text = re.sub(r"(buildFeatures\s*\{)", r"\1\n        dataBinding true", text)
@@ -215,7 +225,7 @@ jobs:
                   text
               )
               p.write_text(text, encoding="utf-8")
-              print(f"Patched {p} with dataBinding + Lamsa SDK {version}")
+              print(f"Patched {p} with minSdk 26 + dataBinding + Lamsa SDK {version}")
           PY
 
       - name: Copy Thawani Lamsa plugin (real SDK bridge)
@@ -276,7 +286,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
+      - name: Patch AndroidManifest.xml for USB + NFC
         shell: bash
         run: |
           set -euxo pipefail
@@ -303,10 +313,9 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
-              xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
+          xml = re.sub(r'\s*<activity\s+android:name="om\.thawani\.lamsa\.sdk\.LamsaSDK"[^>]*/>\s*', '\n', xml)
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
+          print("AndroidManifest.xml patched (USB + NFC)")
           PY
 
       - name: Grant execute permission for gradlew
