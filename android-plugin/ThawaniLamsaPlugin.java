@@ -7,7 +7,7 @@
  * it launches the LamsaSDK Activity for NFC tap-to-pay.
  * 
  * SDK Reference: https://thawani.gitbook.io/lamsa
- * Maven: om.thawani:lamsa.sdk:0.0.22
+ * Maven: om.thawani:lamsa.sdk:0.0.31
  */
 
 package app.lovable.awkafpaymentkiosk;
@@ -37,23 +37,31 @@ public class ThawaniLamsaPlugin extends Plugin {
 
     private static final String TAG = "ThawaniLamsaPlugin";
     private static final String SDK_CLASS = "om.thawani.lamsa.sdk.LamsaSDK";
-    private static final String OPTIONS_CLASS = "om.thawani.lamsa.sdk.model.InitOptionsModel";
-    private static final String RESULT_CLASS = "om.thawani.lamsa.sdk.model.PaymentResultModel";
+    private static final String OPTIONS_CLASS = "om.thawani.lamsa.sdk.models.InitOptionsModel";
+    private static final String RESULT_CLASS = "om.thawani.lamsa.sdk.models.PaymentResultModel";
+    private static final String PAYMENT_OPTIONS_CLASS = "om.thawani.lamsa.sdk.enums.PaymentOptions";
+    private static final String PAYMENT_SERVICE_CLASS = "om.thawani.lamsa.sdk.enums.PaymentService";
 
     private String authKey = null;
     private boolean isProduction = false;
     private boolean sdkAvailable = false;
     private Class<?> lamsaSdkClass = null;
     private Class<?> optionsClass = null;
+    private Class<?> paymentOptionsClass = null;
+    private Class<?> paymentServiceClass = null;
 
     private void detectSdk() {
         try {
             lamsaSdkClass = Class.forName(SDK_CLASS);
             optionsClass = Class.forName(OPTIONS_CLASS);
+            paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS);
+            paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS);
             sdkAvailable = true;
         } catch (ClassNotFoundException e) {
             lamsaSdkClass = null;
             optionsClass = null;
+            paymentOptionsClass = null;
+            paymentServiceClass = null;
             sdkAvailable = false;
         }
     }
