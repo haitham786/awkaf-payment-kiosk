@@ -360,7 +360,13 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
-          ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+          # CRITICAL: -Pandroid.injected.testOnly=false strips the testOnly="true" flag that
+          # AGP injects into debug APKs by default. Without this, sideloaded debug APKs fail
+          # to install with "Unable to open document. Reason: Internal error occurred" or
+          # "App not installed" on most Android devices (Samsung, Xiaomi, stock Android 11+).
+          ./gradlew assembleDebug \
+            -Pandroid.injected.testOnly=false \
+            --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)
         if: always()
