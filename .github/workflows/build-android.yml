@@ -495,7 +495,7 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Verify Thawani Lamsa SDK is bundled in APK
+      - name: Verify Thawani Lamsa SDK and Capacitor bridge are bundled in APK
         if: success()
         shell: bash
         run: |
@@ -513,7 +513,16 @@ jobs:
             echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
             exit 1
           fi
-          echo "✓ Thawani Lamsa SDK classes are bundled in the APK"
+          if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
+            echo "::error::This means MainActivity registration or plugin compilation failed."
+            exit 1
+          fi
+          if ! grep -aR "app/lovable/awkafpaymentkiosk/MainActivity" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::MainActivity class is missing from the APK dex files."
+            exit 1
+          fi
+          echo "✓ Thawani Lamsa SDK + Capacitor bridge classes are bundled in the APK"
 
       - name: Add installation instructions beside APK
         if: success()
