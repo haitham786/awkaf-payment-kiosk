@@ -197,14 +197,19 @@ public class ThawaniLamsaPlugin extends Plugin {
             Intent data = activityResult.getData();
 
             try {
-                Serializable paymentResult = data.getSerializableExtra("paymentResult");
+                Serializable paymentResult = data.getSerializableExtra("result");
+                if (paymentResult == null) {
+                    paymentResult = data.getSerializableExtra("paymentResult");
+                }
 
                 if (paymentResult != null) {
                     // Use reflection to read PaymentResultModel fields
                     Class<?> cls = paymentResult.getClass();
 
-                    int paymentStatus = (int) cls.getMethod("getPaymentStatus").invoke(paymentResult);
-                    boolean success = paymentStatus == 2;
+                    Object statusObject = cls.getMethod("getPaymentStatus").invoke(paymentResult);
+                    int paymentStatus = statusObject instanceof Integer ? (Integer) statusObject : 0;
+                    Object successObject = cls.getMethod("getSuccess").invoke(paymentResult);
+                    boolean success = successObject instanceof Boolean ? (Boolean) successObject : paymentStatus == 2;
 
                     result.put("success", success);
                     result.put("transactionId", transactionId);
