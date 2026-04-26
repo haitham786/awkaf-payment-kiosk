@@ -30,7 +30,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 
 @CapacitorPlugin(name = "ThawaniLamsa")
 public class ThawaniLamsaPlugin extends Plugin {
@@ -122,7 +121,9 @@ public class ThawaniLamsaPlugin extends Plugin {
 
         Log.d(TAG, "startPayment: amount=" + amount + ", txId=" + transactionId);
 
-        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null) {
+        detectSdk();
+
+        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null || paymentOptionsClass == null || paymentServiceClass == null) {
             Log.w(TAG, "SDK not available - returning error");
             JSObject result = new JSObject();
             result.put("success", false);
@@ -148,14 +149,20 @@ public class ThawaniLamsaPlugin extends Plugin {
         bridge.saveCall(call);
 
         try {
-            // Create InitOptionsModel via reflection
+            // Create InitOptionsModel via reflection using the official 0.0.31 constructor:
+            // (double amount, String authKey, boolean isProduction, String remarks,
+            //  PaymentOptions paymentOption, Integer paymentRequestId,
+            //  LocalDateTime expiryDate, Integer autoCloseInMillis, PaymentService paymentService)
+            Object paymentOption = Enum.valueOf((Class<Enum>) paymentOptionsClass.asSubclass(Enum.class), "CARD_ACCEPT");
+            Object paymentService = Enum.valueOf((Class<Enum>) paymentServiceClass.asSubclass(Enum.class), "LAMSA");
             Constructor<?> ctor = optionsClass.getConstructor(
-                double.class, String.class, String.class, boolean.class, int.class, int.class
+                double.class, String.class, boolean.class, String.class,
+                paymentOptionsClass, Integer.class, java.time.LocalDateTime.class, Integer.class, paymentServiceClass
             );
-            Object options = ctor.newInstance(amount, authKey, remarks, isProduction, 1, 3000);
+            Object options = ctor.newInstance(amount, authKey, isProduction, remarks, paymentOption, null, null, Integer.valueOf(3000), paymentService);
 
             Intent intent = new Intent(getContext(), lamsaSdkClass);
-            intent.putExtra("initOptions", (Serializable) options);
+            intent.putExtra("SDKInitOptions", (Serializable) options);
 
             startActivityForResult(call, intent, "handlePaymentResult");
             Log.d(TAG, "LamsaSDK Activity launched");
