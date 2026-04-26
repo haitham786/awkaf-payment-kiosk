@@ -172,7 +172,7 @@ const NFCPaymentPage = () => {
               <div className="space-y-2">
                 <h2 className="text-xl font-bold text-red-700">خطأ في النظام</h2>
                 <p className="text-sm text-red-500">System Error</p>
-                <p className="text-xs text-gray-600 mt-2">{errorMessage}</p>
+                <p className="text-xs text-gray-600 mt-2 whitespace-pre-line">{errorMessage}</p>
               </div>
               <div className="flex gap-2 justify-center pt-2">
                 <KioskButton variant="confirm" size="sm" onClick={handleRetrySetup}>
