@@ -462,6 +462,26 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
+      - name: Verify Thawani Lamsa SDK is bundled in APK
+        if: success()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK="release-apks/awkaf-kiosk-usb.apk"
+          unzip -l "$APK" | grep -E 'classes[0-9]*\.dex'
+          rm -rf /tmp/apk-dex-check
+          mkdir -p /tmp/apk-dex-check
+          unzip -q "$APK" 'classes*.dex' -d /tmp/apk-dex-check
+          if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
+            exit 1
+          fi
+          if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
+            exit 1
+          fi
+          echo "✓ Thawani Lamsa SDK classes are bundled in the APK"
+
       - name: Add installation instructions beside APK
         if: success()
         shell: bash
