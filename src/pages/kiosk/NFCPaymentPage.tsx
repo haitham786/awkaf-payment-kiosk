@@ -65,9 +65,7 @@ const NFCPaymentPage = () => {
       if (!config) { setErrorMessage('Soft POS is not configured for this kiosk.'); setStage('error'); return; }
       const initialized = await initializeSoftPOS(config);
       if (!initialized) {
-        setErrorMessage(
-          'Thawani Lamsa SDK was not bundled into this APK. Rebuild the Android app from GitHub Actions so the SDK is included, then reinstall.'
-        );
+        setErrorMessage('Soft POS could not be initialized. Please rebuild the APK from GitHub Actions.');
         setStage('error');
         return;
       }
@@ -82,7 +80,14 @@ const NFCPaymentPage = () => {
       setStage('waiting');
     } catch (error: any) {
       console.error('Failed to initialize payment:', error);
-      setErrorMessage(error.message || 'Failed to initialize payment terminal');
+      const raw = error?.message || 'Failed to initialize payment terminal';
+      let friendly = raw;
+      if (/PLUGIN_NOT_REGISTERED/i.test(raw)) {
+        friendly = 'Native Thawani plugin is not registered in this APK. Rebuild from GitHub Actions and reinstall.';
+      } else if (/SDK_NOT_LOADABLE|ClassNotFound|NoClassDefFound/i.test(raw)) {
+        friendly = 'Thawani Lamsa SDK is not bundled in this APK. Rebuild from GitHub Actions and reinstall.';
+      }
+      setErrorMessage(`${friendly}\n\nDetails: ${raw}`);
       setStage('error');
     }
   }, [kioskId]);
@@ -167,7 +172,7 @@ const NFCPaymentPage = () => {
               <div className="space-y-2">
                 <h2 className="text-xl font-bold text-red-700">خطأ في النظام</h2>
                 <p className="text-sm text-red-500">System Error</p>
-                <p className="text-xs text-gray-600 mt-2">{errorMessage}</p>
+                <p className="text-xs text-gray-600 mt-2 whitespace-pre-line">{errorMessage}</p>
               </div>
               <div className="flex gap-2 justify-center pt-2">
                 <KioskButton variant="confirm" size="sm" onClick={handleRetrySetup}>

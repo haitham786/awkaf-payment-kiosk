@@ -39,16 +39,25 @@ export interface NFCStatus {
   errorMessage?: string;
 }
 
+export interface ThawaniInitResult {
+  success: boolean;
+  message: string;
+  sdkAvailable?: boolean;
+  bridgeRegistered?: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 export interface ThawaniLamsaPluginInterface {
   /**
    * Check if the plugin is available on this platform
    */
-  isAvailable(): Promise<{ available: boolean }>;
+  isAvailable(): Promise<{ available: boolean; error?: string }>;
   
   /**
    * Initialize the Thawani Lamsa SDK with credentials
    */
-  initialize(options: ThawaniInitOptions): Promise<{ success: boolean; message: string }>;
+  initialize(options: ThawaniInitOptions): Promise<ThawaniInitResult>;
   
   /**
    * Check NFC availability and status
@@ -85,40 +94,68 @@ export default ThawaniLamsaPlugin;
 export class ThawaniLamsaService {
   private isInitialized = false;
   private currentConfig: ThawaniInitOptions | null = null;
-  
+  private lastInitResult: ThawaniInitResult | null = null;
+
   /**
    * Check if we're running on a native platform with the plugin
    */
   isNativeAvailable(): boolean {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   }
-  
+
+  /**
+   * Detailed result of the last initialize() call. Useful so the UI can tell
+   * apart "plugin missing", "SDK class not loadable", and "ok".
+   */
+  getLastInitResult(): ThawaniInitResult | null {
+    return this.lastInitResult;
+  }
+
   /**
    * Initialize the SDK
    */
   async initialize(tajerToken: string, isProduction: boolean = false): Promise<boolean> {
     console.log('[ThawaniLamsa] Initializing SDK...', { isProduction });
-    
+    this.lastInitResult = null;
+
     if (!this.isNativeAvailable()) {
       console.log('[ThawaniLamsa] Native platform not available, using simulation mode');
       this.isInitialized = true;
       this.currentConfig = { tajerToken, isProduction };
+      this.lastInitResult = {
+        success: true,
+        message: 'Simulation mode (non-native platform)',
+        sdkAvailable: false,
+        bridgeRegistered: false,
+      };
       return true;
     }
-    
+
     try {
       const result = await ThawaniLamsaPlugin.initialize({
         tajerToken,
         isProduction,
       });
-      
+
       console.log('[ThawaniLamsa] SDK initialization result:', result);
-      this.isInitialized = result.success;
+      this.isInitialized = !!result.success;
       this.currentConfig = { tajerToken, isProduction };
-      return result.success;
-    } catch (error) {
+      this.lastInitResult = result;
+      return !!result.success;
+    } catch (error: any) {
+      // If Capacitor throws "UNIMPLEMENTED" the native plugin is not registered in MainActivity.
+      const msg = error?.message || String(error);
+      const isUnimplemented = /UNIMPLEMENTED|not implemented|No such plugin/i.test(msg);
       console.error('[ThawaniLamsa] SDK initialization failed:', error);
       this.isInitialized = false;
+      this.lastInitResult = {
+        success: false,
+        message: msg,
+        sdkAvailable: false,
+        bridgeRegistered: !isUnimplemented,
+        errorCode: isUnimplemented ? 'PLUGIN_NOT_REGISTERED' : 'INIT_THREW',
+        errorMessage: msg,
+      };
       return false;
     }
   }

@@ -49,15 +49,24 @@ public class ThawaniLamsaPlugin extends Plugin {
     private Class<?> paymentOptionsClass = null;
     private Class<?> paymentServiceClass = null;
 
+    private String sdkLoadError = null;
+
     private void detectSdk() {
+        sdkLoadError = null;
         try {
-            lamsaSdkClass = Class.forName(SDK_CLASS);
-            optionsClass = Class.forName(OPTIONS_CLASS);
-            paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS);
-            paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS);
+            ClassLoader cl = getContext() != null
+                ? getContext().getClassLoader()
+                : ThawaniLamsaPlugin.class.getClassLoader();
+            // initialize=false so static initializers do not run during detection.
+            lamsaSdkClass = Class.forName(SDK_CLASS, false, cl);
+            optionsClass = Class.forName(OPTIONS_CLASS, false, cl);
+            paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS, false, cl);
+            paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS, false, cl);
             sdkAvailable = true;
+            Log.d(TAG, "Lamsa SDK classes detected on classpath");
         } catch (Throwable e) {
-            Log.w(TAG, "Lamsa SDK detection failed", e);
+            Log.w(TAG, "Lamsa SDK detection failed: " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+            sdkLoadError = e.getClass().getSimpleName() + ": " + (e.getMessage() != null ? e.getMessage() : "unknown");
             lamsaSdkClass = null;
             optionsClass = null;
             paymentOptionsClass = null;
@@ -72,6 +81,9 @@ public class ThawaniLamsaPlugin extends Plugin {
         detectSdk();
         JSObject result = new JSObject();
         result.put("available", sdkAvailable);
+        if (!sdkAvailable && sdkLoadError != null) {
+            result.put("error", sdkLoadError);
+        }
         call.resolve(result);
     }
 
@@ -79,16 +91,24 @@ public class ThawaniLamsaPlugin extends Plugin {
     public void initialize(PluginCall call) {
         authKey = call.getString("tajerToken", "");
         isProduction = call.getBoolean("isProduction", false);
-        Log.d(TAG, "initialize: authKey length=" + authKey.length() + ", isProduction=" + isProduction);
+        Log.d(TAG, "initialize: authKey length=" + (authKey != null ? authKey.length() : 0) + ", isProduction=" + isProduction);
 
         detectSdk();
 
         JSObject result = new JSObject();
         // success is TRUE only when the Lamsa SDK class is actually present in the APK.
-        // This lets the JS layer fail loudly if the SDK didn't get bundled.
+        // bridgeRegistered is always true when this code runs (proves the plugin reached the device).
         result.put("success", sdkAvailable);
         result.put("sdkAvailable", sdkAvailable);
-        result.put("message", sdkAvailable ? "Lamsa SDK initialized" : "SDK not in classpath - bundling failed");
+        result.put("bridgeRegistered", true);
+        if (sdkAvailable) {
+            result.put("message", "Lamsa SDK initialized");
+        } else {
+            String reason = sdkLoadError != null ? sdkLoadError : "class not found in classpath";
+            result.put("message", "Lamsa SDK not loadable on device: " + reason);
+            result.put("errorCode", "SDK_NOT_LOADABLE");
+            result.put("errorMessage", reason);
+        }
         call.resolve(result);
     }
 

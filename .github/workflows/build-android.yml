@@ -247,32 +247,65 @@ jobs:
             echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
           fi
 
-      - name: Register plugin in MainActivity
+      - name: Register plugin in MainActivity (deterministic rewrite)
         shell: bash
         run: |
           set -euxo pipefail
           python3 - << 'PY'
           from pathlib import Path
-          import re, glob
+          import glob, re
 
-          for pattern in ["android/app/src/main/java/**/MainActivity.java", "android/app/src/main/java/**/MainActivity.kt"]:
-              for f in glob.glob(pattern, recursive=True):
-                  p = Path(f)
-                  text = p.read_text(encoding="utf-8")
-                  if "ThawaniLamsaPlugin" in text:
-                      print(f"Plugin already registered in {p}")
-                      continue
-                  if f.endswith(".java"):
-                      if "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;" not in text:
-                          text = text.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", 1)
-                          if "import android.os.Bundle;" not in text:
-                              text = re.sub(r"(package [^;]+;)", r"\1\nimport app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;", text, count=1)
-                      text = re.sub(r"(super\.onCreate\(savedInstanceState\);)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
-                      if "super.onCreate" not in text:
-                          text = re.sub(r"(onCreate\([^)]*\)\s*\{)", r"\1\n        registerPlugin(ThawaniLamsaPlugin.class);", text, count=1)
-                  p.write_text(text, encoding="utf-8")
-                  print(f"Registered ThawaniLamsaPlugin in {p}")
+          MAIN_JAVA = (
+              "package app.lovable.awkafpaymentkiosk;\n\n"
+              "import android.os.Bundle;\n"
+              "import com.getcapacitor.BridgeActivity;\n"
+              "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n\n"
+              "public class MainActivity extends BridgeActivity {\n"
+              "    @Override\n"
+              "    public void onCreate(Bundle savedInstanceState) {\n"
+              "        registerPlugin(ThawaniLamsaPlugin.class);\n"
+              "        super.onCreate(savedInstanceState);\n"
+              "    }\n"
+              "}\n"
+          )
+
+          # Remove any stray Kotlin MainActivity that Capacitor may have generated
+          for f in glob.glob("android/app/src/main/java/**/MainActivity.kt", recursive=True):
+              Path(f).unlink()
+              print(f"Removed Kotlin MainActivity: {f}")
+
+          # Always rewrite the Java MainActivity at the canonical Capacitor path
+          target_dir = Path("android/app/src/main/java/app/lovable/awkafpaymentkiosk")
+          target_dir.mkdir(parents=True, exist_ok=True)
+          target = target_dir / "MainActivity.java"
+          target.write_text(MAIN_JAVA, encoding="utf-8")
+          print(f"Wrote canonical MainActivity.java at {target}")
+
+          # Remove duplicate MainActivity.java files anywhere else in the source tree
+          for f in glob.glob("android/app/src/main/java/**/MainActivity.java", recursive=True):
+              p = Path(f).resolve()
+              if p != target.resolve():
+                  p.unlink()
+                  print(f"Removed duplicate MainActivity.java: {p}")
           PY
+
+      - name: Assert MainActivity registers ThawaniLamsa plugin
+        shell: bash
+        run: |
+          set -euxo pipefail
+          MAIN="android/app/src/main/java/app/lovable/awkafpaymentkiosk/MainActivity.java"
+          test -f "$MAIN" || { echo "::error::MainActivity.java missing at $MAIN"; exit 1; }
+          echo "=== Final MainActivity.java ==="
+          cat "$MAIN"
+          echo "==============================="
+          grep -q "extends BridgeActivity" "$MAIN" || { echo "::error::MainActivity does not extend BridgeActivity"; exit 1; }
+          grep -q "import android.os.Bundle;" "$MAIN" || { echo "::error::Missing Bundle import"; exit 1; }
+          grep -q "registerPlugin(ThawaniLamsaPlugin.class);" "$MAIN" || { echo "::error::ThawaniLamsaPlugin is not registered"; exit 1; }
+          echo "✓ MainActivity correctly registers ThawaniLamsaPlugin"
+
+          PLUGIN="android/app/src/main/java/app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin.java"
+          test -f "$PLUGIN" || { echo "::error::ThawaniLamsaPlugin.java was not copied to $PLUGIN"; exit 1; }
+          echo "✓ ThawaniLamsaPlugin.java is present in the source tree"
 
       - name: Create USB device filter XML
         run: |
@@ -462,7 +495,7 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Verify Thawani Lamsa SDK is bundled in APK
+      - name: Verify Thawani Lamsa SDK and Capacitor bridge are bundled in APK
         if: success()
         shell: bash
         run: |
@@ -480,7 +513,16 @@ jobs:
             echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
             exit 1
           fi
-          echo "✓ Thawani Lamsa SDK classes are bundled in the APK"
+          if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
+            echo "::error::This means MainActivity registration or plugin compilation failed."
+            exit 1
+          fi
+          if ! grep -aR "app/lovable/awkafpaymentkiosk/MainActivity" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::MainActivity class is missing from the APK dex files."
+            exit 1
+          fi
+          echo "✓ Thawani Lamsa SDK + Capacitor bridge classes are bundled in the APK"
 
       - name: Add installation instructions beside APK
         if: success()

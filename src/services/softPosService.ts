@@ -150,17 +150,21 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
     const success = await thawaniLamsaService.initialize(config.authKey, config.isProduction);
     if (success) {
       console.log('[SoftPOS] Thawani Lamsa SDK initialized on device');
-      // Force live mode on native - the Lamsa Activity is what should drive the UX.
       currentMode = 'live';
       isInitialized = true;
       return true;
     }
-    console.error('[SoftPOS] Lamsa SDK init returned false on native device.');
+    const last = thawaniLamsaService.getLastInitResult();
+    const code = last?.errorCode || 'SDK_INIT_FAILED';
+    const reason = last?.errorMessage || last?.message || 'unknown reason';
+    console.error('[SoftPOS] Lamsa SDK init returned false on native device:', code, reason);
     isInitialized = false;
-    return false;
-  } catch (error) {
+    // Encode the precise reason in the thrown error so the UI can show it.
+    throw new Error(`${code}: ${reason}`);
+  } catch (error: any) {
     console.error('[SoftPOS] Failed to initialize Lamsa SDK on native device:', error);
     isInitialized = false;
+    if (error instanceof Error) throw error;
     return false;
   }
 };
