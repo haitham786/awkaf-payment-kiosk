@@ -428,12 +428,30 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Upload APK as workflow artifact
+      - name: Add installation instructions beside APK
+        if: success()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > release-apks/README-INSTALL.txt << 'EOF'
+          IMPORTANT:
+          GitHub Actions artifacts are downloaded as ZIP files.
+          Android cannot install the ZIP directly and may show:
+          "Unable to open document. Reason: Internal error occurred"
+
+          Correct install options:
+          1. Best: open this workflow's GitHub Release and download awkaf-kiosk-usb.apk directly.
+          2. Or: unzip this artifact first, then install awkaf-kiosk-usb.apk from inside it.
+          EOF
+
+      - name: Upload ZIP artifact (unzip before installing)
         if: success()
         uses: actions/upload-artifact@v5
         with:
-          name: awkaf-kiosk-usb-apk
-          path: release-apks/awkaf-kiosk-usb.apk
+          name: UNZIP-FIRST-then-install-awkaf-kiosk-usb-apk
+          path: |
+            release-apks/awkaf-kiosk-usb.apk
+            release-apks/README-INSTALL.txt
           retention-days: 30
 
       - name: Create GitHub Release with APK
@@ -451,4 +469,4 @@ jobs:
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
-            --notes "Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"
+            --notes "Download the APK from this Release asset directly on the Android device. Do not install the GitHub Actions artifact ZIP; if you downloaded the artifact, unzip it first and install awkaf-kiosk-usb.apk from inside. Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"
