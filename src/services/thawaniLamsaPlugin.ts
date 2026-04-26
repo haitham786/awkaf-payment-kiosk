@@ -95,6 +95,7 @@ export class ThawaniLamsaService {
   private isInitialized = false;
   private currentConfig: ThawaniInitOptions | null = null;
   private lastInitResult: ThawaniInitResult | null = null;
+  private readonly launchTimeoutMs = 12000;
 
   /**
    * Check if we're running on a native platform with the plugin
@@ -225,11 +226,20 @@ export class ThawaniLamsaService {
     }
     
     try {
-      const result = await ThawaniLamsaPlugin.startPayment({
+      const result = await Promise.race([
+        ThawaniLamsaPlugin.startPayment({
         amount: amountOMR,
         transactionId,
         remarks: remarks || `Donation ${transactionId}`,
-      });
+        }),
+        new Promise<ThawaniPaymentResult>((resolve) => window.setTimeout(() => resolve({
+          success: false,
+          transactionId,
+          errorCode: 'LAUNCH_TIMEOUT',
+          errorMessage: 'Thawani Lamsa interface did not appear after launch request.',
+          timestamp: new Date().toISOString(),
+        }), this.launchTimeoutMs)),
+      ]);
       
       console.log('[ThawaniLamsa] Payment result:', result);
       return result;
