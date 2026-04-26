@@ -22,14 +22,14 @@ export class ThawaniLamsaPluginWeb implements ThawaniLamsaPluginInterface {
     return { available: false };
   }
   
-  async initialize(options: ThawaniInitOptions): Promise<{ success: boolean; message: string }> {
+  async initialize(options: ThawaniInitOptions) {
     console.log('[ThawaniLamsa-Web] initialize called with options:', {
       tajerToken: options.tajerToken ? '***REDACTED***' : 'empty',
       isProduction: options.isProduction,
     });
     
     if (!options.tajerToken) {
-      return { success: false, message: 'Tajer Token is required' };
+      return { success: false, message: 'Tajer Token is required', sdkAvailable: false, bridgeRegistered: false };
     }
     
     this.isInitialized = true;
@@ -37,7 +37,9 @@ export class ThawaniLamsaPluginWeb implements ThawaniLamsaPluginInterface {
     
     return { 
       success: true, 
-      message: 'Web simulation mode initialized - actual payments require native Android app' 
+      message: 'Web simulation mode initialized - actual payments require native Android app',
+      sdkAvailable: false,
+      bridgeRegistered: false,
     };
   }
   
