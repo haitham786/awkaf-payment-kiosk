@@ -30,10 +30,12 @@ const NFCPaymentPage = () => {
   const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isNativeMode, setIsNativeMode] = useState(false);
+  const [isPaymentReady, setIsPaymentReady] = useState(false);
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
   const autoStartRef = React.useRef(false);
+  const paymentInFlightRef = React.useRef(false);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -59,6 +61,10 @@ const NFCPaymentPage = () => {
 
   const initializePayment = useCallback(async () => {
     setErrorMessage('');
+    setIsPaymentReady(false);
+    autoStartRef.current = false;
+    paymentInFlightRef.current = false;
+    if (!Number.isFinite(amount) || amount <= 0) { setErrorMessage('Invalid donation amount. Please select or enter an amount again.'); setStage('error'); return; }
     if (!kioskId) { setErrorMessage('Kiosk is not registered. Please set up the kiosk first.'); setStage('error'); return; }
     try {
       const config = await loadKioskSoftPosConfig(kioskId);
@@ -78,6 +84,7 @@ const NFCPaymentPage = () => {
       onSoftPOSApproval((result) => { setTransactionResult(result); handlePaymentSuccess(result); });
       onSoftPOSFailure((error, errorCode) => { setStage('declined'); setTransactionResult({ success: false, error, errorCode }); });
       setStage('waiting');
+      setIsPaymentReady(true);
     } catch (error: any) {
       console.error('Failed to initialize payment:', error);
       const raw = error?.message || 'Failed to initialize payment terminal';
@@ -89,12 +96,14 @@ const NFCPaymentPage = () => {
       }
       setErrorMessage(`${friendly}\n\nDetails: ${raw}`);
       setStage('error');
+      setIsPaymentReady(false);
     }
-  }, [kioskId]);
+  }, [amount, kioskId]);
 
   useEffect(() => { initializePayment(); return () => { cancelTransaction(); }; }, [initializePayment]);
 
   const handlePaymentSuccess = async (result: SoftPOSTransactionResult) => {
+    paymentInFlightRef.current = false;
     const status = getSoftPOSStatus();
     const transactionData = { transactionId, kioskId, amount, category, paymentResult: result, paymentType: 'soft_pos', provider: 'thawani', mode: status.mode === 'test' ? 'test' : 'live', thawaniReference: result.thawaniReference, createdAt: new Date().toISOString() };
     if (isOnline()) {
@@ -115,13 +124,20 @@ const NFCPaymentPage = () => {
   };
 
   const handleStartPayment = useCallback(async () => {
+    if (paymentInFlightRef.current) return;
+    paymentInFlightRef.current = true;
     setStage('processing');
     try {
       const result = await startSoftPOSTransaction(amount, transactionId, `Donation - ${category}`);
+      paymentInFlightRef.current = false;
       if (result.success) { /* handled by callback */ }
-      else if (result.errorCode !== 'USER_CANCELLED') { /* handled by callback */ }
-      else { setStage('waiting'); }
-    } catch (error: any) { setStage('declined'); setTransactionResult({ success: false, error: error.message }); }
+      else if (result.errorCode === 'USER_CANCELLED' || result.errorCode === 'CANCELLED') { setStage('waiting'); }
+      else { setStage('declined'); setTransactionResult(result); }
+    } catch (error: any) {
+      paymentInFlightRef.current = false;
+      setStage('declined');
+      setTransactionResult({ success: false, error: error.message || 'Payment launch failed', errorCode: 'PAYMENT_EXCEPTION' });
+    }
   }, [amount, category, transactionId]);
 
   // Auto-launch payment as soon as we're ready.
@@ -129,6 +145,7 @@ const NFCPaymentPage = () => {
   // - In simulation/test (web preview): triggers our simulated tap-card UI.
   useEffect(() => {
     if (stage !== 'waiting') return;
+    if (!isPaymentReady) return;
     if (autoStartRef.current) return;
     autoStartRef.current = true;
     const status = getSoftPOSStatus();
@@ -137,12 +154,12 @@ const NFCPaymentPage = () => {
     const delay = status.isNativeAvailable ? 0 : 900;
     const t = window.setTimeout(() => { void handleStartPayment(); }, delay);
     return () => window.clearTimeout(t);
-  }, [handleStartPayment, stage]);
+  }, [handleStartPayment, isPaymentReady, stage]);
 
-  const handleTryAgain = () => { autoStartRef.current = false; setStage('waiting'); setTransactionResult(null); setErrorMessage(''); };
+  const handleTryAgain = () => { autoStartRef.current = false; paymentInFlightRef.current = false; setStage('waiting'); setTransactionResult(null); setErrorMessage(''); };
   const handleCancel = () => { cancelTransaction(); navigate('/kiosk'); };
   const handleTimeout = () => { cancelTransaction(); navigate('/kiosk'); };
-  const handleRetrySetup = () => { setStage('waiting'); setErrorMessage(''); initializePayment(); };
+  const handleRetrySetup = () => { setStage('waiting'); setErrorMessage(''); setIsPaymentReady(false); initializePayment(); };
 
   const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);

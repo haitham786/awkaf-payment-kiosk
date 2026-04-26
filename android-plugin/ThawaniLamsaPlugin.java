@@ -17,6 +17,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.nfc.NfcAdapter;
 import android.nfc.NfcManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
@@ -50,6 +52,10 @@ public class ThawaniLamsaPlugin extends Plugin {
     private Class<?> paymentServiceClass = null;
 
     private String sdkLoadError = null;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private String pendingLaunchCallbackId = null;
+    private boolean waitingForLamsaToOpen = false;
+    private boolean lamsaActivityOpened = false;
 
     private void detectSdk() {
         sdkLoadError = null;
@@ -168,6 +174,9 @@ public class ThawaniLamsaPlugin extends Plugin {
         }
 
         bridge.saveCall(call);
+        pendingLaunchCallbackId = call.getCallbackId();
+        waitingForLamsaToOpen = true;
+        lamsaActivityOpened = false;
 
         try {
             // Create InitOptionsModel via reflection using the official 0.0.31 constructor:
@@ -187,9 +196,11 @@ public class ThawaniLamsaPlugin extends Plugin {
 
             startActivityForResult(call, intent, "handlePaymentResult");
             Log.d(TAG, "LamsaSDK Activity launched");
+            mainHandler.postDelayed(() -> resolveIfLamsaDidNotOpen(transactionId), 5000);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to launch LamsaSDK", e);
+            waitingForLamsaToOpen = false;
             PluginCall savedCall = bridge.getSavedCall(call.getCallbackId());
             if (savedCall != null) {
                 JSObject result = new JSObject();
@@ -206,6 +217,8 @@ public class ThawaniLamsaPlugin extends Plugin {
 
     @ActivityCallback
     private void handlePaymentResult(PluginCall call, ActivityResult activityResult) {
+        waitingForLamsaToOpen = false;
+        pendingLaunchCallbackId = null;
         if (call == null) {
             Log.e(TAG, "handlePaymentResult: call is null");
             return;
@@ -288,6 +301,35 @@ public class ThawaniLamsaPlugin extends Plugin {
         }
 
         call.resolve(result);
+    }
+
+    @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        if (waitingForLamsaToOpen) {
+            lamsaActivityOpened = true;
+            Log.d(TAG, "Host activity paused after Lamsa launch request");
+        }
+    }
+
+    private void resolveIfLamsaDidNotOpen(String transactionId) {
+        if (!waitingForLamsaToOpen || lamsaActivityOpened || pendingLaunchCallbackId == null) {
+            return;
+        }
+        Log.e(TAG, "LamsaSDK did not open after launch request");
+        PluginCall savedCall = bridge.getSavedCall(pendingLaunchCallbackId);
+        waitingForLamsaToOpen = false;
+        pendingLaunchCallbackId = null;
+        if (savedCall != null) {
+            JSObject result = new JSObject();
+            result.put("success", false);
+            result.put("transactionId", transactionId);
+            result.put("errorCode", "LAUNCH_TIMEOUT");
+            result.put("errorMessage", "Thawani Lamsa interface did not appear after launch request.");
+            result.put("timestamp", String.valueOf(System.currentTimeMillis()));
+            savedCall.resolve(result);
+            bridge.releaseCall(savedCall);
+        }
     }
 
     @PluginMethod

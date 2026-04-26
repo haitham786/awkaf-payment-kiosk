@@ -234,6 +234,15 @@ jobs:
               )
               p.write_text(text, encoding="utf-8")
               print(f"Patched {p} with minSdk 26 + dataBinding + Lamsa SDK {version}")
+          proguard = Path("android/app/proguard-rules.pro")
+          if proguard.exists():
+              text = proguard.read_text(encoding="utf-8")
+          else:
+              text = ""
+          keep = "-keep class om.thawani.lamsa.sdk.** { *; }\n-keep class acrNfcReader.** { *; }\n-keep class com.module.creditCardNfcReader.** { *; }\n"
+          if "om.thawani.lamsa.sdk" not in text:
+              proguard.write_text(text.rstrip() + "\n" + keep, encoding="utf-8")
+              print("Added Lamsa SDK keep rules")
           PY
 
       - name: Copy Thawani Lamsa plugin (real SDK bridge)
@@ -357,6 +366,7 @@ jobs:
           if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
               activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
               xml = xml.replace('</application>', activity + '    </application>', 1)
+          xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
           p.write_text(xml, encoding="utf-8")
           print("AndroidManifest.xml patched (USB + NFC)")
           PY
