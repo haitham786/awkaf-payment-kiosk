@@ -17,6 +17,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.nfc.NfcAdapter;
 import android.nfc.NfcManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
@@ -50,6 +52,10 @@ public class ThawaniLamsaPlugin extends Plugin {
     private Class<?> paymentServiceClass = null;
 
     private String sdkLoadError = null;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private String pendingLaunchCallbackId = null;
+    private boolean waitingForLamsaToOpen = false;
+    private boolean lamsaActivityOpened = false;
 
     private void detectSdk() {
         sdkLoadError = null;
