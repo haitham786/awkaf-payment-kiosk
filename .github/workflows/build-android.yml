@@ -176,9 +176,13 @@ jobs:
           ]
           thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}]
           thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}]
-          for f in ["android/settings.gradle", "android/build.gradle"]:
+          for f in ["android/settings.gradle"]:
+              patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
+          for f in ["android/settings.gradle.kts"]:
+              patch_file(Path(f), common_kts_snippets + thawani_kts_snippets)
+          for f in ["android/build.gradle"]:
               patch_file(Path(f), common_groovy_snippets)
-          for f in ["android/settings.gradle.kts", "android/build.gradle.kts"]:
+          for f in ["android/build.gradle.kts"]:
               patch_file(Path(f), common_kts_snippets)
           for f in ["android/app/build.gradle"]:
               patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
