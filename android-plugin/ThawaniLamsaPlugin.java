@@ -174,6 +174,9 @@ public class ThawaniLamsaPlugin extends Plugin {
         }
 
         bridge.saveCall(call);
+        pendingLaunchCallbackId = call.getCallbackId();
+        waitingForLamsaToOpen = true;
+        lamsaActivityOpened = false;
 
         try {
             // Create InitOptionsModel via reflection using the official 0.0.31 constructor:
@@ -193,9 +196,11 @@ public class ThawaniLamsaPlugin extends Plugin {
 
             startActivityForResult(call, intent, "handlePaymentResult");
             Log.d(TAG, "LamsaSDK Activity launched");
+            mainHandler.postDelayed(() -> resolveIfLamsaDidNotOpen(transactionId), 2500);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to launch LamsaSDK", e);
+            waitingForLamsaToOpen = false;
             PluginCall savedCall = bridge.getSavedCall(call.getCallbackId());
             if (savedCall != null) {
                 JSObject result = new JSObject();
@@ -212,6 +217,8 @@ public class ThawaniLamsaPlugin extends Plugin {
 
     @ActivityCallback
     private void handlePaymentResult(PluginCall call, ActivityResult activityResult) {
+        waitingForLamsaToOpen = false;
+        pendingLaunchCallbackId = null;
         if (call == null) {
             Log.e(TAG, "handlePaymentResult: call is null");
             return;
