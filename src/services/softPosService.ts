@@ -99,14 +99,10 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
     const softPosConfig = config?.soft_pos || {};
     const mode: SoftPosMode = softPosConfig.mode || 'test';
     
-    // In live mode, auth key is required
-    if (mode === 'live' && !softPosConfig.auth_key) {
-      console.error('[SoftPOS] Auth Key required for live mode');
-      return null;
-    }
-    
+    // Trial-friendly: pass whatever auth key is configured straight to Lamsa.
+    // Lamsa itself will accept/reject the key during the actual transaction.
     return {
-      authKey: softPosConfig.auth_key || 'TEST_AUTH_KEY',
+      authKey: softPosConfig.auth_key || 'TRIAL_AUTH_KEY',
       isProduction: softPosConfig.is_production ?? false,
       mode: mode,
     };
