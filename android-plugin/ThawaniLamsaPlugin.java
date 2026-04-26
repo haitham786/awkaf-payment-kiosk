@@ -7,7 +7,7 @@
  * it launches the LamsaSDK Activity for NFC tap-to-pay.
  * 
  * SDK Reference: https://thawani.gitbook.io/lamsa
- * Maven: om.thawani:lamsa.sdk:0.0.22
+ * Maven: om.thawani:lamsa.sdk:0.0.31
  */
 
 package app.lovable.awkafpaymentkiosk;
@@ -30,30 +30,38 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 
 @CapacitorPlugin(name = "ThawaniLamsa")
 public class ThawaniLamsaPlugin extends Plugin {
 
     private static final String TAG = "ThawaniLamsaPlugin";
     private static final String SDK_CLASS = "om.thawani.lamsa.sdk.LamsaSDK";
-    private static final String OPTIONS_CLASS = "om.thawani.lamsa.sdk.model.InitOptionsModel";
-    private static final String RESULT_CLASS = "om.thawani.lamsa.sdk.model.PaymentResultModel";
+    private static final String OPTIONS_CLASS = "om.thawani.lamsa.sdk.models.InitOptionsModel";
+    private static final String RESULT_CLASS = "om.thawani.lamsa.sdk.models.PaymentResultModel";
+    private static final String PAYMENT_OPTIONS_CLASS = "om.thawani.lamsa.sdk.enums.PaymentOptions";
+    private static final String PAYMENT_SERVICE_CLASS = "om.thawani.lamsa.sdk.enums.PaymentService";
 
     private String authKey = null;
     private boolean isProduction = false;
     private boolean sdkAvailable = false;
     private Class<?> lamsaSdkClass = null;
     private Class<?> optionsClass = null;
+    private Class<?> paymentOptionsClass = null;
+    private Class<?> paymentServiceClass = null;
 
     private void detectSdk() {
         try {
             lamsaSdkClass = Class.forName(SDK_CLASS);
             optionsClass = Class.forName(OPTIONS_CLASS);
+            paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS);
+            paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS);
             sdkAvailable = true;
-        } catch (ClassNotFoundException e) {
+        } catch (Throwable e) {
+            Log.w(TAG, "Lamsa SDK detection failed", e);
             lamsaSdkClass = null;
             optionsClass = null;
+            paymentOptionsClass = null;
+            paymentServiceClass = null;
             sdkAvailable = false;
         }
     }
@@ -114,7 +122,9 @@ public class ThawaniLamsaPlugin extends Plugin {
 
         Log.d(TAG, "startPayment: amount=" + amount + ", txId=" + transactionId);
 
-        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null) {
+        detectSdk();
+
+        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null || paymentOptionsClass == null || paymentServiceClass == null) {
             Log.w(TAG, "SDK not available - returning error");
             JSObject result = new JSObject();
             result.put("success", false);
@@ -140,14 +150,20 @@ public class ThawaniLamsaPlugin extends Plugin {
         bridge.saveCall(call);
 
         try {
-            // Create InitOptionsModel via reflection
+            // Create InitOptionsModel via reflection using the official 0.0.31 constructor:
+            // (double amount, String authKey, boolean isProduction, String remarks,
+            //  PaymentOptions paymentOption, Integer paymentRequestId,
+            //  LocalDateTime expiryDate, Integer autoCloseInMillis, PaymentService paymentService)
+            Object paymentOption = Enum.valueOf((Class<Enum>) paymentOptionsClass.asSubclass(Enum.class), "CARD_ACCEPT");
+            Object paymentService = Enum.valueOf((Class<Enum>) paymentServiceClass.asSubclass(Enum.class), "LAMSA");
             Constructor<?> ctor = optionsClass.getConstructor(
-                double.class, String.class, String.class, boolean.class, int.class, int.class
+                double.class, String.class, boolean.class, String.class,
+                paymentOptionsClass, Integer.class, java.time.LocalDateTime.class, Integer.class, paymentServiceClass
             );
-            Object options = ctor.newInstance(amount, authKey, remarks, isProduction, 1, 3000);
+            Object options = ctor.newInstance(amount, authKey, isProduction, remarks, paymentOption, null, null, Integer.valueOf(3000), paymentService);
 
             Intent intent = new Intent(getContext(), lamsaSdkClass);
-            intent.putExtra("initOptions", (Serializable) options);
+            intent.putExtra("SDKInitOptions", (Serializable) options);
 
             startActivityForResult(call, intent, "handlePaymentResult");
             Log.d(TAG, "LamsaSDK Activity launched");
@@ -182,14 +198,19 @@ public class ThawaniLamsaPlugin extends Plugin {
             Intent data = activityResult.getData();
 
             try {
-                Serializable paymentResult = data.getSerializableExtra("paymentResult");
+                Serializable paymentResult = data.getSerializableExtra("result");
+                if (paymentResult == null) {
+                    paymentResult = data.getSerializableExtra("paymentResult");
+                }
 
                 if (paymentResult != null) {
                     // Use reflection to read PaymentResultModel fields
                     Class<?> cls = paymentResult.getClass();
 
-                    int paymentStatus = (int) cls.getMethod("getPaymentStatus").invoke(paymentResult);
-                    boolean success = paymentStatus == 2;
+                    Object statusObject = cls.getMethod("getPaymentStatus").invoke(paymentResult);
+                    int paymentStatus = statusObject instanceof Integer ? (Integer) statusObject : 0;
+                    Object successObject = cls.getMethod("getSuccess").invoke(paymentResult);
+                    boolean success = successObject instanceof Boolean ? (Boolean) successObject : paymentStatus == 2;
 
                     result.put("success", success);
                     result.put("transactionId", transactionId);
