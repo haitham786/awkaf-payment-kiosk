@@ -342,12 +342,11 @@ jobs:
         shell: bash
         timeout-minutes: 8
         env:
-          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          echo "Building with Thawani SDK package access: ${HAS_THAWANI_PACKAGE_ACCESS:-false}"
+          echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)
