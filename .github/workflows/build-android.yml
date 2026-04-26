@@ -350,7 +350,44 @@ jobs:
           set -euxo pipefail
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
 
-      - name: Build Debug APK
+      - name: Create temporary release signing key
+        shell: bash
+        run: |
+          set -euxo pipefail
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/awkaf-release-key.p12 \
+            -alias awkaf_release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Awkaf Payment Kiosk, OU=Kiosk, O=Awkaf, L=Muscat, ST=Muscat, C=OM"
+
+      - name: Patch Android release signing
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          if not p.exists():
+              raise SystemExit("android/app/build.gradle not found")
+          text = p.read_text(encoding="utf-8")
+          if "awkaf-release-key.p12" not in text:
+              text = re.sub(r"(android\s*\{)", r"\1\n    signingConfigs {\n        release {\n            storeFile file('awkaf-release-key.p12')\n            storePassword 'android'\n            keyAlias 'awkaf_release'\n            keyPassword 'android'\n        }\n    }", text, count=1)
+          if "buildTypes" in text and "signingConfig signingConfigs.release" not in text:
+              text = re.sub(r"(release\s*\{)", r"\1\n            signingConfig signingConfigs.release", text, count=1)
+          elif "buildTypes" not in text:
+              text = re.sub(r"(android\s*\{)", r"\1\n    buildTypes {\n        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'\n        }\n    }", text, count=1)
+          p.write_text(text, encoding="utf-8")
+          print("Release signing configured")
+          PY
+
+      - name: Build signed Release APK
         working-directory: android
         shell: bash
         timeout-minutes: 8
@@ -360,11 +397,7 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
-          # CRITICAL: -Pandroid.injected.testOnly=false strips the testOnly="true" flag that
-          # AGP injects into debug APKs by default. Without this, sideloaded debug APKs fail
-          # to install with "Unable to open document. Reason: Internal error occurred" or
-          # "App not installed" on most Android devices (Samsung, Xiaomi, stock Android 11+).
-          ./gradlew assembleDebug \
+          ./gradlew assembleRelease \
             -Pandroid.injected.testOnly=false \
             --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
@@ -383,7 +416,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-apks
-          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
           if [ ! -f "$APK_PATH" ]; then
             APK_PATH=$(find android/app/build/outputs -type f -name "*.apk" 2>/dev/null | head -n 1 || true)
           fi
@@ -435,13 +468,16 @@ jobs:
           set -euxo pipefail
           cat > release-apks/README-INSTALL.txt << 'EOF'
           IMPORTANT:
-          GitHub Actions artifacts are downloaded as ZIP files.
-          Android cannot install the ZIP directly and may show:
+          Install ONLY the file named awkaf-kiosk-usb.apk.
+
+          If you download from GitHub Actions, GitHub gives you a ZIP file.
+          Android cannot install that ZIP directly and may show:
           "Unable to open document. Reason: Internal error occurred"
 
           Correct install options:
           1. Best: open this workflow's GitHub Release and download awkaf-kiosk-usb.apk directly.
-          2. Or: unzip this artifact first, then install awkaf-kiosk-usb.apk from inside it.
+          2. Or: unzip the GitHub Actions artifact first, then install awkaf-kiosk-usb.apk from inside it.
+          This APK is a signed release build, not a debug/test APK.
           EOF
 
       - name: Upload ZIP artifact (unzip before installing)
