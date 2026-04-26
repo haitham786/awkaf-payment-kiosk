@@ -196,7 +196,7 @@ public class ThawaniLamsaPlugin extends Plugin {
 
             startActivityForResult(call, intent, "handlePaymentResult");
             Log.d(TAG, "LamsaSDK Activity launched");
-            mainHandler.postDelayed(() -> resolveIfLamsaDidNotOpen(transactionId), 2500);
+            mainHandler.postDelayed(() -> resolveIfLamsaDidNotOpen(transactionId), 5000);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to launch LamsaSDK", e);
