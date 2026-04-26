@@ -111,41 +111,45 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      # Thawani Lamsa SDK is distributed via GitHub Packages with PUBLIC credentials
+      # published in their official integration docs: https://thawani.gitbook.io/lamsa
+      # These are NOT private - Thawani publishes them so any developer can pull the SDK.
+      - name: Set Thawani Maven credentials (public, from Thawani docs)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "THAWANI_MAVEN_USER=ThawaniMobile" >> "$GITHUB_ENV"
+          echo "THAWANI_MAVEN_TOKEN=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" >> "$GITHUB_ENV"
+          echo "LAMSA_SDK_VERSION=0.0.31" >> "$GITHUB_ENV"
+
       - name: Verify Thawani SDK package access
         shell: bash
         env:
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
+          LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
         run: |
           set -euxo pipefail
-          HAS_ACCESS="false"
-          if [ -n "${THAWANI_MAVEN_USER:-}" ] && [ -n "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            STATUS_CODE="$(curl -sS -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/0.0.22/lamsa.sdk-0.0.22.pom || true)"
-            if [ "$STATUS_CODE" = "200" ]; then
-              HAS_ACCESS="true"
-            else
-              echo "Thawani SDK package access check failed with HTTP ${STATUS_CODE}; building APK in stub mode."
-            fi
-          else
-            echo "Thawani SDK credentials not provided; building APK in stub mode."
+          STATUS_CODE="$(curl -sS -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/${LAMSA_SDK_VERSION}/lamsa.sdk-${LAMSA_SDK_VERSION}.pom" || true)"
+          echo "Thawani SDK ${LAMSA_SDK_VERSION} POM check: HTTP ${STATUS_CODE}"
+          if [ "$STATUS_CODE" != "200" ]; then
+            echo "::error::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} from GitHub Packages."
+            echo "::error::This usually means Thawani rotated their public credentials in the docs."
+            echo "::error::Check https://thawani.gitbook.io/lamsa for the latest username/token."
+            cat /tmp/thawani-sdk-check.txt || true
+            exit 1
           fi
-          echo "HAS_THAWANI_PACKAGE_ACCESS=$HAS_ACCESS" >> "$GITHUB_ENV"
 
-      - name: Ensure Maven repositories (JitPack + conditional Thawani)
+      - name: Ensure Maven repositories (JitPack + Thawani)
         shell: bash
         env:
-          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
-          echo "Thawani SDK package access: $HAS_CREDS"
-          python3 - "$HAS_CREDS" << 'PY'
-          import sys
+          python3 - << 'PY'
           from pathlib import Path
           import re
-          has_creds = sys.argv[1] == "true"
           def patch_repositories_block(text, snippets):
               patched = text
               for snippet in snippets:
@@ -166,13 +170,8 @@ jobs:
           common_kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
           ]
-          thawani_groovy_snippets = []
-          thawani_kts_snippets = []
-          if has_creds:
-              thawani_groovy_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'})
-              thawani_kts_snippets.append({"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'})
-          else:
-              print("Skipping Thawani Maven repository (no credentials)")
+          thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}]
+          thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}]
           for f in ["android/settings.gradle", "android/build.gradle"]:
               patch_file(Path(f), common_groovy_snippets)
           for f in ["android/settings.gradle.kts", "android/build.gradle.kts"]:
@@ -184,55 +183,35 @@ jobs:
           print("Maven repositories configured")
           PY
 
-      - name: Add dataBinding and optional Lamsa SDK dependency
+      - name: Add dataBinding and Lamsa SDK dependency
         shell: bash
         env:
-          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
+          LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
-          echo "Thawani SDK package access: $HAS_CREDS"
-          python3 - "$HAS_CREDS" << 'PY'
-          import sys
+          python3 - "$LAMSA_SDK_VERSION" << 'PY'
+          import sys, re
           from pathlib import Path
-          import re
-
-          has_creds = sys.argv[1] == "true"
-
+          version = sys.argv[1]
           for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
               p = Path(gradle_name)
               if not p.exists():
                   continue
               text = p.read_text(encoding="utf-8")
-
-              # Add dataBinding if not present
               if "dataBinding" not in text:
                   if "buildFeatures" in text:
-                      text = re.sub(
-                          r"(buildFeatures\s*\{)",
-                          r"\1\n        dataBinding true",
-                          text
-                      )
+                      text = re.sub(r"(buildFeatures\s*\{)", r"\1\n        dataBinding true", text)
                   else:
-                      text = re.sub(
-                          r"(android\s*\{)",
-                          r"\1\n    buildFeatures {\n        dataBinding true\n    }",
-                          text
-                      )
-
-              # Add Lamsa SDK dependency only if Maven credentials are available
-              if has_creds and "om.thawani" not in text:
-                  text = re.sub(
-                      r"(dependencies\s*\{)",
-                      r'\1\n    implementation("om.thawani:lamsa.sdk:0.0.22")',
-                      text
-                  )
-                  print(f"Added Lamsa SDK dependency to {p}")
-              elif not has_creds:
-                  print(f"Skipping Lamsa SDK dependency (no Maven credentials) for {p}")
-
+                      text = re.sub(r"(android\s*\{)", r"\1\n    buildFeatures {\n        dataBinding true\n    }", text)
+              # Replace any existing om.thawani implementation line, then add the current version
+              text = re.sub(r'\n\s*implementation\(?["\']om\.thawani:lamsa\.sdk:[^"\']+["\']\)?', '', text)
+              text = re.sub(
+                  r"(dependencies\s*\{)",
+                  rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")',
+                  text
+              )
               p.write_text(text, encoding="utf-8")
-              print(f"Patched {p} with dataBinding")
+              print(f"Patched {p} with dataBinding + Lamsa SDK {version}")
           PY
 
       - name: Copy Thawani Lamsa plugin (real SDK bridge)
@@ -293,18 +272,13 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC + conditional Lamsa
+      - name: Patch AndroidManifest.xml for USB + NFC + Lamsa
         shell: bash
-        env:
-          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
         run: |
           set -euxo pipefail
-          HAS_CREDS="${HAS_THAWANI_PACKAGE_ACCESS:-false}"
-          python3 - "$HAS_CREDS" << 'PY'
-          import sys
+          python3 - << 'PY'
           from pathlib import Path
           import re
-          has_creds = sys.argv[1] == "true"
           p = Path("android/app/src/main/AndroidManifest.xml")
           if not p.exists():
               raise SystemExit("AndroidManifest.xml not found")
@@ -325,12 +299,10 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          if has_creds and "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
+          if "om.thawani.lamsa.sdk.LamsaSDK" not in xml:
               xml = xml.replace("</application>", '        <activity android:name="om.thawani.lamsa.sdk.LamsaSDK" android:exported="false" />\n    </application>', 1)
-          elif not has_creds:
-              print("Skipping LamsaSDK activity registration (no credentials)")
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC" + (" + Lamsa" if has_creds else "") + ")")
+          print("AndroidManifest.xml patched (USB + NFC + Lamsa)")
           PY
 
       - name: Grant execute permission for gradlew
@@ -370,12 +342,11 @@ jobs:
         shell: bash
         timeout-minutes: 8
         env:
-          HAS_THAWANI_PACKAGE_ACCESS: ${{ env.HAS_THAWANI_PACKAGE_ACCESS }}
-          THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
+          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
+          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          echo "Building with Thawani SDK package access: ${HAS_THAWANI_PACKAGE_ACCESS:-false}"
+          echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
           ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)

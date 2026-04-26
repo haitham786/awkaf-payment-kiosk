@@ -76,9 +76,11 @@ public class ThawaniLamsaPlugin extends Plugin {
         detectSdk();
 
         JSObject result = new JSObject();
-        result.put("success", true);
+        // success is TRUE only when the Lamsa SDK class is actually present in the APK.
+        // This lets the JS layer fail loudly if the SDK didn't get bundled.
+        result.put("success", sdkAvailable);
         result.put("sdkAvailable", sdkAvailable);
-        result.put("message", sdkAvailable ? "Lamsa SDK initialized" : "SDK not in classpath - stub mode");
+        result.put("message", sdkAvailable ? "Lamsa SDK initialized" : "SDK not in classpath - bundling failed");
         call.resolve(result);
     }
 

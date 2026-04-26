@@ -99,14 +99,10 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
     const softPosConfig = config?.soft_pos || {};
     const mode: SoftPosMode = softPosConfig.mode || 'test';
     
-    // In live mode, auth key is required
-    if (mode === 'live' && !softPosConfig.auth_key) {
-      console.error('[SoftPOS] Auth Key required for live mode');
-      return null;
-    }
-    
+    // Trial-friendly: pass whatever auth key is configured straight to Lamsa.
+    // Lamsa itself will accept/reject the key during the actual transaction.
     return {
-      authKey: softPosConfig.auth_key || 'TEST_AUTH_KEY',
+      authKey: softPosConfig.auth_key || 'TRIAL_AUTH_KEY',
       isProduction: softPosConfig.is_production ?? false,
       mode: mode,
     };
@@ -121,7 +117,11 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
 // ============================================================================
 
 /**
- * Initialize the SoftPOS service with configuration
+ * Initialize the SoftPOS service with configuration.
+ *
+ * On native Android we REQUIRE the Lamsa SDK to be present; if it's missing
+ * we surface a loud error instead of silently dropping into simulation
+ * (silent fallback hides build/Maven configuration problems).
  */
 export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean> => {
   console.log('[SoftPOS] Initializing Thawani Lamsa...', {
@@ -133,32 +133,35 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
   currentMode = config.mode || 'test';
   currentConfig = config;
 
-  if (currentMode === 'test') {
-    console.log('[SoftPOS] Running in TEST mode - payments will be simulated');
+  const isNativePlatform = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+
+  // On the web preview (no Capacitor native bridge), force simulation regardless
+  // of mode, so designers/admins can still walk through the flow on desktop.
+  if (!isNativePlatform) {
+    console.log('[SoftPOS] Web/desktop preview - using simulation');
+    currentMode = 'test';
     isInitialized = true;
     return true;
   }
 
-  // LIVE MODE - Initialize via Thawani Lamsa Capacitor Plugin
+  // On native Android: try to initialize the real Thawani Lamsa SDK via plugin.
   try {
     const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
     const success = await thawaniLamsaService.initialize(config.authKey, config.isProduction);
     if (success) {
-      console.log('[SoftPOS] Thawani Lamsa SDK initialized successfully');
-      isInitialized = true;
-      return true;
-    } else {
-      console.warn('[SoftPOS] Lamsa SDK init failed - falling back to test mode');
-      currentMode = 'test';
+      console.log('[SoftPOS] Thawani Lamsa SDK initialized on device');
+      // Force live mode on native - the Lamsa Activity is what should drive the UX.
+      currentMode = 'live';
       isInitialized = true;
       return true;
     }
+    console.error('[SoftPOS] Lamsa SDK init returned false on native device.');
+    isInitialized = false;
+    return false;
   } catch (error) {
-    console.error('[SoftPOS] Failed to initialize Lamsa SDK:', error);
-    console.warn('[SoftPOS] Falling back to test mode');
-    currentMode = 'test';
-    isInitialized = true;
-    return true;
+    console.error('[SoftPOS] Failed to initialize Lamsa SDK on native device:', error);
+    isInitialized = false;
+    return false;
   }
 };
 
