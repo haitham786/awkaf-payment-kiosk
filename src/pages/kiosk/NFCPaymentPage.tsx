@@ -64,7 +64,13 @@ const NFCPaymentPage = () => {
       const config = await loadKioskSoftPosConfig(kioskId);
       if (!config) { setErrorMessage('Soft POS is not configured for this kiosk.'); setStage('error'); return; }
       const initialized = await initializeSoftPOS(config);
-      if (!initialized) { setErrorMessage('Failed to initialize payment terminal.'); setStage('error'); return; }
+      if (!initialized) {
+        setErrorMessage(
+          'Thawani Lamsa SDK was not bundled into this APK. Rebuild the Android app from GitHub Actions so the SDK is included, then reinstall.'
+        );
+        setStage('error');
+        return;
+      }
       const status = getSoftPOSStatus();
       setIsNativeMode(status.isNativeAvailable);
       const nfcStatus = await checkNFCAvailability();
@@ -113,13 +119,18 @@ const NFCPaymentPage = () => {
     } catch (error: any) { setStage('declined'); setTransactionResult({ success: false, error: error.message }); }
   }, [amount, category, transactionId]);
 
+  // Auto-launch payment as soon as we're ready.
+  // - On native (Lamsa SDK present): hands off immediately to Thawani's official Activity.
+  // - In simulation/test (web preview): triggers our simulated tap-card UI.
   useEffect(() => {
     if (stage !== 'waiting') return;
-    const status = getSoftPOSStatus();
-    if (status.mode !== 'test') return;
     if (autoStartRef.current) return;
     autoStartRef.current = true;
-    const t = window.setTimeout(() => { void handleStartPayment(); }, 900);
+    const status = getSoftPOSStatus();
+    // Native: launch immediately so Thawani's UI takes the screen with no delay.
+    // Simulation: tiny delay so the user sees the "waiting" UI for a beat.
+    const delay = status.isNativeAvailable ? 0 : 900;
+    const t = window.setTimeout(() => { void handleStartPayment(); }, delay);
     return () => window.clearTimeout(t);
   }, [handleStartPayment, stage]);
 
@@ -135,7 +146,10 @@ const NFCPaymentPage = () => {
   };
 
   const status = getSoftPOSStatus();
-  const useFullScreenUI = status.mode === 'test' && ['waiting', 'processing'].includes(stage);
+  // Show our custom Tap Card simulation ONLY in non-native (web preview) mode.
+  // On native Android, the official Thawani Lamsa Activity takes over the screen,
+  // so we must NOT draw a competing UI.
+  const useFullScreenUI = !status.isNativeAvailable && status.mode === 'test' && ['waiting', 'processing'].includes(stage);
 
   if (useFullScreenUI) {
     return <ThawaniTapCardScreen amount={amount} category={category} stage={stage as 'waiting' | 'processing'} isTrialMode={true} onCancel={handleCancel} onTimeout={handleTimeout} />;
