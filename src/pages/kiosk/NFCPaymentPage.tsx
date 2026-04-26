@@ -30,10 +30,12 @@ const NFCPaymentPage = () => {
   const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isNativeMode, setIsNativeMode] = useState(false);
+  const [isPaymentReady, setIsPaymentReady] = useState(false);
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
   const autoStartRef = React.useRef(false);
+  const paymentInFlightRef = React.useRef(false);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -59,6 +61,10 @@ const NFCPaymentPage = () => {
 
   const initializePayment = useCallback(async () => {
     setErrorMessage('');
+    setIsPaymentReady(false);
+    autoStartRef.current = false;
+    paymentInFlightRef.current = false;
+    if (!Number.isFinite(amount) || amount <= 0) { setErrorMessage('Invalid donation amount. Please select or enter an amount again.'); setStage('error'); return; }
     if (!kioskId) { setErrorMessage('Kiosk is not registered. Please set up the kiosk first.'); setStage('error'); return; }
     try {
       const config = await loadKioskSoftPosConfig(kioskId);
@@ -78,6 +84,7 @@ const NFCPaymentPage = () => {
       onSoftPOSApproval((result) => { setTransactionResult(result); handlePaymentSuccess(result); });
       onSoftPOSFailure((error, errorCode) => { setStage('declined'); setTransactionResult({ success: false, error, errorCode }); });
       setStage('waiting');
+      setIsPaymentReady(true);
     } catch (error: any) {
       console.error('Failed to initialize payment:', error);
       const raw = error?.message || 'Failed to initialize payment terminal';
@@ -89,8 +96,9 @@ const NFCPaymentPage = () => {
       }
       setErrorMessage(`${friendly}\n\nDetails: ${raw}`);
       setStage('error');
+      setIsPaymentReady(false);
     }
-  }, [kioskId]);
+  }, [amount, kioskId]);
 
   useEffect(() => { initializePayment(); return () => { cancelTransaction(); }; }, [initializePayment]);
 
