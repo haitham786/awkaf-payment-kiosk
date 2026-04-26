@@ -468,13 +468,16 @@ jobs:
           set -euxo pipefail
           cat > release-apks/README-INSTALL.txt << 'EOF'
           IMPORTANT:
-          GitHub Actions artifacts are downloaded as ZIP files.
-          Android cannot install the ZIP directly and may show:
+          Install ONLY the file named awkaf-kiosk-usb.apk.
+
+          If you download from GitHub Actions, GitHub gives you a ZIP file.
+          Android cannot install that ZIP directly and may show:
           "Unable to open document. Reason: Internal error occurred"
 
           Correct install options:
           1. Best: open this workflow's GitHub Release and download awkaf-kiosk-usb.apk directly.
-          2. Or: unzip this artifact first, then install awkaf-kiosk-usb.apk from inside it.
+          2. Or: unzip the GitHub Actions artifact first, then install awkaf-kiosk-usb.apk from inside it.
+          This APK is a signed release build, not a debug/test APK.
           EOF
 
       - name: Upload ZIP artifact (unzip before installing)
