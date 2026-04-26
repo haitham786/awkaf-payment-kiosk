@@ -56,7 +56,8 @@ public class ThawaniLamsaPlugin extends Plugin {
             paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS);
             paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS);
             sdkAvailable = true;
-        } catch (ClassNotFoundException e) {
+        } catch (Throwable e) {
+            Log.w(TAG, "Lamsa SDK detection failed", e);
             lamsaSdkClass = null;
             optionsClass = null;
             paymentOptionsClass = null;
