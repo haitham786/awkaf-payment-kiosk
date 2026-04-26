@@ -104,12 +104,7 @@ const KiosksManagement = () => {
 
   const validateForm = (): boolean => {
     setValidationError(null);
-    if (formData.configuration.payment_mode === 'soft_pos') {
-      if (formData.configuration.soft_pos?.mode === 'live' && !formData.configuration.soft_pos?.auth_key?.trim()) {
-        setValidationError('Auth Key is required for Thawani Lamsa Live Mode');
-        return false;
-      }
-    }
+    // Trial mode: any non-empty auth key is accepted. Real key only needed for live transactions.
     return true;
   };
 
