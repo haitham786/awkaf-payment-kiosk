@@ -39,16 +39,25 @@ export interface NFCStatus {
   errorMessage?: string;
 }
 
+export interface ThawaniInitResult {
+  success: boolean;
+  message: string;
+  sdkAvailable?: boolean;
+  bridgeRegistered?: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 export interface ThawaniLamsaPluginInterface {
   /**
    * Check if the plugin is available on this platform
    */
-  isAvailable(): Promise<{ available: boolean }>;
+  isAvailable(): Promise<{ available: boolean; error?: string }>;
   
   /**
    * Initialize the Thawani Lamsa SDK with credentials
    */
-  initialize(options: ThawaniInitOptions): Promise<{ success: boolean; message: string }>;
+  initialize(options: ThawaniInitOptions): Promise<ThawaniInitResult>;
   
   /**
    * Check NFC availability and status
