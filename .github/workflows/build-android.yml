@@ -360,7 +360,13 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
-          ./gradlew assembleDebug --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+          # CRITICAL: -Pandroid.injected.testOnly=false strips the testOnly="true" flag that
+          # AGP injects into debug APKs by default. Without this, sideloaded debug APKs fail
+          # to install with "Unable to open document. Reason: Internal error occurred" or
+          # "App not installed" on most Android devices (Samsung, Xiaomi, stock Android 11+).
+          ./gradlew assembleDebug \
+            -Pandroid.injected.testOnly=false \
+            --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
 
       - name: List Android build outputs (always)
         if: always()
@@ -386,6 +392,40 @@ jobs:
           else
             echo "ERROR: APK not found"
             exit 1
+          fi
+
+      - name: Verify APK is installable (no testOnly flag, valid signature)
+        if: success()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK="release-apks/awkaf-kiosk-usb.apk"
+          BUILD_TOOLS_DIR="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* 2>/dev/null | sort -V | tail -n 1)"
+          AAPT="$BUILD_TOOLS_DIR/aapt"
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          echo "=== APK file info ==="
+          ls -lh "$APK"
+          file "$APK"
+          echo ""
+          echo "=== Manifest flags (testOnly must be absent / false) ==="
+          if [ -x "$AAPT" ]; then
+            "$AAPT" dump badging "$APK" 2>&1 | head -20 || true
+            TEST_ONLY="$("$AAPT" dump xmltree "$APK" AndroidManifest.xml 2>/dev/null | grep -i 'testOnly' || true)"
+            if echo "$TEST_ONLY" | grep -q '0xffffffff\|=true\|=(type 0x12)0xffffffff'; then
+              echo "::error::APK has testOnly=true flag. It will fail to install via sideload."
+              echo "$TEST_ONLY"
+              exit 1
+            fi
+            echo "✓ testOnly flag is not set (sideload-installable)"
+          fi
+          echo ""
+          echo "=== Signature verification (v1/v2/v3) ==="
+          if [ -x "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose "$APK" || {
+              echo "::error::APK signature verification failed"
+              exit 1
+            }
+            echo "✓ APK signature is valid"
           fi
 
       - name: Upload APK as workflow artifact
