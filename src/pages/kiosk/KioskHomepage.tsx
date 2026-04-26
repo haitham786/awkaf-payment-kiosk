@@ -151,33 +151,25 @@ const KioskHomepage = () => {
 
       {kioskStatus !== 'active' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-          <Card className="max-w-sm w-full p-6 text-center bg-white shadow-2xl">
+          <Card className="max-w-sm w-full p-6 text-center bg-white/70 backdrop-blur-md shadow-2xl border border-white/40">
             <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
               {kioskStatus === 'unregistered' ? <Settings className="w-10 h-10 text-white" /> : <AlertTriangle className="w-10 h-10 text-white" />}
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">
-              {statusMessages[kioskStatus]?.ar || 'غير متاح حالياً'}
-            </h2>
-            <p className="text-lg text-gray-500 mb-3">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
               {statusMessages[kioskStatus]?.en || 'Currently Unavailable'}
-            </p>
-            <p className="text-base text-gray-700 leading-relaxed mb-1">
-              {kioskMessage}
-            </p>
-            <p className="text-sm text-gray-500 leading-relaxed mb-4">
+            </h2>
+            <p className="text-base text-gray-700 leading-relaxed mb-4">
               {statusMessageEn[kioskMessage] || ''}
             </p>
             {kioskStatus === 'unregistered' && (
               <Button size="default" className="text-sm px-4 py-2 max-w-[250px] w-full bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
-                <Settings className="w-4 h-4 ml-1 flex-shrink-0" />
-                <span className="truncate">فتح الإعدادات</span>
-                <span className="text-xs ml-1 opacity-80">Settings</span>
+                <Settings className="w-4 h-4 mr-1 flex-shrink-0" />
+                <span>Settings</span>
               </Button>
             )}
             {kioskStatus !== 'unregistered' && (
               <div className="mt-2">
-                <p className="text-sm text-gray-600">نشكر لكم تفهمكم</p>
-                <p className="text-xs text-gray-400">Thank you for your understanding</p>
+                <p className="text-sm text-gray-600">Thank you for your understanding</p>
               </div>
             )}
           </Card>
