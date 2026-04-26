@@ -435,10 +435,11 @@ const KiosksManagement = () => {
                     <Input id="auth_key" type="password"
                       value={formData.configuration.soft_pos?.auth_key || ''}
                       onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, soft_pos: { ...formData.configuration.soft_pos!, auth_key: e.target.value } } })}
-                      placeholder="Enter Thawani Auth Key"
-                      className={validationError ? 'border-destructive' : ''}
+                      placeholder="Enter any value for trial, real key for live"
                     />
-                    {validationError && <p className="text-xs text-destructive mt-1">{validationError}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Trial: any value is accepted so you can verify NFC card detection. A real touchpoint key from merchant.thawani.om is required for live card charging.
+                    </p>
                   </div>
 
                   <div>
