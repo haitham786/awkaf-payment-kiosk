@@ -350,7 +350,7 @@ jobs:
           set -euxo pipefail
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
 
-      - name: Create temporary release signing key
+      - name: Create temporary APK signing key
         shell: bash
         run: |
           set -euxo pipefail
@@ -366,31 +366,10 @@ jobs:
             -keypass android \
             -dname "CN=Awkaf Payment Kiosk, OU=Kiosk, O=Awkaf, L=Muscat, ST=Muscat, C=OM"
 
-      - name: Patch Android release signing
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python3 - << 'PY'
-          from pathlib import Path
-          import re
-          p = Path("android/app/build.gradle")
-          if not p.exists():
-              raise SystemExit("android/app/build.gradle not found")
-          text = p.read_text(encoding="utf-8")
-          if "awkaf-release-key.p12" not in text:
-              text = re.sub(r"(android\s*\{)", r"\1\n    signingConfigs {\n        release {\n            storeFile file('awkaf-release-key.p12')\n            storePassword 'android'\n            keyAlias 'awkaf_release'\n            keyPassword 'android'\n        }\n    }", text, count=1)
-          if "buildTypes" in text and "signingConfig signingConfigs.release" not in text:
-              text = re.sub(r"(release\s*\{)", r"\1\n            signingConfig signingConfigs.release", text, count=1)
-          elif "buildTypes" not in text:
-              text = re.sub(r"(android\s*\{)", r"\1\n    buildTypes {\n        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'\n        }\n    }", text, count=1)
-          p.write_text(text, encoding="utf-8")
-          print("Release signing configured")
-          PY
-
-      - name: Build signed Release APK
+      - name: Build unsigned Release APK
         working-directory: android
         shell: bash
-        timeout-minutes: 8
+        timeout-minutes: 20
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
@@ -400,6 +379,27 @@ jobs:
           ./gradlew assembleRelease \
             -Pandroid.injected.testOnly=false \
             --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+
+      - name: Sign release APK externally
+        if: success()
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p release-apks
+          BUILD_TOOLS_DIR="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* 2>/dev/null | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          UNSIGNED_APK="$(find android/app/build/outputs/apk/release -type f \( -name '*-unsigned.apk' -o -name '*.apk' \) | head -n 1)"
+          test -n "$UNSIGNED_APK"
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED_APK" release-apks/awkaf-kiosk-usb-aligned.apk
+          "$APKSIGNER" sign \
+            --ks android/app/awkaf-release-key.p12 \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --ks-key-alias awkaf_release \
+            --out release-apks/awkaf-kiosk-usb.apk \
+            release-apks/awkaf-kiosk-usb-aligned.apk
+          "$APKSIGNER" verify --verbose release-apks/awkaf-kiosk-usb.apk
 
       - name: List Android build outputs (always)
         if: always()
@@ -415,17 +415,8 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p release-apks
-          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
-          if [ ! -f "$APK_PATH" ]; then
-            APK_PATH=$(find android/app/build/outputs -type f -name "*.apk" 2>/dev/null | head -n 1 || true)
-          fi
-          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
-            cp "$APK_PATH" release-apks/awkaf-kiosk-usb.apk
-          else
-            echo "ERROR: APK not found"
-            exit 1
-          fi
+          test -f release-apks/awkaf-kiosk-usb.apk
+          ls -lh release-apks/awkaf-kiosk-usb.apk
 
       - name: Verify APK is installable (no testOnly flag, valid signature)
         if: success()
