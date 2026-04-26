@@ -7,6 +7,9 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  THAWANI_MAVEN_USER: ThawaniMobile
+  THAWANI_MAVEN_TOKEN: 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
+  LAMSA_SDK_VERSION: 0.0.31
 
 permissions:
   contents: write
@@ -118,9 +121,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          echo "THAWANI_MAVEN_USER=ThawaniMobile" >> "$GITHUB_ENV"
-          echo "THAWANI_MAVEN_TOKEN=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" >> "$GITHUB_ENV"
-          echo "LAMSA_SDK_VERSION=0.0.31" >> "$GITHUB_ENV"
+          test -n "${THAWANI_MAVEN_USER:-}"
+          test -n "${THAWANI_MAVEN_TOKEN:-}"
+          test -n "${LAMSA_SDK_VERSION:-}"
 
       - name: Verify Thawani SDK package access
         shell: bash
