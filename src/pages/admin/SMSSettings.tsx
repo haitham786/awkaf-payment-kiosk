@@ -141,9 +141,14 @@ const SMSSettings = () => {
 
       if (error) throw error;
 
+      const detail = data?.return_code
+        ? `Return code ${data.return_code}: ${data.error || data.message}`
+        : (data?.error || data?.message || 'No response from gateway');
+
       toast({
-        title: "Test SMS sent",
-        description: data.message || "Check the logs for the SMS preview.",
+        title: data?.success ? "Test SMS sent" : "Test SMS failed",
+        description: detail,
+        variant: data?.success ? "default" : "destructive",
       });
     } catch (error: any) {
       toast({
@@ -184,65 +189,47 @@ const SMSSettings = () => {
         <Card className="p-6">
           <div className="space-y-6">
             <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="api_endpoint">API Endpoint URL</Label>
-                <Input
-                  id="api_endpoint"
-                  type="url"
-                  placeholder="https://api.smsgateway.com/send"
-                  value={settings.api_endpoint}
-                  onChange={(e) => setSettings(prev => ({ ...prev, api_endpoint: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The full URL of the SMS gateway API endpoint
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+                <p className="font-semibold">Omantel iSmart SMS (Infocomm) gateway</p>
+                <p className="text-muted-foreground">
+                  Uses HTTP POST to <code className="text-xs">SMSDynamicRefIntlAPI.aspx</code>. Provide the User ID,
+                  Password, and registered Sender Header issued by Infocomm.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="api_key">API Key</Label>
-                <div className="relative">
-                  <Input
-                    id="api_key"
-                    type={showApiKey ? "text" : "password"}
-                    placeholder="Enter your API key"
-                    value={settings.api_key}
-                    onChange={(e) => setSettings(prev => ({ ...prev, api_key: e.target.value }))}
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                  >
-                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Label htmlFor="api_endpoint">API URL</Label>
+                <Input
+                  id="api_endpoint"
+                  type="url"
+                  placeholder="https://www.ismartsms.net/iBulkSMS/HttpWS/SMSDynamicRefIntlAPI.aspx"
+                  value={settings.api_endpoint}
+                  onChange={(e) => setSettings(prev => ({ ...prev, api_endpoint: e.target.value }))}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Authentication key for the SMS gateway
+                  Leave blank to use the default Infocomm endpoint.
                 </p>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api_username">API Username (Optional)</Label>
+                  <Label htmlFor="api_username">User ID (UserId)</Label>
                   <Input
                     id="api_username"
                     type="text"
-                    placeholder="Username"
+                    placeholder="Provided by Infocomm"
                     value={settings.api_username}
                     onChange={(e) => setSettings(prev => ({ ...prev, api_username: e.target.value }))}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="api_password">API Password (Optional)</Label>
+                  <Label htmlFor="api_password">Password</Label>
                   <div className="relative">
                     <Input
                       id="api_password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Password"
+                      placeholder="Provided by Infocomm"
                       value={settings.api_password}
                       onChange={(e) => setSettings(prev => ({ ...prev, api_password: e.target.value }))}
                       className="pr-10"
@@ -261,16 +248,17 @@ const SMSSettings = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sender_id">Sender ID</Label>
+                <Label htmlFor="sender_id">Sender Header</Label>
                 <Input
                   id="sender_id"
                   type="text"
-                  placeholder="e.g., Awkaf"
+                  maxLength={11}
+                  placeholder="e.g. Awkaf"
                   value={settings.sender_id}
                   onChange={(e) => setSettings(prev => ({ ...prev, sender_id: e.target.value }))}
                 />
                 <p className="text-xs text-muted-foreground">
-                  The sender name that will appear on SMS messages (max 11 characters)
+                  Max 11 characters. Must be a header registered with Infocomm, otherwise the gateway returns code 19.
                 </p>
               </div>
             </div>
@@ -283,7 +271,7 @@ const SMSSettings = () => {
               <Button
                 variant="outline"
                 onClick={handleTestSMS}
-                disabled={testing || !settings.api_endpoint}
+                disabled={testing || (!settings.api_username && !settings.api_endpoint)}
               >
                 <Send className="w-4 h-4 mr-2" />
                 {testing ? 'Testing...' : 'Send Test SMS'}
