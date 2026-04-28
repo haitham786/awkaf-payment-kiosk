@@ -19,7 +19,32 @@ interface SMSRequest {
 // Validate Omani mobile number format (with or without country code)
 const OMAN_MOBILE_REGEX = /^(968)?[79]\d{7}$/;
 
-// Categories are dynamic - no hardcoded validation needed
+// Default Omantel iSmart SMS endpoint (Infocomm)
+const DEFAULT_ISMART_URL = 'https://www.ismartsms.net/iBulkSMS/HttpWS/SMSDynamicRefIntlAPI.aspx';
+
+// iSmart return-code map (per Infocomm API document Rev 1.0)
+const ISMART_RETURN_CODES: Record<string, string> = {
+  '1': 'Message pushed successfully.',
+  '2': 'Company does not exist.',
+  '3': 'User or password is wrong.',
+  '4': 'Credit is low.',
+  '5': 'Message is blank.',
+  '6': 'Message length exceeded.',
+  '7': 'Account is inactive.',
+  '8': 'Mobile number length is empty.',
+  '9': 'Invalid mobile number.',
+  '10': 'Invalid language.',
+  '11': 'Unknown error.',
+  '12': 'Account blocked by administrator (concurrent login failures).',
+  '13': 'Account expired.',
+  '14': 'Credit expired.',
+  '15': 'Invalid HTTP request or wrong parameter fields.',
+  '16': 'Invalid date-time parameter.',
+  '17': 'Web service user ID not registered.',
+  '18': 'User not registered to use HTTP GET method API.',
+  '19': 'Header not registered with Infocomm.',
+  '20': 'Client IP address has been blocked.',
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -89,7 +114,6 @@ serve(async (req) => {
     }
 
     // Server-side verification: Check if transaction exists
-    // Try by reference_number first, then by transaction ID
     let transaction = null;
     let txError = null;
 
@@ -102,7 +126,6 @@ serve(async (req) => {
     if (txByRef) {
       transaction = txByRef;
     } else if (transaction_id) {
-      // Fallback: look up by transaction UUID
       const { data: txById, error: idError } = await supabaseAdmin
         .from('transactions')
         .select('id, reference_number, amount_baisas, status, sms_status, category')
@@ -130,7 +153,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify transaction status is completed
     if (transaction.status !== 'completed') {
       console.error('Transaction not completed:', transaction.status);
       return new Response(
@@ -139,7 +161,6 @@ serve(async (req) => {
       );
     }
 
-    // Check if SMS was already sent (prevent duplicate sends)
     if (transaction.sms_status === 'sent') {
       console.log('SMS already sent for transaction:', reference_number);
       return new Response(
@@ -169,7 +190,7 @@ serve(async (req) => {
       minute: '2-digit' 
     });
 
-    // Fetch category title from database for SMS message
+    // Fetch category title from database
     const { data: catData } = await supabaseAdmin
       .from('donation_categories')
       .select('title')
@@ -181,14 +202,13 @@ serve(async (req) => {
     // Use the system reference number from the transaction record
     const smsReference = transaction.reference_number || reference_number;
 
-    // Create SMS message in Arabic with BOTH references
+    // Build SMS body in Arabic
     let smsMessage = `شكراً لتبرعكم!
 الفئة: ${categoryArabic}
 المبلغ: ${formattedAmount}
 التاريخ: ${dateStr} ${timeStr}
 رقم المعاملة: ${smsReference}`;
 
-    // Add POS/Bank reference if available
     if (pos_rrn) {
       smsMessage += `
 رقم مرجع البنك: ${pos_rrn}`;
@@ -199,54 +219,80 @@ serve(async (req) => {
 
     console.log('SMS prepared for:', cleanMobile.slice(-4));
 
-    // Get SMS gateway credentials from database
-    const { data: smsSettings, error: settingsError } = await supabaseAdmin
+    // Load iSmart credentials from sms_settings
+    const { data: smsSettings } = await supabaseAdmin
       .from('sms_settings')
       .select('*')
       .limit(1)
       .maybeSingle();
 
-    let smsSent = false;
-    let smsError = null;
+    const apiUrl = (smsSettings?.api_endpoint && smsSettings.api_endpoint.trim()) || DEFAULT_ISMART_URL;
+    const userId = smsSettings?.api_username?.trim();
+    const password = smsSettings?.api_password?.trim();
+    const header = (smsSettings?.sender_id || '').trim().slice(0, 11);
 
-    // Only attempt to send if SMS gateway is configured in database
-    if (smsSettings?.api_endpoint && smsSettings?.api_key) {
+    let smsSent = false;
+    let smsError: string | null = null;
+    let returnCode: string | null = null;
+    let gatewayResponse: string | null = null;
+
+    if (!userId || !password || !header) {
+      smsError = 'iSmart SMS gateway not configured. Set User ID, Password, and Sender Header in admin → SMS Settings.';
+      console.warn(smsError);
+    } else {
       try {
-        console.log('Attempting to send SMS via gateway...');
-        
-        const smsResponse = await fetch(smsSettings.api_endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${smsSettings.api_key}`,
-          },
-          body: JSON.stringify({
-            to: cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`,
-            from: smsSettings.sender_id || 'Awkaf',
-            message: smsMessage,
-            username: smsSettings.api_username,
-            password: smsSettings.api_password,
-          }),
+        // Format mobile to international (Omantel iSmart expects country-code prefix, no '+')
+        const intlMobile = cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`;
+
+        // Reference id: 3-6 digit number derived from system reference (digits only, last 6)
+        const refDigits = smsReference.replace(/\D/g, '').slice(-6) || '100';
+        const referenceIds = refDigits.padStart(3, '0').slice(0, 6);
+
+        // Lang=64 → Arabic (message body is Arabic)
+        const formBody = new URLSearchParams({
+          UserId: userId,
+          Password: password,
+          MobileNo: intlMobile,
+          Message: smsMessage,
+          Lang: '64',
+          Header: header,
+          referenceIds: referenceIds,
         });
 
-        if (smsResponse.ok) {
+        console.log('Posting to iSmart gateway:', apiUrl, '| header:', header, '| ref:', referenceIds);
+
+        const smsResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'text/plain, */*',
+          },
+          body: formBody.toString(),
+        });
+
+        gatewayResponse = (await smsResponse.text()).trim();
+        console.log('iSmart raw response:', gatewayResponse, '| HTTP', smsResponse.status);
+
+        // Extract leading integer from response (gateway sometimes returns extra whitespace/markup)
+        const match = gatewayResponse.match(/\d+/);
+        returnCode = match ? match[0] : null;
+
+        if (!smsResponse.ok) {
+          smsError = `Gateway HTTP ${smsResponse.status}: ${gatewayResponse.slice(0, 200)}`;
+        } else if (returnCode === '1') {
           smsSent = true;
-          console.log('SMS sent successfully via gateway');
+        } else if (returnCode && ISMART_RETURN_CODES[returnCode]) {
+          smsError = `iSmart code ${returnCode}: ${ISMART_RETURN_CODES[returnCode]}`;
         } else {
-          const errorText = await smsResponse.text();
-          smsError = `Gateway error: ${smsResponse.status} - ${errorText}`;
-          console.error('SMS gateway error:', smsError);
+          smsError = `Unrecognised iSmart response: ${gatewayResponse.slice(0, 200)}`;
         }
       } catch (gatewayError: any) {
         smsError = `Gateway exception: ${gatewayError.message}`;
-        console.error('SMS gateway exception:', gatewayError);
+        console.error('iSmart gateway exception:', gatewayError);
       }
-    } else {
-      console.log('SMS gateway not configured in database');
-      smsError = 'SMS gateway not configured. Please configure SMS settings in the admin panel.';
     }
 
-    // Update transaction to mark SMS status
+    // Update transaction with delivery status
     const { error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ 
@@ -264,7 +310,8 @@ serve(async (req) => {
         success: smsSent, 
         message: smsSent ? 'SMS sent successfully' : 'SMS sending failed',
         error: smsError,
-        // For development/testing purposes only
+        return_code: returnCode,
+        gateway_response: gatewayResponse,
         preview: smsMessage,
         references: {
           system_reference: reference_number,
