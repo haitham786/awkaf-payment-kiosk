@@ -271,7 +271,7 @@ const SMSSettings = () => {
               <Button
                 variant="outline"
                 onClick={handleTestSMS}
-                disabled={testing || !settings.api_endpoint}
+                disabled={testing || (!settings.api_username && !settings.api_endpoint)}
               >
                 <Send className="w-4 h-4 mr-2" />
                 {testing ? 'Testing...' : 'Send Test SMS'}
