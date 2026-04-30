@@ -1,54 +1,41 @@
-# Integrate Omantel iSmart SMS Gateway
+# Keep Kiosk Screen Always On
 
-## What this changes
+## Problem
+When the kiosk app sits idle, Android dims and turns off the screen, requiring a touch to wake it. The donor experience must show the homepage at all times without interaction.
 
-The current `send-sms` Edge Function sends a generic JSON `{to, from, message, username, password}` payload with a `Bearer` token — that does not match Omantel's iSmart gateway. iSmart expects an **HTTP POST with form-encoded query-style parameters** and returns a **plain numeric code** (1 = success, 2–20 = errors). We will rewrite the function to speak this protocol and adjust the admin Settings UI labels accordingly. The kiosk SMS flow, transaction lookup, duplicate-send guard, and Arabic message body all remain unchanged.
+## Solution
+Apply a two-layer approach so the screen stays awake whenever the app is in the foreground, on both the native Android kiosk APK and any browser-based preview.
 
-## iSmart protocol (from your PDF)
+### 1. Native Android (primary, for the kiosk APK)
+Use the official Capacitor community plugin **`@capacitor-community/keep-awake`**, which wraps Android's `WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON`. This is the standard, battery-safe way (it only keeps the screen on while *our* activity is in the foreground — no wake-lock leaks).
 
-- **Endpoint**: `https://www.ismartsms.net/iBulkSMS/HttpWS/SMSDynamicRefIntlAPI.aspx`
-- **Method**: HTTP POST, body `application/x-www-form-urlencoded`
-- **Parameters**:
-  - `UserId` — provided by Infocomm
-  - `Password` — provided by Infocomm
-  - `MobileNo` — international format with country code (e.g. `96879XXXXXXX`), comma-separated for multiple
-  - `Message` — text body
-  - `PushDateTime` — `MM/DD/YYYY hh:mm:ss` (omit → "send now")
-  - `Lang` — `0` English, `64` Arabic
-  - `Header` — sender header, max 11 chars, registered with Infocomm
-  - `referenceIds` — optional 3–6 digit number
-- **Response**: plain text body containing one of `1`–`20` (1 = success). All others are failures with specific meanings (3 = bad credentials, 4 = low credit, 6 = message too long, 19 = header not registered, etc.).
+- Add dependency: `@capacitor-community/keep-awake`.
+- On app startup (in `src/main.tsx`, before React mounts), call `KeepAwake.keepAwake()`.
+- Re-assert it on every Capacitor `App` resume event so it survives backgrounding/foregrounding.
+- Wrap calls in `try/catch` and a `Capacitor.isNativePlatform()` check (per the project's Android safe-init memory) so the web build never crashes.
 
-## Changes
+### 2. Web fallback (for browser previews / PWA)
+Use the browser **Screen Wake Lock API** (`navigator.wakeLock.request('screen')`):
 
-### 1. `supabase/functions/send-sms/index.ts`
-- Read the same row from `sms_settings`. Map columns to iSmart parameters:
-  - `api_endpoint` → POST URL (default to the iSmart URL above if empty)
-  - `api_username` → `UserId`
-  - `api_password` → `Password`
-  - `sender_id`    → `Header` (truncate/validate ≤ 11 chars)
-  - `api_key`      → kept in schema for backward compatibility but no longer required
-- Build form body with `URLSearchParams`, set `Content-Type: application/x-www-form-urlencoded`, `Accept: text/plain`.
-- Send `Lang=64` (Arabic, since the message is Arabic) and pass the transaction reference (digits only, last 6 chars) as `referenceIds`.
-- Format `MobileNo` to international: strip `+`/spaces, ensure it starts with `968`.
-- Parse response as text, extract the leading integer, and map to a human-readable result. Treat `1` as success; everything else updates `sms_status='failed'` with the mapped reason returned to the UI.
-- Keep all existing logic: transaction lookup, completed-status check, duplicate-send guard, `sms_status` + `mobile_number` update on the transaction row, CORS headers, Arabic message body.
+- Request the wake lock on app load.
+- Re-request it on `visibilitychange` when the document becomes visible again (browsers auto-release it on tab hide).
+- Silently ignore if the API is unavailable (older browsers / iOS Safari < 16.4).
 
-### 2. `src/pages/admin/SMSSettings.tsx`
-- Re-label the form for iSmart clarity (no schema change needed):
-  - `api_endpoint` → "API URL" with placeholder `https://www.ismartsms.net/iBulkSMS/HttpWS/SMSDynamicRefIntlAPI.aspx`
-  - `api_username` → "User ID (UserId)"
-  - `api_password` → "Password"
-  - `sender_id`    → "Sender Header (max 11 chars, registered with Infocomm)" with `maxLength={11}`
-  - Hide / mark optional the `api_key` field (no longer used by iSmart)
-- Update the "Send Test SMS" button to surface the iSmart return-code message returned by the edge function.
+### 3. GitHub Actions Android build
+The `.github/workflows/build-android.yml` already runs `npm install` + `npx cap sync android`. Adding the new dependency to `package.json` is enough — Capacitor auto-registers the plugin during sync; no manual `MainActivity.java` edits required.
 
-### 3. No database migration
-The existing `sms_settings` columns cover every iSmart field. `api_key` becomes unused but is left in place to avoid a destructive migration.
+### 4. Optional polish (no extra plugin)
+Add the CSS hint `html, body { -webkit-user-select: none; }` is already implicit; no change needed. We will *not* add Android Immersive/Kiosk mode here — that is a separate request.
 
-## Out of scope
-- The Thawani Lamsa native bridge work from previous turns is untouched.
-- No changes to kiosk SMS-trigger code (`MobileNumberPage`/`ThankYouPage`) — they already call `send-sms` with the correct payload.
+## Files to change
+- `package.json` — add `@capacitor-community/keep-awake`.
+- `src/main.tsx` — initialize keep-awake (native) and screen wake lock (web) before render; re-assert on resume/visibility change.
+- (No edits to `capacitor.config.ts`, `MainActivity.java`, or `AndroidManifest.xml` — the plugin handles permissions automatically.)
 
-## After deploy
-You'll need to enter your Infocomm-issued **UserId**, **Password**, and **Header** (and confirm the API URL) in Admin → SMS Settings, then hit "Send Test SMS" to verify return code `1`.
+## Technical notes
+- The plugin sets `FLAG_KEEP_SCREEN_ON` on the activity window, so the OS still respects the user pressing the power button but never auto-sleeps.
+- This does **not** prevent screen burn-in; if that becomes a concern later we can add a subtle ambient animation, but the existing animated NFC / homepage transitions already mitigate it.
+- Memory rule respected: real-time Supabase subscriptions and audio init remain deferred; keep-awake init is synchronous and safe.
+
+## Verification
+After merge, install the new APK, leave the kiosk on the homepage for 10+ minutes — the screen should remain fully lit until manually powered off.
