@@ -70,7 +70,7 @@ const AmountPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-sm mx-auto flex flex-col h-full pb-10">
+      <div className="w-full max-w-[18rem] mx-auto flex flex-col h-full pb-20">
         {/* Category header */}
         <div className="text-center mb-1 shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5">
