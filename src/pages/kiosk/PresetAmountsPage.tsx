@@ -45,7 +45,7 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-md mx-auto flex flex-col h-full pb-10">
+      <div className="w-full max-w-md mx-auto flex flex-col h-full pb-20">
         <div className="text-center shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5 mb-1 min-h-[60px]">
             <div className="w-10 h-10 flex items-center justify-center">
