@@ -43,11 +43,8 @@ const AmountPage = () => {
 
   const handleNumberClick = (num: string) => {
     if (activeField === "rial") {
-      if (num === "." && rialAmount.includes(".")) return;
-      if (rialAmount === "" && num === ".") { setRialAmount("0."); return; }
       setRialAmount(prev => prev + num);
     } else {
-      if (num === ".") return;
       if (baisaAmount.length >= 3) return;
       setBaisaAmount(prev => prev + num);
     }
@@ -56,6 +53,11 @@ const AmountPage = () => {
   const handleBackspace = () => {
     if (activeField === "rial") setRialAmount(prev => prev.slice(0, -1));
     else setBaisaAmount(prev => prev.slice(0, -1));
+  };
+
+  const handleClear = () => {
+    if (activeField === "rial") setRialAmount("");
+    else setBaisaAmount("");
   };
 
   const handleConfirm = () => {
