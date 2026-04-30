@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
-import { Delete } from "lucide-react";
+import { Delete, Eraser } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
@@ -43,11 +43,8 @@ const AmountPage = () => {
 
   const handleNumberClick = (num: string) => {
     if (activeField === "rial") {
-      if (num === "." && rialAmount.includes(".")) return;
-      if (rialAmount === "" && num === ".") { setRialAmount("0."); return; }
       setRialAmount(prev => prev + num);
     } else {
-      if (num === ".") return;
       if (baisaAmount.length >= 3) return;
       setBaisaAmount(prev => prev + num);
     }
@@ -56,6 +53,11 @@ const AmountPage = () => {
   const handleBackspace = () => {
     if (activeField === "rial") setRialAmount(prev => prev.slice(0, -1));
     else setBaisaAmount(prev => prev.slice(0, -1));
+  };
+
+  const handleClear = () => {
+    if (activeField === "rial") setRialAmount("");
+    else setBaisaAmount("");
   };
 
   const handleConfirm = () => {
@@ -68,7 +70,7 @@ const AmountPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-sm mx-auto flex flex-col h-full pb-10">
+      <div className="w-full max-w-[18rem] mx-auto flex flex-col h-full pb-20">
         {/* Category header */}
         <div className="text-center mb-1 shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5">
@@ -87,66 +89,66 @@ const AmountPage = () => {
           </div>
         </div>
 
-        {/* Amount fields */}
-        <div className="space-y-1.5 shrink-0">
+        {/* Amount fields - side by side, above the dial */}
+        <div className="grid grid-cols-2 gap-1.5 shrink-0">
           {/* Rial Field */}
           <div
-            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 ${
+            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 aspect-[2/1] flex flex-col items-center justify-center ${
               activeField === "rial" ? "bg-emerald-50/90 border-2 border-emerald-500" : "bg-white/60 border-2 border-gray-200"
             }`}
             onClick={() => setActiveField("rial")}
           >
-            <div className="text-center text-xl font-bold text-emerald-600 flex items-center justify-center gap-1.5">
-              <CurrencyLogo className="h-4" />
+            <div className="text-center text-2xl font-bold text-emerald-600 flex items-center justify-center gap-1.5 leading-none">
+              <CurrencyLogo className="h-5" />
               {rialAmount || "0"}
             </div>
-            <p className="text-center text-[0.6rem] text-gray-600">ریال عماني / Omani Rial</p>
+            <p className="text-center text-[0.6rem] text-gray-600 mt-1">ریال عماني / Rials</p>
           </div>
 
           {/* Baisa Field */}
           <div
-            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 ${
+            className={`backdrop-blur-sm shadow-md rounded-lg cursor-pointer transition-all p-2 aspect-[2/1] flex flex-col items-center justify-center ${
               activeField === "baisa" ? "bg-blue-50/90 border-2 border-blue-500" : "bg-white/60 border-2 border-gray-200"
             }`}
             onClick={() => setActiveField("baisa")}
           >
-            <div className="text-center text-xl font-bold text-blue-600">
+            <div className="text-center text-2xl font-bold text-blue-600 leading-none">
               {baisaAmount || "0"}
             </div>
-            <p className="text-center text-[0.6rem] text-gray-600">بيسة / Baisa</p>
+            <p className="text-center text-[0.6rem] text-gray-600 mt-1">بيسة / Baisas</p>
           </div>
         </div>
 
-        {/* Number Pad */}
-        <div className="grid grid-cols-3 gap-1.5 mt-2 flex-1 min-h-0">
+        {/* Number Pad - square buttons in proper matrix */}
+        <div className="grid grid-cols-3 gap-1.5 mt-2 shrink-0 justify-items-center">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
             <KioskButton
               key={num}
               variant="keypad"
               soundEffect="keypad"
-              className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
+              className="aspect-square w-full text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
               onClick={() => handleNumberClick(num.toString())}
             >
               {num}
             </KioskButton>
           ))}
 
-          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-10 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={handleBackspace}>
-            <Delete className="w-4 h-4" />
+          <KioskButton variant="keypad" soundEffect="keypad" className="aspect-square w-full bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={handleBackspace}>
+            <Delete className="w-5 h-5" />
           </KioskButton>
 
-          <KioskButton variant="keypad" soundEffect="keypad" className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={() => handleNumberClick("0")}>
+          <KioskButton variant="keypad" soundEffect="keypad" className="aspect-square w-full text-2xl font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100" onClick={() => handleNumberClick("0")}>
             0
           </KioskButton>
 
           <KioskButton
             variant="keypad"
             soundEffect="keypad"
-            className="w-full h-10 text-lg font-bold bg-white/70 hover:bg-white/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            onClick={() => activeField === "rial" && handleNumberClick(".")}
-            disabled={activeField === "baisa"}
+            className="aspect-square w-full bg-white/70 hover:bg-amber-50/90 text-gray-800 border-0 rounded-lg shadow-none hover:shadow-md active:scale-95 transition-all duration-100"
+            onClick={handleClear}
+            aria-label="Clear"
           >
-            .
+            <Eraser className="w-5 h-5" />
           </KioskButton>
         </div>
 
