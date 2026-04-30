@@ -64,9 +64,11 @@ export const initKeepAwake = () => {
 
   // Re-assert on Capacitor app resume (Android backgrounding).
   if (isNative()) {
-    import("@capacitor/app")
-      .then(({ App }) => {
-        App.addListener("appStateChange", ({ isActive }) => {
+    // @vite-ignore + dynamic specifier so TS/Vite don't require the module at build time.
+    const appModule = "@capacitor/app";
+    import(/* @vite-ignore */ appModule)
+      .then((mod: any) => {
+        mod?.App?.addListener?.("appStateChange", ({ isActive }: { isActive: boolean }) => {
           if (isActive) enableNative();
         });
       })
