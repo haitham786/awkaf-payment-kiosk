@@ -252,10 +252,7 @@ const KioskHomepage = () => {
           <div className="flex justify-center items-center gap-3 flex-wrap">
             <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5 w-auto object-contain" />
             <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
-            <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-5 w-auto object-contain" />
-            <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-5 w-auto object-contain" />
             <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-6 w-auto object-contain" />
-            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-6 w-auto object-contain" />
             <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-6 w-auto object-contain" />
           </div>
         </div>
