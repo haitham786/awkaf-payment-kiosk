@@ -126,8 +126,8 @@ const ErrorPage = () => {
             className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold tracking-normal">إلغاء</span>
-              <span className="text-xs font-normal text-gray-500 mt-1">Cancel</span>
+              <span className="text-base font-bold text-gray-900 tracking-normal">إلغاء</span>
+              <span className="text-xs font-normal text-gray-900 mt-1">Cancel</span>
             </span>
           </KioskButton>
 
@@ -138,8 +138,8 @@ const ErrorPage = () => {
             className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
-              <span className="text-xs font-normal text-gray-500 mt-1">Try Again</span>
+              <span className="text-base font-bold text-gray-900 tracking-normal">المحاولة مرة أخرى</span>
+              <span className="text-xs font-normal text-gray-900 mt-1">Try Again</span>
             </span>
           </KioskButton>
         </div>
