@@ -57,7 +57,7 @@ const ErrorPage = () => {
   const handleTryAgain = () => {
     if (source === 'gateway') {
       // Re-launch Thawani gateway with same amount
-      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}`);
+      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}&retry=${Date.now()}`);
     } else {
       navigate(`/kiosk/amount?category=${categoryId}`);
     }

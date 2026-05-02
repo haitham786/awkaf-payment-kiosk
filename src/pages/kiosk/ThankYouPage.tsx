@@ -9,6 +9,7 @@ import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 const imageCache = new Map<string, boolean>();
+const PENDING_GATEWAY_KEY = "kiosk_pending_gateway_payment";
 
 const ThankYouPage = () => {
   const navigate = useNavigate();
@@ -56,20 +57,24 @@ const ThankYouPage = () => {
 
         if (error) {
           console.error('Gateway verification error:', error);
-        } else if (data?.success) {
+        } else if (data?.payment_completed || data?.already_completed) {
           if (data.transaction?.reference_number) {
             setReferenceNumber(data.transaction.reference_number);
           }
+          sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+        } else {
+          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
         }
       } catch (err) {
         console.error('Gateway verification failed:', err);
+        navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
       } finally {
         setVerifying(false);
       }
     };
 
     verifyGatewayPayment();
-  }, [paymentMethod, transactionId, gatewayMode]);
+  }, [paymentMethod, transactionId, gatewayMode, navigate, category, amount]);
 
   // Countdown timer
   useEffect(() => {
