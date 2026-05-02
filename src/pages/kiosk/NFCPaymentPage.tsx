@@ -218,20 +218,14 @@ const NFCPaymentPage = () => {
     return (
       <KioskLayout>
         <div className="w-full max-w-md mx-auto flex flex-col justify-center gap-3 pb-24">
-          <Card className="px-5 py-7 bg-card/90 backdrop-blur-md shadow-lg border-2 border-destructive/45 text-center">
+          <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm border-2 border-destructive/45 text-center rounded-xl">
             <div className="space-y-5">
               <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center border-2 border-destructive/45">
                 <X className="w-9 h-9 text-destructive" aria-hidden="true" />
               </div>
-              <div className="space-y-3">
-                <div className="leading-tight flex flex-col items-center">
-                  <h2 className="text-2xl font-bold text-destructive tracking-normal">تم رفض العملية</h2>
-                  <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
-                </div>
-                <div className="leading-tight flex flex-col items-center">
-                  <p className="text-base font-bold text-card-foreground tracking-normal">لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.</p>
-                  <p className="text-xs text-muted-foreground mt-1">The transaction was not completed. You may try again with the same amount.</p>
-                </div>
+              <div className="leading-tight flex flex-col items-center">
+                <h2 className="text-2xl font-bold text-destructive tracking-normal">تم رفض العملية</h2>
+                <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
               </div>
             </div>
           </Card>
@@ -241,22 +235,22 @@ const NFCPaymentPage = () => {
               variant="secondary"
               size="xl"
               onClick={handleCancel}
-              className="h-auto min-h-[82px] px-8 py-5 bg-card/55 hover:bg-card/75 bg-none backdrop-blur-sm text-card-foreground border-0 rounded-xl shadow-card flex items-center justify-center"
+              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
             >
               <span className="flex flex-col items-center leading-tight">
                 <span className="text-base font-bold tracking-normal">إلغاء</span>
-                <span className="text-xs font-normal text-muted-foreground mt-1">Cancel</span>
+                <span className="text-xs font-normal text-gray-500 mt-1">Cancel</span>
               </span>
             </KioskButton>
             <KioskButton
               variant="secondary"
               size="xl"
               onClick={handleTryAgain}
-              className="h-auto min-h-[82px] px-8 py-5 bg-card/55 hover:bg-card/75 bg-none backdrop-blur-sm text-card-foreground border-0 rounded-xl shadow-card flex items-center justify-center"
+              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
             >
               <span className="flex flex-col items-center leading-tight">
                 <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
-                <span className="text-xs font-normal text-muted-foreground mt-1">Try Again</span>
+                <span className="text-xs font-normal text-gray-500 mt-1">Try Again</span>
               </span>
             </KioskButton>
           </div>
