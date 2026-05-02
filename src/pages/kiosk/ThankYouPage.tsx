@@ -66,6 +66,7 @@ const ThankYouPage = () => {
               setReferenceNumber(data.transaction.reference_number);
             }
             sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+            localStorage.removeItem(PENDING_GATEWAY_KEY);
             setVerifying(false);
             return;
           }

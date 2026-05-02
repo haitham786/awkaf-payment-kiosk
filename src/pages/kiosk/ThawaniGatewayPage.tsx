@@ -10,12 +10,49 @@ import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCac
 
 const PENDING_GATEWAY_KEY = "kiosk_pending_gateway_payment";
 
+const readPendingGatewayPayment = () =>
+  sessionStorage.getItem(PENDING_GATEWAY_KEY) || localStorage.getItem(PENDING_GATEWAY_KEY);
+
+const savePendingGatewayPayment = (value: string) => {
+  sessionStorage.setItem(PENDING_GATEWAY_KEY, value);
+  localStorage.setItem(PENDING_GATEWAY_KEY, value);
+};
+
+const clearPendingGatewayPayment = () => {
+  sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+  localStorage.removeItem(PENDING_GATEWAY_KEY);
+};
+
 const ThawaniGatewayPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const retryToken = searchParams.get('retry') || '';
+
+  const gatewayReturnState = React.useMemo<'none' | 'success' | 'failure'>(() => {
+    const rawStatus = [
+      searchParams.get('status'),
+      searchParams.get('payment_status'),
+      searchParams.get('paymentStatus'),
+      searchParams.get('result'),
+      searchParams.get('state'),
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    if (
+      searchParams.get('success') === 'true' ||
+      /paid|success|successful|completed/.test(rawStatus)
+    ) return 'success';
+
+    if (
+      searchParams.get('success') === 'false' ||
+      searchParams.get('cancelled') === 'true' ||
+      searchParams.get('canceled') === 'true' ||
+      /cancel|fail|declin|reject|error/.test(rawStatus)
+    ) return 'failure';
+
+    return 'none';
+  }, [searchParams]);
 
   const [stage, setStage] = useState<'creating' | 'redirecting' | 'error'>('creating');
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -61,6 +98,7 @@ const ThawaniGatewayPage = () => {
   }, [kioskId]);
 
   const createSession = useCallback(async () => {
+    if (gatewayReturnState !== 'none') return;
     if (!kioskId) { setErrorMessage('Kiosk is not registered.'); setStage('error'); return; }
     if (sessionStartedRef.current) return;
     sessionStartedRef.current = true;
@@ -68,17 +106,29 @@ const ThawaniGatewayPage = () => {
     try {
       setStage('creating');
 
-      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+      const pendingPayment = readPendingGatewayPayment();
       if (pendingPayment && !retryToken) {
         const pending = JSON.parse(pendingPayment);
         if (pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+          try {
+            const { data } = await supabase.functions.invoke('thawani-checkout', {
+              body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
+            });
+
+            if (data?.payment_completed || data?.already_completed) {
+              navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
+            } else {
+              navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+            }
+          } catch {
+            navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          }
           return;
         }
       }
 
       if (retryToken) {
-        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+        clearPendingGatewayPayment();
       }
 
       const origin = window.location.origin;
@@ -102,7 +152,7 @@ const ThawaniGatewayPage = () => {
       setCheckoutUrl(data.checkout_url);
       setStage('redirecting');
 
-      sessionStorage.setItem(PENDING_GATEWAY_KEY, JSON.stringify({
+      savePendingGatewayPayment(JSON.stringify({
         category,
         amount,
         transactionId,
@@ -111,15 +161,37 @@ const ThawaniGatewayPage = () => {
         createdAt: Date.now(),
       }));
 
-      // Open Thawani checkout in same window
-      window.location.href = data.checkout_url;
+      // Open Thawani checkout in the same window without keeping this loading page in history.
+      window.location.replace(data.checkout_url);
     } catch (err: any) {
       sessionStartedRef.current = false;
       console.error('Thawani session error:', err);
       setErrorMessage(err.message || 'Failed to create payment session. Please verify the gateway environment and API keys.');
       setStage('error');
     }
-  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken]);
+  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken, gatewayReturnState]);
+
+  useEffect(() => {
+    if (gatewayReturnState === 'none') return;
+
+    const pendingPayment = readPendingGatewayPayment();
+    let pending: any = null;
+    try {
+      pending = pendingPayment ? JSON.parse(pendingPayment) : null;
+    } catch {
+      clearPendingGatewayPayment();
+    }
+
+    if (gatewayReturnState === 'success') {
+      navigate(
+        `/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId || transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`,
+        { replace: true }
+      );
+      return;
+    }
+
+    navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+  }, [amount, category, categoryData, gatewayMode, gatewayReturnState, navigate, transactionId]);
 
   useEffect(() => {
     if (!gatewayConfigReady) return;
@@ -127,18 +199,26 @@ const ThawaniGatewayPage = () => {
   }, [createSession, gatewayConfigReady]);
 
   useEffect(() => {
-    const handleGatewayReturn = () => {
-      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+    const handleGatewayReturn = async () => {
+      const pendingPayment = readPendingGatewayPayment();
       if (!pendingPayment) return;
 
       try {
         const pending = JSON.parse(pendingPayment);
         const returnedFromCheckout = Date.now() - Number(pending?.createdAt || 0) > 1500;
         if (returnedFromCheckout && pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+          const { data } = await supabase.functions.invoke('thawani-checkout', {
+            body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
+          });
+
+          if (data?.payment_completed || data?.already_completed) {
+            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
+          } else {
+            navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          }
         }
       } catch {
-        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+        navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
       }
     };
 
@@ -155,7 +235,7 @@ const ThawaniGatewayPage = () => {
       window.removeEventListener('focus', handleGatewayReturn);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [amount, category, navigate]);
+  }, [amount, category, categoryData, gatewayMode, navigate]);
 
   const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);

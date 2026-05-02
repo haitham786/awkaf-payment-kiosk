@@ -102,6 +102,15 @@ const NFCPaymentPage = () => {
 
   useEffect(() => { initializePayment(); return () => { cancelTransaction(); }; }, [initializePayment]);
 
+  useEffect(() => {
+    if (stage !== 'declined' && stage !== 'error') return;
+    const timer = window.setTimeout(() => {
+      cancelTransaction();
+      navigate('/kiosk');
+    }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [navigate, stage]);
+
   const handlePaymentSuccess = async (result: SoftPOSTransactionResult) => {
     paymentInFlightRef.current = false;
     const status = getSoftPOSStatus();
@@ -131,7 +140,6 @@ const NFCPaymentPage = () => {
       const result = await startSoftPOSTransaction(amount, transactionId, `Donation - ${category}`);
       paymentInFlightRef.current = false;
       if (result.success) { /* handled by callback */ }
-      else if (result.errorCode === 'USER_CANCELLED' || result.errorCode === 'CANCELLED') { setStage('waiting'); }
       else { setStage('declined'); setTransactionResult(result); }
     } catch (error: any) {
       paymentInFlightRef.current = false;
@@ -179,7 +187,7 @@ const NFCPaymentPage = () => {
 
   if (stage === 'error') {
     return (
-      <KioskLayout showHomeButton={false}>
+      <KioskLayout>
         <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
@@ -208,7 +216,7 @@ const NFCPaymentPage = () => {
 
   if (stage === 'declined') {
     return (
-      <KioskLayout showHomeButton={false}>
+      <KioskLayout>
         <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
