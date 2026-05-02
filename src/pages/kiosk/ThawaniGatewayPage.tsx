@@ -10,6 +10,19 @@ import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCac
 
 const PENDING_GATEWAY_KEY = "kiosk_pending_gateway_payment";
 
+const readPendingGatewayPayment = () =>
+  sessionStorage.getItem(PENDING_GATEWAY_KEY) || localStorage.getItem(PENDING_GATEWAY_KEY);
+
+const savePendingGatewayPayment = (value: string) => {
+  sessionStorage.setItem(PENDING_GATEWAY_KEY, value);
+  localStorage.setItem(PENDING_GATEWAY_KEY, value);
+};
+
+const clearPendingGatewayPayment = () => {
+  sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+  localStorage.removeItem(PENDING_GATEWAY_KEY);
+};
+
 const ThawaniGatewayPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -93,7 +106,7 @@ const ThawaniGatewayPage = () => {
     try {
       setStage('creating');
 
-      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+      const pendingPayment = readPendingGatewayPayment();
       if (pendingPayment && !retryToken) {
         const pending = JSON.parse(pendingPayment);
         if (pending?.category === category && Number(pending?.amount) === amount) {
@@ -115,7 +128,7 @@ const ThawaniGatewayPage = () => {
       }
 
       if (retryToken) {
-        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+        clearPendingGatewayPayment();
       }
 
       const origin = window.location.origin;
@@ -139,7 +152,7 @@ const ThawaniGatewayPage = () => {
       setCheckoutUrl(data.checkout_url);
       setStage('redirecting');
 
-      sessionStorage.setItem(PENDING_GATEWAY_KEY, JSON.stringify({
+      savePendingGatewayPayment(JSON.stringify({
         category,
         amount,
         transactionId,
