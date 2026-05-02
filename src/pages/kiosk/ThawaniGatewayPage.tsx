@@ -17,6 +17,30 @@ const ThawaniGatewayPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const retryToken = searchParams.get('retry') || '';
 
+  const gatewayReturnState = React.useMemo<'none' | 'success' | 'failure'>(() => {
+    const rawStatus = [
+      searchParams.get('status'),
+      searchParams.get('payment_status'),
+      searchParams.get('paymentStatus'),
+      searchParams.get('result'),
+      searchParams.get('state'),
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    if (
+      searchParams.get('success') === 'true' ||
+      /paid|success|successful|completed/.test(rawStatus)
+    ) return 'success';
+
+    if (
+      searchParams.get('success') === 'false' ||
+      searchParams.get('cancelled') === 'true' ||
+      searchParams.get('canceled') === 'true' ||
+      /cancel|fail|declin|reject|error/.test(rawStatus)
+    ) return 'failure';
+
+    return 'none';
+  }, [searchParams]);
+
   const [stage, setStage] = useState<'creating' | 'redirecting' | 'error'>('creating');
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -61,6 +85,7 @@ const ThawaniGatewayPage = () => {
   }, [kioskId]);
 
   const createSession = useCallback(async () => {
+    if (gatewayReturnState !== 'none') return;
     if (!kioskId) { setErrorMessage('Kiosk is not registered.'); setStage('error'); return; }
     if (sessionStartedRef.current) return;
     sessionStartedRef.current = true;
@@ -72,7 +97,7 @@ const ThawaniGatewayPage = () => {
       if (pendingPayment && !retryToken) {
         const pending = JSON.parse(pendingPayment);
         if (pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
           return;
         }
       }
@@ -111,15 +136,37 @@ const ThawaniGatewayPage = () => {
         createdAt: Date.now(),
       }));
 
-      // Open Thawani checkout in same window
-      window.location.href = data.checkout_url;
+      // Open Thawani checkout in the same window without keeping this loading page in history.
+      window.location.replace(data.checkout_url);
     } catch (err: any) {
       sessionStartedRef.current = false;
       console.error('Thawani session error:', err);
       setErrorMessage(err.message || 'Failed to create payment session. Please verify the gateway environment and API keys.');
       setStage('error');
     }
-  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken]);
+  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken, gatewayReturnState]);
+
+  useEffect(() => {
+    if (gatewayReturnState === 'none') return;
+
+    const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+    let pending: any = null;
+    try {
+      pending = pendingPayment ? JSON.parse(pendingPayment) : null;
+    } catch {
+      sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+    }
+
+    if (gatewayReturnState === 'success') {
+      navigate(
+        `/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId || transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`,
+        { replace: true }
+      );
+      return;
+    }
+
+    navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+  }, [amount, category, categoryData, gatewayMode, gatewayReturnState, navigate, transactionId]);
 
   useEffect(() => {
     if (!gatewayConfigReady) return;
