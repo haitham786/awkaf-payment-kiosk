@@ -97,13 +97,17 @@ const ThawaniGatewayPage = () => {
       if (pendingPayment && !retryToken) {
         const pending = JSON.parse(pendingPayment);
         if (pending?.category === category && Number(pending?.amount) === amount) {
-          const { data } = await supabase.functions.invoke('thawani-checkout', {
-            body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
-          });
+          try {
+            const { data } = await supabase.functions.invoke('thawani-checkout', {
+              body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
+            });
 
-          if (data?.payment_completed || data?.already_completed) {
-            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
-          } else {
+            if (data?.payment_completed || data?.already_completed) {
+              navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
+            } else {
+              navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+            }
+          } catch {
             navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
           }
           return;
