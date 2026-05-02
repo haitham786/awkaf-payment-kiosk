@@ -174,12 +174,12 @@ const ThawaniGatewayPage = () => {
   useEffect(() => {
     if (gatewayReturnState === 'none') return;
 
-    const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+    const pendingPayment = readPendingGatewayPayment();
     let pending: any = null;
     try {
       pending = pendingPayment ? JSON.parse(pendingPayment) : null;
     } catch {
-      sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+      clearPendingGatewayPayment();
     }
 
     if (gatewayReturnState === 'success') {
@@ -200,7 +200,7 @@ const ThawaniGatewayPage = () => {
 
   useEffect(() => {
     const handleGatewayReturn = async () => {
-      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+      const pendingPayment = readPendingGatewayPayment();
       if (!pendingPayment) return;
 
       try {
