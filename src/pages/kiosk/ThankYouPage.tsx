@@ -47,33 +47,43 @@ const ThankYouPage = () => {
   // For payment gateway: verify payment and get system reference
   useEffect(() => {
     if (paymentMethod !== 'gateway' || !transactionId) return;
+    let cancelled = false;
 
     const verifyGatewayPayment = async () => {
       setVerifying(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('thawani-checkout', {
-          body: { action: 'check_session', transactionId, gatewayMode },
-        });
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const { data, error } = await supabase.functions.invoke('thawani-checkout', {
+            body: { action: 'check_session', transactionId, gatewayMode },
+          });
 
-        if (error) {
-          console.error('Gateway verification error:', error);
-        } else if (data?.payment_completed || data?.already_completed) {
-          if (data.transaction?.reference_number) {
-            setReferenceNumber(data.transaction.reference_number);
+          if (cancelled) return;
+
+          if (error) {
+            console.error('Gateway verification error:', error);
+          } else if (data?.payment_completed || data?.already_completed) {
+            if (data.transaction?.reference_number) {
+              setReferenceNumber(data.transaction.reference_number);
+            }
+            sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+            setVerifying(false);
+            return;
           }
-          sessionStorage.removeItem(PENDING_GATEWAY_KEY);
-        } else {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+        } catch (err) {
+          console.error('Gateway verification failed:', err);
         }
-      } catch (err) {
-        console.error('Gateway verification failed:', err);
-        navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
-      } finally {
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      if (!cancelled) {
         setVerifying(false);
+        navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
       }
     };
 
     verifyGatewayPayment();
+    return () => { cancelled = true; };
   }, [paymentMethod, transactionId, gatewayMode, navigate, category, amount]);
 
   // Countdown timer
