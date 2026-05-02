@@ -31,13 +31,13 @@ export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInf
           <Info className="w-5 h-5 text-gray-700" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-white/80 backdrop-blur-md border-0 shadow-xl max-w-xs mx-4 rounded-2xl [&>button]:bg-transparent [&>button]:border-0 [&>button]:ring-0 [&>button]:shadow-none [&>button]:outline-none [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0 [&>button]:p-0">
+      <DialogContent className="bg-white/80 backdrop-blur-md border-0 shadow-xl max-w-xs mx-4 rounded-2xl [&>button]:bg-transparent [&>button]:border-0 [&>button]:border-none [&>button]:ring-0 [&>button]:ring-offset-0 [&>button]:shadow-none [&>button]:outline-none [&>button]:hover:bg-transparent [&>button]:focus:ring-0 [&>button]:focus:ring-offset-0 [&>button]:focus:outline-none [&>button]:focus-visible:ring-0 [&>button]:focus-visible:ring-offset-0 [&>button]:focus-visible:outline-none [&>button]:p-0 [&>button]:opacity-100">
         <DialogHeader>
-          <DialogTitle className="text-xl text-right font-bold text-gray-900 pl-10">
+          <DialogTitle className="text-xl text-right font-bold text-gray-900 pl-12 pr-1 pt-2">
             {title}
           </DialogTitle>
         </DialogHeader>
-        <div className="text-right text-gray-800 leading-relaxed whitespace-pre-wrap">
+        <div className="text-right text-gray-800 leading-relaxed whitespace-pre-wrap mt-2">
           {content}
         </div>
       </DialogContent>

@@ -12,10 +12,12 @@ const ErrorPage = () => {
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
+  const source = searchParams.get('source') || ''; // 'gateway' for Thawani retry
   const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null } | null>(null);
   const errorType = searchParams.get('error') || 'payment';
 
   useEffect(() => {
+    // After 10s of inactivity on the failure alert, go back to the categories page
     const timer = setTimeout(() => navigate('/kiosk'), 10000);
     return () => clearTimeout(timer);
   }, [navigate]);
@@ -24,7 +26,11 @@ const ErrorPage = () => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
       try {
-        const { data, error } = await supabase.from("donation_categories").select("title, title_en, icon_url").eq("id", categoryId).single();
+        const { data, error } = await supabase
+          .from("donation_categories")
+          .select("title, title_en, icon_url")
+          .or(`category_id.eq.${categoryId},id.eq.${categoryId}`)
+          .maybeSingle();
         if (error) throw error;
         if (data) setCategoryData(data);
       } catch (error) { console.error("Error loading category data:", error); }
@@ -37,7 +43,7 @@ const ErrorPage = () => {
     card: { ar: "خطأ في البطاقة", en: "Card Error", descAr: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى", descEn: "Failed to read card, please check your card and try again", icon: "💳" },
     insufficient: { ar: "رصيد غير كافٍ", en: "Insufficient Balance", descAr: "الرصيد في البطاقة غير كافٍ لإتمام العملية", descEn: "Insufficient card balance to complete the transaction", icon: "💰" },
     declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "تم رفض العملية من البنك، يرجى التواصل مع البنك", descEn: "Transaction declined by bank, please contact your bank", icon: "❌" },
-    payment: { ar: "خطأ في الدفع", en: "Payment Error", descAr: "حدث خطأ أثناء معالجة الدفع، يرجى المحاولة مرة أخرى", descEn: "An error occurred during payment processing, please try again", icon: "⚠️" },
+    payment: { ar: "فشل عملية الدفع", en: "Payment Failed", descAr: "تم إلغاء أو فشل عملية الدفع. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The payment was cancelled or failed. You may try again with the same amount.", icon: "⚠️" },
   };
 
   const errorInfo = errorMessages[errorType] || errorMessages.payment;
@@ -48,7 +54,14 @@ const ErrorPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')}`;
   };
 
-  const handleTryAgain = () => navigate(`/kiosk/amount?category=${categoryId}`);
+  const handleTryAgain = () => {
+    if (source === 'gateway') {
+      // Re-launch Thawani gateway with same amount
+      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}`);
+    } else {
+      navigate(`/kiosk/amount?category=${categoryId}`);
+    }
+  };
 
   return (
     <KioskLayout>

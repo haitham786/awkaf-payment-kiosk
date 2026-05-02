@@ -103,7 +103,7 @@ const ConfirmationPage = () => {
           </div>
         </Card>
 
-        <div className="flex justify-center gap-4 mt-4 pb-20">
+        <div className="flex justify-center gap-4 mt-4 pb-24">
           <KioskButton
             variant="outline"
             size="xl"
