@@ -86,17 +86,17 @@ const ErrorPage = () => {
           </div>
         )}
 
-        <Card className="p-5 bg-card/90 backdrop-blur-md shadow-lg border-2 border-destructive/45 text-center">
-          <div className="space-y-4">
+        <Card className="px-5 py-6 bg-card/90 backdrop-blur-md shadow-lg border-2 border-destructive/45 text-center">
+          <div className="space-y-5">
             <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center border-2 border-destructive/45">
-              <X className="w-9 h-9 text-destructive" />
+              <X className="w-9 h-9 text-destructive" aria-hidden="true" />
             </div>
-            <div className="space-y-2">
-              <div className="leading-tight">
+            <div className="space-y-3">
+              <div className="leading-tight flex flex-col items-center">
                 <h2 className="text-2xl font-bold text-destructive">{errorInfo.ar}</h2>
                 <p className="text-sm text-destructive/70 mt-1">{errorInfo.en}</p>
               </div>
-              <div className="leading-tight">
+              <div className="leading-tight flex flex-col items-center">
                 <p className="text-base font-bold text-card-foreground">{errorInfo.descAr}</p>
                 <p className="text-xs text-muted-foreground mt-1">{errorInfo.descEn}</p>
               </div>
@@ -116,12 +116,12 @@ const ErrorPage = () => {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-3 px-1">
+        <div className="grid grid-cols-2 gap-3 px-1 pt-1 items-stretch">
           <KioskButton
             variant="secondary"
             size="xl"
             onClick={() => navigate('/kiosk')}
-            className="h-auto min-h-[74px] px-5 py-4 bg-card/70 hover:bg-card/85 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[78px] px-5 py-4 bg-card/55 hover:bg-card/75 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
               <span className="text-base font-bold">إلغاء</span>
@@ -133,7 +133,7 @@ const ErrorPage = () => {
             variant="secondary"
             size="xl"
             onClick={handleTryAgain}
-            className="h-auto min-h-[74px] px-5 py-4 bg-card/70 hover:bg-card/85 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[78px] px-5 py-4 bg-card/55 hover:bg-card/75 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
               <span className="text-base font-bold">المحاولة مرة أخرى</span>
