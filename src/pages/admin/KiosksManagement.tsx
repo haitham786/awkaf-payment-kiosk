@@ -120,14 +120,46 @@ const KiosksManagement = () => {
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
       if (editingId) {
-        const { error } = await supabase.from('kiosks').update({
-          name: formData.name, reference_number: referenceNumber,
-          location: formData.location, status: formData.status,
-          configuration: formData.configuration
-        } as any).eq('id', editingId);
+        const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
+        const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
+        const updatePayload: Record<string, any> = {
+          name: formData.name,
+          location: formData.location,
+          status: formData.status,
+          configuration: formData.configuration,
+        };
+
+        if (referenceNumber !== currentReferenceNumber) {
+          if (referenceNumber) {
+            const { data: duplicateKiosk, error: duplicateError } = await supabase
+              .from('kiosks')
+              .select('id')
+              .eq('reference_number', referenceNumber)
+              .neq('id', editingId)
+              .maybeSingle();
+
+            if (duplicateError) throw duplicateError;
+            if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
+          }
+
+          updatePayload.reference_number = referenceNumber;
+        }
+
+        const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
         toast.success("Kiosk updated successfully");
       } else {
+        if (referenceNumber) {
+          const { data: duplicateKiosk, error: duplicateError } = await supabase
+            .from('kiosks')
+            .select('id')
+            .eq('reference_number', referenceNumber)
+            .maybeSingle();
+
+          if (duplicateError) throw duplicateError;
+          if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
+        }
+
         const { error } = await supabase.from('kiosks').insert([{
           name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
