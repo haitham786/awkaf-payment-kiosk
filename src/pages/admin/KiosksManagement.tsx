@@ -108,14 +108,20 @@ const KiosksManagement = () => {
     return true;
   };
 
+  const normalizeReferenceNumber = (referenceNumber: string) => {
+    const trimmedReference = referenceNumber.trim();
+    return trimmedReference.length > 0 ? trimmedReference : null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     try {
+      const referenceNumber = normalizeReferenceNumber(formData.reference_number);
       if (editingId) {
         const { error } = await supabase.from('kiosks').update({
-          name: formData.name, reference_number: formData.reference_number,
+          name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
           configuration: formData.configuration
         } as any).eq('id', editingId);
@@ -123,7 +129,7 @@ const KiosksManagement = () => {
         toast.success("Kiosk updated successfully");
       } else {
         const { error } = await supabase.from('kiosks').insert([{
-          name: formData.name, reference_number: formData.reference_number,
+          name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
           configuration: formData.configuration
         } as any]);
