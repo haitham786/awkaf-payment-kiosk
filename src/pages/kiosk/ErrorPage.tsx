@@ -48,8 +48,8 @@ const ErrorPage = () => {
     network: { ar: "خطأ في الاتصال", en: "Connection Error", descAr: "تعذر الاتصال بالشبكة، يرجى المحاولة مرة أخرى", descEn: "Network connection failed, please try again" },
     card: { ar: "خطأ في البطاقة", en: "Card Error", descAr: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى", descEn: "Failed to read card, please check your card and try again" },
     insufficient: { ar: "رصيد غير كافٍ", en: "Insufficient Balance", descAr: "الرصيد في البطاقة غير كافٍ لإتمام العملية", descEn: "Insufficient card balance to complete the transaction" },
-    declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The transaction was not completed. You may try again with the same amount." },
-    payment: { ar: "تعذر إتمام عملية الدفع", en: "Transaction Declined", descAr: "لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The transaction was not completed. You may try again with the same amount." },
+    declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "", descEn: "" },
+    payment: { ar: "تعذر إتمام عملية الدفع", en: "Transaction Declined", descAr: "", descEn: "" },
   };
 
   const errorInfo = errorMessages[errorType] || errorMessages.payment;
@@ -86,7 +86,7 @@ const ErrorPage = () => {
           </div>
         )}
 
-        <Card className="px-5 py-6 bg-card/90 backdrop-blur-md shadow-lg border-2 border-destructive/45 text-center">
+        <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm border-2 border-destructive/45 text-center rounded-xl">
           <div className="space-y-5">
             <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center border-2 border-destructive/45">
               <X className="w-9 h-9 text-destructive" aria-hidden="true" />
@@ -96,10 +96,12 @@ const ErrorPage = () => {
                 <h2 className="text-2xl font-bold text-destructive tracking-normal">{errorInfo.ar}</h2>
                 <p className="text-sm text-destructive/70 mt-1">{errorInfo.en}</p>
               </div>
-              <div className="leading-tight flex flex-col items-center">
-                <p className="text-base font-bold text-card-foreground tracking-normal">{errorInfo.descAr}</p>
-                <p className="text-xs text-muted-foreground mt-1">{errorInfo.descEn}</p>
-              </div>
+              {(errorInfo.descAr || errorInfo.descEn) && (
+                <div className="leading-tight flex flex-col items-center">
+                  {errorInfo.descAr && <p className="text-base font-bold text-gray-900 tracking-normal">{errorInfo.descAr}</p>}
+                  {errorInfo.descEn && <p className="text-xs text-gray-500 mt-1">{errorInfo.descEn}</p>}
+                </div>
+              )}
             </div>
 
             <div className="bg-muted/60 rounded-lg p-4 border border-border">
