@@ -104,7 +104,7 @@ serve(async (req) => {
           },
         ],
         success_url: successUrl || `${req.headers.get('origin')}/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${transactionId}&paymentMethod=gateway&catRef=${resolvedCategoryReference}`,
-        cancel_url: cancelUrl || `${req.headers.get('origin')}/kiosk/error?category=${category}&amount=${amount}`,
+        cancel_url: cancelUrl || `${req.headers.get('origin')}/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`,
         metadata: {
           kiosk_id: kioskId,
           category,
