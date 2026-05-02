@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
@@ -44,12 +44,12 @@ const ErrorPage = () => {
     loadCategoryData();
   }, [categoryId]);
 
-  const errorMessages: Record<string, { ar: string; en: string; descAr: string; descEn: string; icon: string }> = {
-    network: { ar: "خطأ في الاتصال", en: "Connection Error", descAr: "تعذر الاتصال بالشبكة، يرجى المحاولة مرة أخرى", descEn: "Network connection failed, please try again", icon: "🌐" },
-    card: { ar: "خطأ في البطاقة", en: "Card Error", descAr: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى", descEn: "Failed to read card, please check your card and try again", icon: "💳" },
-    insufficient: { ar: "رصيد غير كافٍ", en: "Insufficient Balance", descAr: "الرصيد في البطاقة غير كافٍ لإتمام العملية", descEn: "Insufficient card balance to complete the transaction", icon: "💰" },
-    declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "تم رفض العملية من البنك، يرجى التواصل مع البنك", descEn: "Transaction declined by bank, please contact your bank", icon: "❌" },
-    payment: { ar: "فشل عملية الدفع", en: "Payment Failed", descAr: "تم إلغاء أو فشل عملية الدفع. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The payment was cancelled or failed. You may try again with the same amount.", icon: "⚠️" },
+  const errorMessages: Record<string, { ar: string; en: string; descAr: string; descEn: string }> = {
+    network: { ar: "خطأ في الاتصال", en: "Connection Error", descAr: "تعذر الاتصال بالشبكة، يرجى المحاولة مرة أخرى", descEn: "Network connection failed, please try again" },
+    card: { ar: "خطأ في البطاقة", en: "Card Error", descAr: "تعذر قراءة البطاقة، يرجى التأكد من البطاقة والمحاولة مرة أخرى", descEn: "Failed to read card, please check your card and try again" },
+    insufficient: { ar: "رصيد غير كافٍ", en: "Insufficient Balance", descAr: "الرصيد في البطاقة غير كافٍ لإتمام العملية", descEn: "Insufficient card balance to complete the transaction" },
+    declined: { ar: "تم رفض العملية", en: "Transaction Declined", descAr: "لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The transaction was not completed. You may try again with the same amount." },
+    payment: { ar: "تعذر إتمام عملية الدفع", en: "Transaction Declined", descAr: "لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.", descEn: "The transaction was not completed. You may try again with the same amount." },
   };
 
   const errorInfo = errorMessages[errorType] || errorMessages.payment;
