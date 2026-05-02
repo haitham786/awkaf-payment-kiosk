@@ -8,11 +8,14 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
+const PENDING_GATEWAY_KEY = "kiosk_pending_gateway_payment";
+
 const ThawaniGatewayPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
+  const retryToken = searchParams.get('retry') || '';
 
   const [stage, setStage] = useState<'creating' | 'redirecting' | 'error'>('creating');
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -59,6 +62,19 @@ const ThawaniGatewayPage = () => {
     try {
       setStage('creating');
 
+      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+      if (pendingPayment && !retryToken) {
+        const pending = JSON.parse(pendingPayment);
+        if (pending?.category === category && Number(pending?.amount) === amount) {
+          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+          return;
+        }
+      }
+
+      if (retryToken) {
+        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+      }
+
       const origin = window.location.origin;
       const { data, error } = await supabase.functions.invoke('thawani-checkout', {
         body: {
@@ -80,6 +96,15 @@ const ThawaniGatewayPage = () => {
       setCheckoutUrl(data.checkout_url);
       setStage('redirecting');
 
+      sessionStorage.setItem(PENDING_GATEWAY_KEY, JSON.stringify({
+        category,
+        amount,
+        transactionId,
+        gatewayMode: data.gateway_mode || gatewayMode,
+        checkoutUrl: data.checkout_url,
+        createdAt: Date.now(),
+      }));
+
       // Open Thawani checkout in same window
       window.location.href = data.checkout_url;
     } catch (err: any) {
@@ -87,7 +112,7 @@ const ThawaniGatewayPage = () => {
       setErrorMessage(err.message || 'Failed to create payment session. Please verify the gateway environment and API keys.');
       setStage('error');
     }
-  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode]);
+  }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken]);
 
   useEffect(() => {
     createSession();
