@@ -97,7 +97,15 @@ const ThawaniGatewayPage = () => {
       if (pendingPayment && !retryToken) {
         const pending = JSON.parse(pendingPayment);
         if (pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          const { data } = await supabase.functions.invoke('thawani-checkout', {
+            body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
+          });
+
+          if (data?.payment_completed || data?.already_completed) {
+            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
+          } else {
+            navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          }
           return;
         }
       }
@@ -174,7 +182,7 @@ const ThawaniGatewayPage = () => {
   }, [createSession, gatewayConfigReady]);
 
   useEffect(() => {
-    const handleGatewayReturn = () => {
+    const handleGatewayReturn = async () => {
       const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
       if (!pendingPayment) return;
 
@@ -182,10 +190,18 @@ const ThawaniGatewayPage = () => {
         const pending = JSON.parse(pendingPayment);
         const returnedFromCheckout = Date.now() - Number(pending?.createdAt || 0) > 1500;
         if (returnedFromCheckout && pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          const { data } = await supabase.functions.invoke('thawani-checkout', {
+            body: { action: 'check_session', transactionId: pending?.transactionId, gatewayMode: pending?.gatewayMode },
+          });
+
+          if (data?.payment_completed || data?.already_completed) {
+            navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&transactionId=${pending?.transactionId}&paymentMethod=gateway&gatewayMode=${pending?.gatewayMode || gatewayMode}&catRef=${categoryData?.category_reference || ''}`, { replace: true });
+          } else {
+            navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
+          }
         }
       } catch {
-        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+        navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
       }
     };
 
