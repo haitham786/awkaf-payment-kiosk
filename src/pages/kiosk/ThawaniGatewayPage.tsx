@@ -22,6 +22,8 @@ const ThawaniGatewayPage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [categoryData, setCategoryData] = useState<any>(null);
   const [gatewayMode, setGatewayMode] = useState<'test' | 'live'>('test');
+  const [gatewayConfigReady, setGatewayConfigReady] = useState(false);
+  const sessionStartedRef = React.useRef(false);
 
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem('kiosk_id') || "";
@@ -37,7 +39,7 @@ const ThawaniGatewayPage = () => {
 
   useEffect(() => {
     const loadGatewayMode = async () => {
-      if (!kioskId) return;
+      if (!kioskId) { setGatewayConfigReady(true); return; }
 
       try {
         const { data } = await supabase
@@ -50,6 +52,8 @@ const ThawaniGatewayPage = () => {
         setGatewayMode(config?.payment_gateway?.mode === 'live' ? 'live' : 'test');
       } catch (error) {
         console.error('Error loading gateway mode:', error);
+      } finally {
+        setGatewayConfigReady(true);
       }
     };
 
@@ -58,6 +62,8 @@ const ThawaniGatewayPage = () => {
 
   const createSession = useCallback(async () => {
     if (!kioskId) { setErrorMessage('Kiosk is not registered.'); setStage('error'); return; }
+    if (sessionStartedRef.current) return;
+    sessionStartedRef.current = true;
 
     try {
       setStage('creating');
@@ -108,6 +114,7 @@ const ThawaniGatewayPage = () => {
       // Open Thawani checkout in same window
       window.location.href = data.checkout_url;
     } catch (err: any) {
+      sessionStartedRef.current = false;
       console.error('Thawani session error:', err);
       setErrorMessage(err.message || 'Failed to create payment session. Please verify the gateway environment and API keys.');
       setStage('error');
@@ -115,8 +122,9 @@ const ThawaniGatewayPage = () => {
   }, [kioskId, amount, category, transactionId, categoryData, gatewayMode, navigate, retryToken]);
 
   useEffect(() => {
+    if (!gatewayConfigReady) return;
     createSession();
-  }, [createSession]);
+  }, [createSession, gatewayConfigReady]);
 
   const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
@@ -125,7 +133,7 @@ const ThawaniGatewayPage = () => {
   };
 
   const handleCancel = () => navigate('/kiosk');
-  const handleRetry = () => { setStage('creating'); setErrorMessage(''); createSession(); };
+  const handleRetry = () => { sessionStartedRef.current = false; setStage('creating'); setErrorMessage(''); createSession(); };
 
   return (
     <KioskLayout showHomeButton={false}>
