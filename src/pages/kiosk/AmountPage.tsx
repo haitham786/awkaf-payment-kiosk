@@ -152,18 +152,18 @@ const AmountPage = () => {
           </KioskButton>
         </div>
 
-        {/* Confirm Button - centered */}
-        <div className="flex justify-center pt-1.5 shrink-0">
+        {/* Confirm Button - centered, lowered, transparent white style matching Enter Different Amount */}
+        <div className="flex justify-center pt-4 shrink-0">
           <KioskButton
-            variant="confirm"
+            variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleConfirm}
             disabled={(!rialAmount || parseFloat(rialAmount) <= 0) && (!baisaAmount || parseInt(baisaAmount) <= 0)}
-            className="px-5 py-1.5 text-sm font-bold bg-emerald-500/80 hover:bg-emerald-600/80 backdrop-blur-sm text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-md rounded-lg flex flex-row items-center gap-2"
+            className="px-8 py-3 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl flex flex-col items-center gap-1.5"
           >
-            <span>تأكيد</span>
-            <span className="text-[0.7rem] opacity-80">Confirm</span>
+            <span className="text-sm">تأكيد</span>
+            <span className="text-gray-500">Confirm</span>
           </KioskButton>
         </div>
       </div>
