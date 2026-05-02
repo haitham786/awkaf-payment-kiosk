@@ -126,6 +126,37 @@ const ThawaniGatewayPage = () => {
     createSession();
   }, [createSession, gatewayConfigReady]);
 
+  useEffect(() => {
+    const handleGatewayReturn = () => {
+      const pendingPayment = sessionStorage.getItem(PENDING_GATEWAY_KEY);
+      if (!pendingPayment) return;
+
+      try {
+        const pending = JSON.parse(pendingPayment);
+        const returnedFromCheckout = Date.now() - Number(pending?.createdAt || 0) > 1500;
+        if (returnedFromCheckout && pending?.category === category && Number(pending?.amount) === amount) {
+          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+        }
+      } catch {
+        sessionStorage.removeItem(PENDING_GATEWAY_KEY);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') handleGatewayReturn();
+    };
+
+    window.addEventListener('pageshow', handleGatewayReturn);
+    window.addEventListener('focus', handleGatewayReturn);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('pageshow', handleGatewayReturn);
+      window.removeEventListener('focus', handleGatewayReturn);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [amount, category, navigate]);
+
   const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
     const baisas = totalBaisas % 1000;
