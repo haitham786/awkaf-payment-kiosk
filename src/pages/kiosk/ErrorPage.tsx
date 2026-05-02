@@ -93,11 +93,11 @@ const ErrorPage = () => {
             </div>
             <div className="space-y-3">
               <div className="leading-tight flex flex-col items-center">
-                <h2 className="text-2xl font-bold text-destructive">{errorInfo.ar}</h2>
+                <h2 className="text-2xl font-bold text-destructive tracking-normal">{errorInfo.ar}</h2>
                 <p className="text-sm text-destructive/70 mt-1">{errorInfo.en}</p>
               </div>
               <div className="leading-tight flex flex-col items-center">
-                <p className="text-base font-bold text-card-foreground">{errorInfo.descAr}</p>
+                <p className="text-base font-bold text-card-foreground tracking-normal">{errorInfo.descAr}</p>
                 <p className="text-xs text-muted-foreground mt-1">{errorInfo.descEn}</p>
               </div>
             </div>
@@ -116,16 +116,16 @@ const ErrorPage = () => {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-3 px-1 pt-1 items-stretch">
+        <div className="grid grid-cols-2 gap-4 px-1 pt-2 items-stretch">
           <KioskButton
             variant="secondary"
             size="xl"
             onClick={() => navigate('/kiosk')}
-            className="h-auto min-h-[78px] px-5 py-4 bg-card/55 hover:bg-card/75 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold">إلغاء</span>
-              <span className="text-xs font-normal text-muted-foreground mt-1">Cancel</span>
+              <span className="text-base font-bold tracking-normal">إلغاء</span>
+              <span className="text-xs font-normal text-gray-500 mt-1">Cancel</span>
             </span>
           </KioskButton>
 
@@ -133,11 +133,11 @@ const ErrorPage = () => {
             variant="secondary"
             size="xl"
             onClick={handleTryAgain}
-            className="h-auto min-h-[78px] px-5 py-4 bg-card/55 hover:bg-card/75 backdrop-blur-md text-card-foreground border border-card/60 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold">المحاولة مرة أخرى</span>
-              <span className="text-xs font-normal text-muted-foreground mt-1">Try Again</span>
+              <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
+              <span className="text-xs font-normal text-gray-500 mt-1">Try Again</span>
             </span>
           </KioskButton>
         </div>
