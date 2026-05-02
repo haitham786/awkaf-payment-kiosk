@@ -286,20 +286,14 @@ const ThawaniGatewayPage = () => {
 
         {stage === 'error' && (
           <>
-            <Card className="px-5 py-6 bg-card/90 backdrop-blur-md shadow-lg border-2 border-destructive/45 text-center">
+            <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm border-2 border-destructive/45 text-center rounded-xl">
               <div className="space-y-5">
                 <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center border-2 border-destructive/45">
                   <X className="w-9 h-9 text-destructive" aria-hidden="true" />
                 </div>
-                <div className="space-y-3">
-                  <div className="leading-tight flex flex-col items-center">
-                    <h2 className="text-2xl font-bold text-destructive tracking-normal">تعذر إتمام عملية الدفع</h2>
-                    <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
-                  </div>
-                  <div className="leading-tight flex flex-col items-center">
-                    <p className="text-base font-bold text-card-foreground tracking-normal">لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.</p>
-                    <p className="text-xs text-muted-foreground mt-1">The transaction was not completed. You may try again with the same amount.</p>
-                  </div>
+                <div className="leading-tight flex flex-col items-center">
+                  <h2 className="text-2xl font-bold text-destructive tracking-normal">تعذر إتمام عملية الدفع</h2>
+                  <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
                 </div>
               </div>
             </Card>
@@ -309,7 +303,7 @@ const ThawaniGatewayPage = () => {
                 variant="secondary"
                 size="xl"
                 onClick={handleCancel}
-                className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
+                className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
               >
                 <span className="flex flex-col items-center leading-tight">
                   <span className="text-base font-bold tracking-normal">إلغاء</span>
@@ -320,7 +314,7 @@ const ThawaniGatewayPage = () => {
                 variant="secondary"
                 size="xl"
                 onClick={handleRetry}
-                className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
+                className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
               >
                 <span className="flex flex-col items-center leading-tight">
                   <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
