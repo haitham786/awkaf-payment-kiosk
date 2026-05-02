@@ -123,7 +123,7 @@ const ErrorPage = () => {
             variant="secondary"
             size="xl"
             onClick={() => navigate('/kiosk')}
-            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
               <span className="text-base font-bold tracking-normal">إلغاء</span>
@@ -135,7 +135,7 @@ const ErrorPage = () => {
             variant="secondary"
             size="xl"
             onClick={handleTryAgain}
-            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
+            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
           >
             <span className="flex flex-col items-center leading-tight">
               <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
