@@ -293,11 +293,11 @@ const ThawaniGatewayPage = () => {
                 </div>
                 <div className="space-y-3">
                   <div className="leading-tight flex flex-col items-center">
-                    <h2 className="text-2xl font-bold text-destructive">تعذر إتمام عملية الدفع</h2>
+                    <h2 className="text-2xl font-bold text-destructive tracking-normal">تعذر إتمام عملية الدفع</h2>
                     <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
                   </div>
                   <div className="leading-tight flex flex-col items-center">
-                    <p className="text-base font-bold text-card-foreground">لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.</p>
+                    <p className="text-base font-bold text-card-foreground tracking-normal">لم تكتمل العملية. يمكنك المحاولة مرة أخرى بنفس المبلغ.</p>
                     <p className="text-xs text-muted-foreground mt-1">The transaction was not completed. You may try again with the same amount.</p>
                   </div>
                 </div>
@@ -312,7 +312,7 @@ const ThawaniGatewayPage = () => {
                 className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
               >
                 <span className="flex flex-col items-center leading-tight">
-                  <span className="text-base font-bold">إلغاء</span>
+                  <span className="text-base font-bold tracking-normal">إلغاء</span>
                   <span className="text-xs font-normal text-gray-500 mt-1">Cancel</span>
                 </span>
               </KioskButton>
@@ -323,7 +323,7 @@ const ThawaniGatewayPage = () => {
                 className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-card flex items-center justify-center"
               >
                 <span className="flex flex-col items-center leading-tight">
-                  <span className="text-base font-bold">المحاولة مرة أخرى</span>
+                  <span className="text-base font-bold tracking-normal">المحاولة مرة أخرى</span>
                   <span className="text-xs font-normal text-gray-500 mt-1">Try Again</span>
                 </span>
               </KioskButton>
