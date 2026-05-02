@@ -110,20 +110,34 @@ const ErrorPage = () => {
           </div>
         </Card>
 
-        <div className="flex justify-center mt-4">
-          <KioskButton
-            variant="confirm"
-            size="xl"
-            onClick={handleTryAgain}
-            className="min-w-[240px] bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 flex items-center justify-center border border-white/40"
-          >
-            <RefreshCw className="w-5 h-5 ml-2" />
-            <span className="flex flex-col items-start">
-              <span>المحاولة مرة أخرى</span>
-              <span className="text-xs text-gray-500">Try Again</span>
-            </span>
-          </KioskButton>
-        </div>
+      </div>
+
+      {/* Action buttons - outside and underneath the red frame */}
+      <div className="w-full max-w-3xl mx-auto mt-6 flex items-stretch justify-center gap-4 px-2">
+        <KioskButton
+          variant="confirm"
+          size="xl"
+          onClick={() => navigate('/kiosk')}
+          className="flex-1 max-w-[260px] min-h-[72px] px-8 py-4 bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border border-white/40 rounded-xl flex items-center justify-center"
+        >
+          <span className="flex flex-col items-center leading-tight">
+            <span className="text-base font-bold">إلغاء</span>
+            <span className="text-xs font-normal text-gray-500 mt-0.5">Cancel</span>
+          </span>
+        </KioskButton>
+
+        <KioskButton
+          variant="confirm"
+          size="xl"
+          onClick={handleTryAgain}
+          className="flex-1 max-w-[260px] min-h-[72px] px-8 py-4 bg-white/80 hover:bg-white/90 backdrop-blur-sm text-gray-900 border border-white/40 rounded-xl flex items-center justify-center gap-3"
+        >
+          <RefreshCw className="w-5 h-5 shrink-0" />
+          <span className="flex flex-col items-center leading-tight">
+            <span className="text-base font-bold">المحاولة مرة أخرى</span>
+            <span className="text-xs font-normal text-gray-500 mt-0.5">Try Again</span>
+          </span>
+        </KioskButton>
       </div>
     </KioskLayout>
   );
