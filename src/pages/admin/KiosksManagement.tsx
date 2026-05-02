@@ -360,7 +360,7 @@ const KiosksManagement = () => {
               </div>
               <div>
                 <Label htmlFor="reference_number">Reference Number</Label>
-                <Input id="reference_number" value={formData.reference_number} onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })} required placeholder="e.g., KIOSK001" />
+                <Input id="reference_number" value={formData.reference_number} onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })} placeholder="e.g., KIOSK001" />
               </div>
               <div>
                 <Label htmlFor="location">Location</Label>
