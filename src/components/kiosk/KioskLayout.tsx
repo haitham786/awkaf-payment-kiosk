@@ -106,7 +106,7 @@ export const KioskLayout = ({ children, showHomeButton = true }: KioskLayoutProp
 
       {/* Home Button */}
       {showHomeButton && (
-        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-20">
+        <div className="fixed bottom-12 left-1/2 transform -translate-x-1/2 z-20">
           <KioskButton
             variant="ghost"
             size="sm"

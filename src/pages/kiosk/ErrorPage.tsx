@@ -23,6 +23,11 @@ const ErrorPage = () => {
   }, [navigate]);
 
   useEffect(() => {
+    if (source !== 'gateway') return;
+    sessionStorage.removeItem('kiosk_pending_gateway_payment');
+  }, [source]);
+
+  useEffect(() => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
       try {
@@ -57,7 +62,7 @@ const ErrorPage = () => {
   const handleTryAgain = () => {
     if (source === 'gateway') {
       // Re-launch Thawani gateway with same amount
-      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}`);
+      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}&retry=${Date.now()}`);
     } else {
       navigate(`/kiosk/amount?category=${categoryId}`);
     }

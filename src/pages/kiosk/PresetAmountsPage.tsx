@@ -45,7 +45,7 @@ const PresetAmountsPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-md mx-auto flex flex-col h-full pb-20">
+      <div className="w-full max-w-md mx-auto flex flex-col h-full pb-24">
         <div className="text-center shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5 mb-1 min-h-[60px]">
             <div className="w-10 h-10 flex items-center justify-center">
@@ -86,13 +86,13 @@ const PresetAmountsPage = () => {
           ))}
         </div>
 
-        <div className="flex items-center justify-center mt-4 mb-8 shrink-0">
+        <div className="flex items-center justify-center mt-4 mb-10 shrink-0">
           <KioskButton
             variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleCustomAmount}
-            className="px-8 py-3 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-1.5 rounded-xl"
+            className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-2 rounded-xl"
           >
             <span className="text-sm">إدخال مبلغ مختلف</span>
             <span className="text-gray-500">Enter a different amount</span>
