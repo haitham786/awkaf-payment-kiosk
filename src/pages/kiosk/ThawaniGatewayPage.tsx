@@ -218,7 +218,7 @@ const ThawaniGatewayPage = () => {
       window.removeEventListener('focus', handleGatewayReturn);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [amount, category, navigate]);
+  }, [amount, category, categoryData, gatewayMode, navigate]);
 
   const formatAmountNum = (totalBaisas: number) => {
     const rials = Math.floor(totalBaisas / 1000);
