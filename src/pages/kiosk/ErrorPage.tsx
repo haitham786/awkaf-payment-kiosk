@@ -23,6 +23,11 @@ const ErrorPage = () => {
   }, [navigate]);
 
   useEffect(() => {
+    if (source !== 'gateway') return;
+    sessionStorage.removeItem('kiosk_pending_gateway_payment');
+  }, [source]);
+
+  useEffect(() => {
     const loadCategoryData = async () => {
       if (!categoryId) return;
       try {
