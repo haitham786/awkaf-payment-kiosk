@@ -182,7 +182,7 @@ const ThawaniGatewayPage = () => {
         const pending = JSON.parse(pendingPayment);
         const returnedFromCheckout = Date.now() - Number(pending?.createdAt || 0) > 1500;
         if (returnedFromCheckout && pending?.category === category && Number(pending?.amount) === amount) {
-          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`);
+          navigate(`/kiosk/error?category=${category}&amount=${amount}&source=gateway&error=payment`, { replace: true });
         }
       } catch {
         sessionStorage.removeItem(PENDING_GATEWAY_KEY);
