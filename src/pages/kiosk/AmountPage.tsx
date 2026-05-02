@@ -70,7 +70,7 @@ const AmountPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-[18rem] mx-auto flex flex-col h-full pb-24">
+      <div className="w-full max-w-[18rem] mx-auto flex flex-col h-full pb-16">
         {/* Category header */}
         <div className="text-center mb-1 shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5">
@@ -153,17 +153,17 @@ const AmountPage = () => {
         </div>
 
         {/* Confirm Button - centered, lowered, transparent white style matching Enter Different Amount */}
-        <div className="flex justify-center pt-4 shrink-0">
+        <div className="flex justify-center pt-6 shrink-0">
           <KioskButton
             variant="secondary"
             size="sm"
             soundEffect="navigation"
             onClick={handleConfirm}
             disabled={(!rialAmount || parseFloat(rialAmount) <= 0) && (!baisaAmount || parseInt(baisaAmount) <= 0)}
-            className="px-8 py-3 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl flex flex-col items-center gap-1.5"
+            className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl flex flex-col items-center gap-2"
           >
             <span className="text-sm">تأكيد</span>
-            <span className="text-gray-500">Confirm</span>
+            <span className="text-gray-900">Confirm</span>
           </KioskButton>
         </div>
       </div>

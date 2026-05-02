@@ -248,7 +248,7 @@ const KioskHomepage = () => {
           )}
         </div>
 
-        <div className="shrink-0 pb-4 pt-1">
+        <div className="shrink-0 pb-8 pt-1">
           <div className="flex justify-center items-center gap-3 flex-wrap">
             <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5 w-auto object-contain" />
             <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
