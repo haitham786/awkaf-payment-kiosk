@@ -41,6 +41,9 @@ const CategoriesManagement = () => {
     title: '',
     title_en: '',
     description: '',
+    description_en: '',
+    info_text: '',
+    info_text_en: '',
     is_visible: true,
     icon_url: '',
     category_reference: ''
@@ -176,7 +179,18 @@ const CategoriesManagement = () => {
 
   const handleEdit = (category: any) => {
     setEditingId(category.id);
-    setFormData({ category_id: category.category_id, title: category.title, title_en: category.title_en || '', description: category.description, is_visible: category.is_visible, icon_url: category.icon_url || '', category_reference: category.category_reference || '' });
+    setFormData({
+      category_id: category.category_id,
+      title: category.title,
+      title_en: category.title_en || '',
+      description: category.description,
+      description_en: category.description_en || '',
+      info_text: category.info_text || '',
+      info_text_en: category.info_text_en || '',
+      is_visible: category.is_visible,
+      icon_url: category.icon_url || '',
+      category_reference: category.category_reference || ''
+    });
     setIconPreview(category.icon_url || '');
     setIconFile(null);
   };
@@ -221,7 +235,7 @@ const CategoriesManagement = () => {
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ category_id: '', title: '', title_en: '', description: '', is_visible: true, icon_url: '', category_reference: '' });
+    setFormData({ category_id: '', title: '', title_en: '', description: '', description_en: '', info_text: '', info_text_en: '', is_visible: true, icon_url: '', category_reference: '' });
     setIconFile(null);
     setIconPreview('');
   };
@@ -288,6 +302,18 @@ const CategoriesManagement = () => {
               <div>
                 <Label htmlFor="description">Description (Arabic)</Label>
                 <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required placeholder="وصف الفئة" />
+              </div>
+              <div>
+                <Label htmlFor="description_en">Description (English)</Label>
+                <Textarea id="description_en" value={formData.description_en} onChange={(e) => setFormData({ ...formData, description_en: e.target.value })} placeholder="Category description in English" />
+              </div>
+              <div>
+                <Label htmlFor="info_text">Info Text (Arabic, optional)</Label>
+                <Textarea id="info_text" value={formData.info_text} onChange={(e) => setFormData({ ...formData, info_text: e.target.value })} placeholder="نص يظهر عند الضغط على زر المعلومات" />
+              </div>
+              <div>
+                <Label htmlFor="info_text_en">Info Text (English, optional)</Label>
+                <Textarea id="info_text_en" value={formData.info_text_en} onChange={(e) => setFormData({ ...formData, info_text_en: e.target.value })} placeholder="Info text shown when tapping the info button" />
               </div>
               <div>
                 <Label htmlFor="icon">Category Icon</Label>
