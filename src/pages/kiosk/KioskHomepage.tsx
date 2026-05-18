@@ -12,7 +12,7 @@ import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCac
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
 const readCachedSettings = () => {
-  const cached = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+  const cached = localStorage.getItem(SETTINGS_CACHE_KEY);
   if (!cached) return null as { quranic_verse?: string; quranic_verse_surah?: string } | null;
 
   try {
@@ -26,8 +26,9 @@ const KioskHomepage = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<any[]>(() => readCachedCategories());
   const [loading, setLoading] = useState(() => readCachedCategories().length === 0);
-  const [quranicVerse, setQuranicVerse] = useState<string>(() => readCachedSettings()?.quranic_verse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ");
-  const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>(() => readCachedSettings()?.quranic_verse_surah || "البقرة");
+  const cachedSettings = readCachedSettings();
+  const [quranicVerse, setQuranicVerse] = useState<string>(() => cachedSettings?.quranic_verse || "");
+  const [quranicVerseSurah, setQuranicVerseSurah] = useState<string>(() => cachedSettings?.quranic_verse_surah || "");
   const [kioskStatus, setKioskStatus] = useState<'active' | 'inactive' | 'maintenance' | 'pending_approval' | 'disconnected' | 'unregistered'>(() => {
     const kioskId = localStorage.getItem('kiosk_id');
     return kioskId ? 'active' : 'unregistered';
@@ -103,13 +104,13 @@ const KioskHomepage = () => {
       primeCategoryCache(nextCategories);
 
       const nextSettings = {
-        quranic_verse: settingsResult.data?.quranic_verse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ",
-        quranic_verse_surah: (settingsResult.data as any)?.quranic_verse_surah || "البقرة",
+        quranic_verse: settingsResult.data?.quranic_verse || "",
+        quranic_verse_surah: (settingsResult.data as any)?.quranic_verse_surah || "",
       };
 
       setQuranicVerse(nextSettings.quranic_verse);
       setQuranicVerseSurah(nextSettings.quranic_verse_surah);
-      sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(nextSettings));
+      localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(nextSettings));
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -183,21 +184,25 @@ const KioskHomepage = () => {
           pointerEvents: kioskStatus !== 'active' ? 'none' : 'auto'
         }}
       >
-        <div className="text-center mb-2 shrink-0">
-          <div className="rounded-xl p-2 mb-2">
-            <p className="text-sm font-bold text-gray-800 leading-relaxed drop-shadow-sm">
-              "{quranicVerse || "وَمَا تُنفِقُوا مِنْ خَيْرٍ فَإِنَّ اللَّهَ بِهِ عَلِيمٌ"}"
-            </p>
-            <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
-              سورة {quranicVerseSurah || "البقرة"}
-            </p>
-          </div>
+        <div className="text-center mb-1 shrink-0">
+          {quranicVerse && (
+            <div className="rounded-xl p-1 mb-1">
+              <p className="text-sm font-bold text-gray-800 leading-relaxed drop-shadow-sm">
+                "{quranicVerse}"
+              </p>
+              {quranicVerseSurah && (
+                <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
+                  سورة {quranicVerseSurah}
+                </p>
+              )}
+            </div>
+          )}
 
           <p className="text-base text-gray-900 font-bold drop-shadow mb-0.5">
-            اختر نوع التبرع الذي ترغب في المساهمة به
+            اختر نوع التبرع
           </p>
           <p className="text-sm text-gray-600 font-bold">
-            Choose the type of donation you would like to contribute
+            Choose the category of donation
           </p>
         </div>
 
@@ -218,9 +223,16 @@ const KioskHomepage = () => {
                 key={category.id}
                 className="p-0 overflow-hidden bg-white/40 backdrop-blur-sm border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 group relative"
               >
-                {(category.info_text || category.description) && (
+                {(category.info_text || category.description || category.info_text_en || category.description_en) && (
                   <div className="absolute top-1 right-1 z-10">
-                    <CategoryInfoDialog title={category.title} description={category.description} infoText={category.info_text} />
+                    <CategoryInfoDialog
+                      title={category.title}
+                      titleEn={category.title_en}
+                      description={category.description}
+                      descriptionEn={category.description_en}
+                      infoText={category.info_text}
+                      infoTextEn={category.info_text_en}
+                    />
                   </div>
                 )}
                 <KioskButton

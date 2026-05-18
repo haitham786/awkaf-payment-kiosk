@@ -75,7 +75,7 @@ const ConfirmationPage = () => {
 
         <Card className="p-6 bg-white/40 backdrop-blur-sm shadow-lg border-0 text-center">
           <div className="space-y-4">
-            <div className="w-20 h-20 mx-auto rounded-full shadow-md flex items-center justify-center p-1">
+            <div className="w-20 h-20 mx-auto flex items-center justify-center p-1">
               {categoryData?.icon_url && (
                 <img src={categoryData.icon_url} alt="" className="w-full h-full object-contain" />
               )}

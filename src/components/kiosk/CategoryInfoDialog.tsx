@@ -10,14 +10,25 @@ import { Button } from "@/components/ui/button";
 
 interface CategoryInfoDialogProps {
   title: string;
+  titleEn?: string | null;
   description: string;
-  infoText?: string;
+  descriptionEn?: string | null;
+  infoText?: string | null;
+  infoTextEn?: string | null;
 }
 
-export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInfoDialogProps) => {
-  const content = infoText || description;
-  
-  if (!content) return null;
+export const CategoryInfoDialog = ({
+  title,
+  titleEn,
+  description,
+  descriptionEn,
+  infoText,
+  infoTextEn,
+}: CategoryInfoDialogProps) => {
+  const contentAr = infoText || description;
+  const contentEn = infoTextEn || descriptionEn;
+
+  if (!contentAr && !contentEn) return null;
 
   return (
     <Dialog>
@@ -37,9 +48,21 @@ export const CategoryInfoDialog = ({ title, description, infoText }: CategoryInf
             {title}
           </DialogTitle>
         </DialogHeader>
-        <div className="text-right text-gray-800 leading-relaxed whitespace-pre-wrap mt-4">
-          {content}
-        </div>
+        {contentAr && (
+          <div className="text-right text-gray-800 leading-relaxed whitespace-pre-wrap mt-4">
+            {contentAr}
+          </div>
+        )}
+        {titleEn && (
+          <div className="text-left text-base font-semibold text-gray-900 mt-3">
+            {titleEn}
+          </div>
+        )}
+        {contentEn && (
+          <div className="text-left text-gray-700 leading-relaxed whitespace-pre-wrap mt-1 text-sm">
+            {contentEn}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
