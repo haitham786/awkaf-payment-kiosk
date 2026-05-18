@@ -20,10 +20,12 @@ export type Database = {
           category_reference: string | null
           created_at: string | null
           description: string
+          description_en: string | null
           display_order: number
           icon_url: string | null
           id: string
           info_text: string | null
+          info_text_en: string | null
           is_visible: boolean | null
           title: string
           title_en: string | null
@@ -34,10 +36,12 @@ export type Database = {
           category_reference?: string | null
           created_at?: string | null
           description: string
+          description_en?: string | null
           display_order: number
           icon_url?: string | null
           id?: string
           info_text?: string | null
+          info_text_en?: string | null
           is_visible?: boolean | null
           title: string
           title_en?: string | null
@@ -48,10 +52,12 @@ export type Database = {
           category_reference?: string | null
           created_at?: string | null
           description?: string
+          description_en?: string | null
           display_order?: number
           icon_url?: string | null
           id?: string
           info_text?: string | null
+          info_text_en?: string | null
           is_visible?: boolean | null
           title?: string
           title_en?: string | null

@@ -5,7 +5,9 @@ export interface KioskCategoryCacheItem {
   icon_url: string | null;
   category_reference?: string | null;
   description?: string | null;
+  description_en?: string | null;
   info_text?: string | null;
+  info_text_en?: string | null;
   display_order?: number;
   is_visible?: boolean | null;
 }
@@ -14,10 +16,13 @@ export const CATEGORY_CACHE_KEY = "kiosk_home_categories";
 
 const imageCache = new Set<string>();
 
-export const readCachedCategory = (categoryId: string | null) => {
-  if (!categoryId) return null;
+// Use localStorage for persistence across app restarts (instant load on cold start).
+const storage = typeof window !== "undefined" ? window.localStorage : null;
 
-  const cached = sessionStorage.getItem(`category_${categoryId}`);
+export const readCachedCategory = (categoryId: string | null) => {
+  if (!categoryId || !storage) return null;
+
+  const cached = storage.getItem(`category_${categoryId}`);
   if (!cached) return null;
 
   try {
@@ -28,7 +33,8 @@ export const readCachedCategory = (categoryId: string | null) => {
 };
 
 export const readCachedCategories = () => {
-  const cached = sessionStorage.getItem(CATEGORY_CACHE_KEY);
+  if (!storage) return [] as KioskCategoryCacheItem[];
+  const cached = storage.getItem(CATEGORY_CACHE_KEY);
   if (!cached) return [] as KioskCategoryCacheItem[];
 
   try {
@@ -51,17 +57,19 @@ export const preloadCategoryImages = (items: Array<{ icon_url?: string | null }>
 };
 
 export const primeCategoryCache = (items: KioskCategoryCacheItem[]) => {
-  sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(items));
+  if (!storage) return;
+  storage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(items));
 
   items.forEach((item) => {
     if (!item.category_id) return;
-    sessionStorage.setItem(`category_${item.category_id}`, JSON.stringify(item));
+    storage.setItem(`category_${item.category_id}`, JSON.stringify(item));
   });
 
   preloadCategoryImages(items);
 };
 
 export const storeCategoryInCache = (item: KioskCategoryCacheItem) => {
-  sessionStorage.setItem(`category_${item.category_id}`, JSON.stringify(item));
+  if (!storage) return;
+  storage.setItem(`category_${item.category_id}`, JSON.stringify(item));
   preloadCategoryImages([item]);
 };
