@@ -218,9 +218,9 @@ const NFCPaymentPage = () => {
     return (
       <KioskLayout>
         <div className="w-full max-w-md mx-auto flex flex-col justify-center gap-3 pb-24">
-          <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm border-2 border-destructive/45 text-center rounded-xl">
+          <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm text-center rounded-xl">
             <div className="space-y-5">
-              <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center border-2 border-destructive/45">
+              <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center">
                 <X className="w-9 h-9 text-destructive" aria-hidden="true" />
               </div>
               <div className="leading-tight flex flex-col items-center">
@@ -235,7 +235,7 @@ const NFCPaymentPage = () => {
               variant="secondary"
               size="xl"
               onClick={handleCancel}
-              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
+              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
             >
               <span className="flex flex-col items-center leading-tight">
                 <span className="text-base font-bold text-gray-900 tracking-normal">إلغاء</span>
@@ -246,7 +246,7 @@ const NFCPaymentPage = () => {
               variant="secondary"
               size="xl"
               onClick={handleTryAgain}
-              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 bg-none backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
+              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
             >
               <span className="flex flex-col items-center leading-tight">
                 <span className="text-base font-bold text-gray-900 tracking-normal">المحاولة مرة أخرى</span>
