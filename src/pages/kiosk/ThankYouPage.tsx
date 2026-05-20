@@ -160,16 +160,18 @@ const ThankYouPage = () => {
                 <p className="text-sm text-gray-500">Would you like an SMS receipt?</p>
               </div>
               
-              <KioskButton
-                variant="confirm"
-                size="xl"
-                soundEffect="navigation"
-                onClick={handleSMSReceipt}
-                className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white border-0 flex flex-col items-center"
-              >
-                <span>نعم</span>
-                <span className="text-xs opacity-80">Yes</span>
-              </KioskButton>
+              <div className="flex justify-center">
+                <KioskButton
+                  variant="secondary"
+                  size="sm"
+                  soundEffect="navigation"
+                  onClick={handleSMSReceipt}
+                  className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-1 rounded-xl"
+                >
+                  <span className="text-sm">نعم</span>
+                  <span className="text-gray-900">Yes</span>
+                </KioskButton>
+              </div>
             </div>
 
             <div className="mt-8">
