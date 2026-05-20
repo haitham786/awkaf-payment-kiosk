@@ -128,14 +128,25 @@ const SMSSettings = () => {
   };
 
   const handleTestSMS = async () => {
+    const digits = testMobile.replace(/\D/g, '');
+    if (digits.length < 8) {
+      toast({
+        title: "Invalid mobile number",
+        description: "Enter an 8-digit Omani mobile number (or full international number).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const fullNumber = digits.length === 8 ? `968${digits}` : digits;
+
     setTesting(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
-          mobile_number: '96899999999',
-          category: 'zakat',
-          reference_number: 'TEST123456789',
+          mobile_number: fullNumber,
+          category: 'test',
+          reference_number: 'TEST' + Date.now().toString().slice(-9),
           amount_baisas: 10000
         }
       });
