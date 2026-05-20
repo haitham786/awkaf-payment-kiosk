@@ -246,6 +246,12 @@ const ThawaniGatewayPage = () => {
   const handleCancel = () => navigate('/kiosk');
   const handleRetry = () => { sessionStartedRef.current = false; setStage('creating'); setErrorMessage(''); createSession(); };
 
+  if (stage === 'creating' || stage === 'redirecting') {
+    // Render nothing while creating the Thawani session so the user doesn't see
+    // a loading screen before Thawani's checkout page appears.
+    return null;
+  }
+
   return (
     <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-xl mx-auto space-y-4">
@@ -257,32 +263,6 @@ const ThawaniGatewayPage = () => {
           </p>
         </Card>
 
-        {(stage === 'creating' || stage === 'redirecting') && (
-          <Card className="p-8 bg-white shadow-lg border border-gray-300 text-center">
-            <div className="space-y-4">
-              <Loader2 className="w-16 h-16 mx-auto text-emerald-600 animate-spin" />
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {stage === 'creating' ? 'جاري إنشاء جلسة الدفع...' : 'جاري التحويل إلى صفحة الدفع...'}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {stage === 'creating' ? 'Creating payment session...' : 'Redirecting to payment page...'}
-                </p>
-              </div>
-              {stage === 'redirecting' && checkoutUrl && (
-                <div className="pt-4">
-                  <a
-                    href={checkoutUrl}
-                    className="inline-flex items-center gap-2 text-emerald-600 underline text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Click here if not redirected
-                  </a>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
 
         {stage === 'error' && (
           <>
