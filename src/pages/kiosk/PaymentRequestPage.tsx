@@ -1,9 +1,8 @@
 import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { KioskLayout } from "@/components/kiosk/KioskLayout";
-import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
+
+
 
 const PaymentRequestPage = () => {
   const navigate = useNavigate();
