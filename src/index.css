@@ -5,6 +5,14 @@
 /* Futuristic Donation Kiosk - Cyberpunk Dark Theme with Neon Glows */
 
 @font-face {
+  font-family: 'GE SS Two';
+  src: url('/src/assets/fonts/GE_SS_Two_Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'AppBilingual';
   src: local('Arial Bold'), local('Arial');
   font-weight: 700;
@@ -13,7 +21,7 @@
 
 @font-face {
   font-family: 'AppBilingual';
-  src: local('Times New Roman Bold'), local('Times New Roman');
+  src: url('/src/assets/fonts/GE_SS_Two_Bold.otf') format('opentype');
   font-weight: 700;
   unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
@@ -144,6 +152,11 @@
     @apply bg-background text-foreground;
     font-family: 'AppBilingual', Arial, 'Times New Roman', serif;
     font-weight: 700;
+  }
+
+  /* Kiosk pages: force English text to solid black (admin panel keeps its own styling) */
+  body:not(:has(.admin-panel)) {
+    color: #000;
   }
 
   .admin-panel,
