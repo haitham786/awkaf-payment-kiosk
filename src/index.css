@@ -154,6 +154,11 @@
     font-weight: 700;
   }
 
+  /* Kiosk pages: force English text to solid black (admin panel keeps its own styling) */
+  body:not(:has(.admin-panel)) {
+    color: #000;
+  }
+
   .admin-panel,
   .admin-panel * {
     font-family: Arial, sans-serif;
