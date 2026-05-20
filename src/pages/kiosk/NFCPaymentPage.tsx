@@ -259,27 +259,10 @@ const NFCPaymentPage = () => {
     );
   }
 
-  return (
-    <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-xl mx-auto space-y-3">
-        <div className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-full text-xs font-medium ${isOnlineStatus ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-          {isOnlineStatus ? (<><Wifi className="w-3 h-3" /><span>Online</span></>) : (<><WifiOff className="w-3 h-3" /><span>Offline Mode</span></>)}
-        </div>
-        <Card className="p-3 bg-emerald-50 shadow-md border-2 border-emerald-300 text-center">
-          <p className="text-sm text-gray-600 mb-0.5">المبلغ <span className="text-xs text-gray-400">Amount</span></p>
-          <p className="text-2xl font-bold text-emerald-700 flex items-center justify-center gap-2">
-            <CurrencyLogo className="h-5" />
-            {formatAmountNum(amount)}
-          </p>
-        </Card>
-        <Card className="p-6 bg-white shadow-lg border border-gray-300 text-center">
-          <Loader2 className="w-16 h-16 mx-auto text-emerald-600 animate-spin" />
-          <h2 className="text-xl font-bold text-gray-900 mt-4">جاري التحميل...</h2>
-          <p className="text-sm text-gray-500">Loading...</p>
-        </Card>
-      </div>
-    </KioskLayout>
-  );
+  // Don't render any loading UI in waiting/processing on native — the official
+  // Thawani Lamsa Activity takes over the screen immediately, so the previous
+  // page stays visible until that happens.
+  return null;
 };
 
 export default NFCPaymentPage;
