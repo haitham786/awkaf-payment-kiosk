@@ -38,11 +38,10 @@ const MobileNumberPage = () => {
 
   const resetTimer = () => setInactivityTimer(15);
 
-  const keypadNumbers = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['⌫', '0', '']];
-
   const handleKeypadPress = (value: string) => {
     resetTimer();
-    if (value === '⌫') setMobileNumber(prev => prev.slice(0, -1));
+    if (value === 'back') setMobileNumber(prev => prev.slice(0, -1));
+    else if (value === 'clear') setMobileNumber('');
     else if (value && mobileNumber.length < 8) setMobileNumber(prev => prev + value);
   };
 
