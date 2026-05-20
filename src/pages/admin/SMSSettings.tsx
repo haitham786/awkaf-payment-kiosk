@@ -17,6 +17,7 @@ const SMSSettings = () => {
   const [testing, setTesting] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [testMobile, setTestMobile] = useState('');
 
   const [settings, setSettings] = useState({
     id: '',
@@ -127,14 +128,25 @@ const SMSSettings = () => {
   };
 
   const handleTestSMS = async () => {
+    const digits = testMobile.replace(/\D/g, '');
+    if (digits.length < 8) {
+      toast({
+        title: "Invalid mobile number",
+        description: "Enter an 8-digit Omani mobile number (or full international number).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const fullNumber = digits.length === 8 ? `968${digits}` : digits;
+
     setTesting(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: {
-          mobile_number: '96899999999',
-          category: 'zakat',
-          reference_number: 'TEST123456789',
+          mobile_number: fullNumber,
+          category: 'test',
+          reference_number: 'TEST' + Date.now().toString().slice(-9),
           amount_baisas: 10000
         }
       });
@@ -263,19 +275,43 @@ const SMSSettings = () => {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t">
-              <Button onClick={handleSave} disabled={saving}>
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Settings'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleTestSMS}
-                disabled={testing || (!settings.api_username && !settings.api_endpoint)}
-              >
-                <Send className="w-4 h-4 mr-2" />
-                {testing ? 'Testing...' : 'Send Test SMS'}
-              </Button>
+            <div className="pt-4 border-t space-y-4">
+              <div className="flex gap-3">
+                <Button onClick={handleSave} disabled={saving}>
+                  <Save className="w-4 h-4 mr-2" />
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="test_mobile">Test Mobile Number</Label>
+                <div className="flex gap-3 items-start">
+                  <div className="relative flex-1 max-w-xs">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">+968</div>
+                    <Input
+                      id="test_mobile"
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="9XXXXXXX"
+                      value={testMobile}
+                      onChange={(e) => setTestMobile(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                      className="pl-14"
+                      maxLength={12}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleTestSMS}
+                    disabled={testing || testMobile.replace(/\D/g, '').length < 8 || (!settings.api_username && !settings.api_endpoint)}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {testing ? 'Testing...' : 'Send Test SMS'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter an 8-digit Omani mobile number. The test SMS will be sent to this number.
+                </p>
+              </div>
             </div>
           </div>
 
