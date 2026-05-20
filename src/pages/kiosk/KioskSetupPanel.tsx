@@ -183,12 +183,12 @@ const KioskSetupPanel = () => {
           <form onSubmit={handleLogin} className="space-y-3">
             <div>
               <Label htmlFor="email" className="text-gray-900 text-sm">Email</Label>
-              <Input id="email" type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required placeholder="admin@example.com" className="bg-white text-gray-900 border-gray-300 h-10" />
+              <Input id="email" type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} required placeholder="admin@example.com" className="bg-gray-100 text-gray-900 border-0 h-10 focus-visible:ring-0 focus-visible:ring-offset-0" />
             </div>
             <div>
               <Label htmlFor="password" className="text-gray-900 text-sm">Password</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required placeholder="••••••••" className="bg-white text-gray-900 border-gray-300 h-10 pr-10" />
+                <Input id="password" type={showPassword ? "text" : "password"} value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} required placeholder="••••••••" className="bg-gray-100 text-gray-900 border-0 h-10 pr-10 focus-visible:ring-0 focus-visible:ring-offset-0" />
                 <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff className="h-4 w-4 text-gray-600" /> : <Eye className="h-4 w-4 text-gray-600" />}
                 </Button>
