@@ -49,11 +49,10 @@ const PaymentRequestPage = () => {
     checkPaymentMode();
   }, [navigate, category, amount]);
 
-  const formatAmount = (totalBaisas: number) => {
-    const rials = Math.floor(totalBaisas / 1000);
-    const baisas = totalBaisas % 1000;
-    return `${rials}.${baisas.toString().padStart(3, '0')}`;
-  };
+  // Don't render any loading UI — keep the previous screen visible until we navigate
+  // to the next page (Thawani gateway, Soft POS, or test payment).
+  return null;
+};
 
   // Don't render any loading UI — keep the previous screen visible until we navigate
   // to the next page (Thawani gateway, Soft POS, or test payment).
