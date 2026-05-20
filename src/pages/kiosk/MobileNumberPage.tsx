@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, X, CheckCircle, AlertCircle } from "lucide-react";
+import { Home, X, CheckCircle, AlertCircle, Delete, Eraser } from "lucide-react";
 
 const MobileNumberPage = () => {
   const navigate = useNavigate();
