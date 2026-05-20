@@ -54,9 +54,4 @@ const PaymentRequestPage = () => {
   return null;
 };
 
-  // Don't render any loading UI — keep the previous screen visible until we navigate
-  // to the next page (Thawani gateway, Soft POS, or test payment).
-  return null;
-};
-
 export default PaymentRequestPage;
