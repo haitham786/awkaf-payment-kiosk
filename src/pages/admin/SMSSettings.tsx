@@ -17,6 +17,7 @@ const SMSSettings = () => {
   const [testing, setTesting] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [testMobile, setTestMobile] = useState('');
 
   const [settings, setSettings] = useState({
     id: '',
