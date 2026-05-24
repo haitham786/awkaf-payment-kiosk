@@ -50,9 +50,9 @@ const PaymentRequestPage = () => {
     checkPaymentMode();
   }, [navigate, category, amount]);
 
-  // Don't render any loading UI — keep the previous screen visible until we navigate
-  // to the next page (Thawani gateway, Soft POS, or test payment).
-  return null;
+  // Keep kiosk background visible while we resolve the payment mode to avoid
+  // a black/white flash between submission and the gateway screen.
+  return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
 };
 
 export default PaymentRequestPage;
