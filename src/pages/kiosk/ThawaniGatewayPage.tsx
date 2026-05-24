@@ -247,9 +247,10 @@ const ThawaniGatewayPage = () => {
   const handleRetry = () => { sessionStartedRef.current = false; setStage('creating'); setErrorMessage(''); createSession(); };
 
   if (stage === 'creating' || stage === 'redirecting') {
-    // Render nothing while creating the Thawani session so the user doesn't see
-    // a loading screen before Thawani's checkout page appears.
-    return null;
+    // Keep the kiosk background visible (no black flash) while we create the
+    // Thawani session and redirect. KioskLayout reads bg/logo from localStorage
+    // so it paints instantly, with no children on top.
+    return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
   }
 
   return (
