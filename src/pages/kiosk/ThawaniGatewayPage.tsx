@@ -161,8 +161,8 @@ const ThawaniGatewayPage = () => {
         createdAt: Date.now(),
       }));
 
-      // Open Thawani checkout in the same window without keeping this loading page in history.
-      window.location.replace(data.checkout_url);
+      // Embed Thawani checkout inside the kiosk app via iframe (handled in render).
+      // Do not redirect the top-level window so the user stays inside the kiosk app.
     } catch (err: any) {
       sessionStartedRef.current = false;
       console.error('Thawani session error:', err);
