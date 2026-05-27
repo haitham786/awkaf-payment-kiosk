@@ -246,11 +246,53 @@ const ThawaniGatewayPage = () => {
   const handleCancel = () => navigate('/kiosk');
   const handleRetry = () => { sessionStartedRef.current = false; setStage('creating'); setErrorMessage(''); createSession(); };
 
-  if (stage === 'creating' || stage === 'redirecting') {
+  if (stage === 'creating') {
     // Keep the kiosk background visible (no black flash) while we create the
-    // Thawani session and redirect. KioskLayout reads bg/logo from localStorage
-    // so it paints instantly, with no children on top.
+    // Thawani session. KioskLayout reads bg/logo from localStorage so it paints instantly.
     return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
+  }
+
+  if (stage === 'redirecting' && checkoutUrl) {
+    const handleIframeLoad = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
+      // Try to read the iframe URL. Same-origin success/cancel URLs are readable;
+      // cross-origin Thawani pages will throw and we ignore them.
+      try {
+        const href = e.currentTarget.contentWindow?.location?.href;
+        if (!href) return;
+        if (href.includes('/kiosk/thank-you') || href.includes('/kiosk/error')) {
+          const url = new URL(href);
+          navigate(url.pathname + url.search, { replace: true });
+        }
+      } catch {
+        // cross-origin — Thawani page, ignore
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b shadow-sm">
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-bold text-gray-900">الدفع الآمن عبر ثواني</span>
+            <span className="text-[10px] text-gray-500">Secure payment via Thawani</span>
+          </div>
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-1 text-gray-700 hover:text-destructive px-3 py-1 rounded-md"
+            aria-label="Cancel payment"
+          >
+            <X className="w-5 h-5" />
+            <span className="text-xs font-semibold">إلغاء / Cancel</span>
+          </button>
+        </div>
+        <iframe
+          src={checkoutUrl}
+          title="Thawani Checkout"
+          className="flex-1 w-full border-0"
+          allow="payment *; camera; clipboard-read; clipboard-write"
+          onLoad={handleIframeLoad}
+        />
+      </div>
+    );
   }
 
   return (
