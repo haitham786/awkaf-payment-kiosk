@@ -27,6 +27,7 @@ import KiosksManagement from "./pages/admin/KiosksManagement";
 import AdminsManagement from "./pages/admin/AdminsManagement";
 import AddAdminPage from "./pages/admin/AddAdminPage";
 import SMSSettings from "./pages/admin/SMSSettings";
+import WhatsAppSettings from "./pages/admin/WhatsAppSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
 import ProfilePage from "./pages/admin/ProfilePage";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -88,6 +89,7 @@ const AppContent = () => {
             <Route path="/admin/admins" element={<AdminPanelLayout><AdminsManagement /></AdminPanelLayout>} />
             <Route path="/admin/add-admin" element={<AdminPanelLayout><AddAdminPage /></AdminPanelLayout>} />
             <Route path="/admin/sms-settings" element={<AdminPanelLayout><SMSSettings /></AdminPanelLayout>} />
+            <Route path="/admin/whatsapp-settings" element={<AdminPanelLayout><WhatsAppSettings /></AdminPanelLayout>} />
             <Route path="/admin/statistics" element={<AdminPanelLayout><EnhancedStatistics /></AdminPanelLayout>} />
             <Route path="/admin/profile" element={<AdminPanelLayout><ProfilePage /></AdminPanelLayout>} />
             
