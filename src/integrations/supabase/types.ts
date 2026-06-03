@@ -269,6 +269,7 @@ export type Database = {
           reference_number: string | null
           sms_status: string | null
           status: Database["public"]["Enums"]["transaction_status"]
+          whatsapp_status: string | null
         }
         Insert: {
           amount_baisas: number
@@ -294,6 +295,7 @@ export type Database = {
           reference_number?: string | null
           sms_status?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
+          whatsapp_status?: string | null
         }
         Update: {
           amount_baisas?: number
@@ -319,6 +321,7 @@ export type Database = {
           reference_number?: string | null
           sms_status?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
+          whatsapp_status?: string | null
         }
         Relationships: [
           {
@@ -348,6 +351,36 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_settings: {
+        Row: {
+          created_at: string
+          from_number: string
+          id: string
+          is_enabled: boolean
+          template_language: string
+          template_sid: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          from_number?: string
+          id?: string
+          is_enabled?: boolean
+          template_language?: string
+          template_sid?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          from_number?: string
+          id?: string
+          is_enabled?: boolean
+          template_language?: string
+          template_sid?: string
+          updated_at?: string
         }
         Relationships: []
       }
