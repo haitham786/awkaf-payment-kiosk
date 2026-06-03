@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
 type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment';
+type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
   payment_mode: PaymentMode;
@@ -28,6 +29,7 @@ interface KioskConfiguration {
     auto_approve?: boolean;
   };
   sound_enabled?: boolean;
+  receipt_channel?: ReceiptChannel;
 }
 
 const KiosksManagement = () => {
@@ -47,6 +49,7 @@ const KiosksManagement = () => {
       soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
       payment_gateway: { mode: 'test' as 'test' | 'live' },
       sound_enabled: true,
+      receipt_channel: 'sms' as ReceiptChannel,
     } as KioskConfiguration
   });
   const [backgroundImage, setBackgroundImage] = useState<string>("");
@@ -187,6 +190,7 @@ const KiosksManagement = () => {
         payment_gateway: config.payment_gateway || { mode: 'test' },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
+        receipt_channel: (config.receipt_channel as ReceiptChannel) || 'sms',
       }
     });
     setValidationError(null);
@@ -214,6 +218,7 @@ const KiosksManagement = () => {
         payment_gateway: { mode: 'test' },
         test_payment: { auto_approve: true },
         sound_enabled: true,
+        receipt_channel: 'sms',
       }
     });
     setValidationError(null);
@@ -555,6 +560,35 @@ const KiosksManagement = () => {
                   </h4>
                 </div>
               )}
+
+              {/* Receipt Channel */}
+              <div className="space-y-3 border-t pt-4">
+                <h3 className="font-semibold text-sm">Receipt Channel</h3>
+                <p className="text-xs text-muted-foreground">
+                  Choose how donors receive their receipt after a successful donation.
+                </p>
+                <RadioGroup
+                  value={formData.configuration.receipt_channel || 'sms'}
+                  onValueChange={(value: ReceiptChannel) =>
+                    setFormData({ ...formData, configuration: { ...formData.configuration, receipt_channel: value } })
+                  }
+                  className="flex flex-wrap gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sms" id="rc_sms" />
+                    <Label htmlFor="rc_sms" className="cursor-pointer">SMS only</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="whatsapp" id="rc_wa" />
+                    <Label htmlFor="rc_wa" className="cursor-pointer">WhatsApp only</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="both" id="rc_both" />
+                    <Label htmlFor="rc_both" className="cursor-pointer">Both</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
 
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">{editingId ? 'Update' : 'Add'} Kiosk</Button>

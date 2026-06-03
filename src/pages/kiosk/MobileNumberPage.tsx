@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { sendDonationReceipt } from "@/lib/receiptDispatcher";
 import { Home, X, CheckCircle, AlertCircle, Delete, Eraser } from "lucide-react";
 
 const MobileNumberPage = () => {
@@ -59,12 +60,19 @@ const MobileNumberPage = () => {
     }
     setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: { mobile_number: `968${mobileNumber}`, category, reference_number: referenceNumber || transactionId, amount_baisas: amount },
+      const result = await sendDonationReceipt({
+        mobile_number: `968${mobileNumber}`,
+        category,
+        reference_number: referenceNumber || transactionId,
+        transaction_id: transactionId || undefined,
+        amount_baisas: amount,
       });
-      if (error) { showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.'); return; }
-      if (data?.success) showResultPopup('success', `تم إرسال الإيصال بنجاح إلى الرقم ${mobileNumber}`);
-      else showResultPopup('error', data?.error || 'حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً.');
+      if (result.ok) {
+        showResultPopup('success', `تم إرسال الإيصال بنجاح إلى الرقم ${mobileNumber}`);
+      } else {
+        const err = result.sms?.error || result.whatsapp?.error || 'حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً.';
+        showResultPopup('error', err);
+      }
     } catch (error: any) {
       showResultPopup('error', 'نظام الرسائل غير متاح حالياً. يرجى المحاولة لاحقاً.');
     } finally { setSending(false); }

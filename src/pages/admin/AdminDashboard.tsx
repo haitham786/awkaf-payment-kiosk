@@ -325,6 +325,10 @@ const AdminDashboard = () => {
               <Settings className="mr-2 h-4 w-4" />
               SMS Settings
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/whatsapp-settings')}>
+              <Settings className="mr-2 h-4 w-4" />
+              WhatsApp Settings
+            </Button>
           </div>
         </div>
       </header>
