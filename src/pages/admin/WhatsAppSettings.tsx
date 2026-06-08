@@ -217,7 +217,7 @@ const WhatsAppSettings = () => {
                   <Button
                     variant="outline"
                     onClick={handleTest}
-                    disabled={testing || testMobile.replace(/\D/g, '').length < 8 || !settings.from_number || !settings.template_sid}
+                    disabled={testing || testMobile.replace(/\D/g, '').length < 8 || !settings.from_number}
                   >
                     <Send className="w-4 h-4 mr-2" />
                     {testing ? 'Testing...' : 'Send Test WhatsApp'}
