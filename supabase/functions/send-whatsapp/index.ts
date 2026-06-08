@@ -107,12 +107,13 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    if (!waSettings.from_number || !waSettings.template_sid) {
+    if (!waSettings.from_number) {
       return new Response(
-        JSON.stringify({ success: false, error: 'WhatsApp sender / template not configured.' }),
+        JSON.stringify({ success: false, error: 'WhatsApp sender (From number) not configured.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
