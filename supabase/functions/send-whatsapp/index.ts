@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildReceiptMessage, formatAmountOMR, formatArabicDateTime } from "../_shared/receiptMessage.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -105,12 +107,13 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    if (!waSettings.from_number || !waSettings.template_sid) {
+    if (!waSettings.from_number) {
       return new Response(
-        JSON.stringify({ success: false, error: 'WhatsApp sender / template not configured.' }),
+        JSON.stringify({ success: false, error: 'WhatsApp sender (From number) not configured.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
@@ -121,13 +124,9 @@ serve(async (req) => {
       );
     }
 
-    // Format amount + date
-    const rials = Math.floor(amount_baisas / 1000);
-    const baisas = amount_baisas % 1000;
-    const formattedAmount = `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-OM', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    const timeStr = now.toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' });
+    // Format amount + date (shared with SMS for identical output)
+    const formattedAmount = formatAmountOMR(amount_baisas);
+    const { dateStr, timeStr } = formatArabicDateTime();
 
     // Resolve category title
     const { data: catData } = await supabaseAdmin
@@ -143,23 +142,40 @@ serve(async (req) => {
       ? waSettings.from_number
       : `whatsapp:${waSettings.from_number}`;
 
-    // Twilio Content API template variables (positional 1..n)
-    const contentVariables = {
-      "1": categoryArabic,
-      "2": formattedAmount,
-      "3": `${dateStr} ${timeStr}`,
-      "4": transaction.reference_number || reference_number,
-      "5": pos_rrn || '-',
-    };
+    // Build the exact same Arabic message the SMS gateway sends, so both
+    // channels deliver identical content, ordering, and formatting (including
+    // the conditional bank-reference line).
+    const receiptBody = buildReceiptMessage({
+      categoryArabic,
+      amount_baisas,
+      reference: transaction.reference_number || reference_number,
+      pos_rrn: pos_rrn || null,
+    });
 
     const form = new URLSearchParams({
       To: to,
       From: from,
-      ContentSid: waSettings.template_sid,
-      ContentVariables: JSON.stringify(contentVariables),
+      Body: receiptBody,
     });
 
-    console.log('Twilio WhatsApp send →', to, '| template:', waSettings.template_sid);
+    // If an approved template is configured, include it as well. Twilio uses
+    // the template when the recipient is outside the 24h customer-care window
+    // (where free-form Body is rejected). The template should be authored to
+    // render the same content using the positional variables below.
+    if (waSettings.template_sid) {
+      const contentVariables = {
+        "1": categoryArabic,
+        "2": formattedAmount,
+        "3": `${dateStr} ${timeStr}`,
+        "4": transaction.reference_number || reference_number,
+        "5": pos_rrn || '-',
+      };
+      form.set('ContentSid', waSettings.template_sid);
+      form.set('ContentVariables', JSON.stringify(contentVariables));
+    }
+
+    console.log('Twilio WhatsApp send →', to, '| template:', waSettings.template_sid || '(freeform)');
+
 
     const twilioRes = await fetch(`${GATEWAY_URL}/Messages.json`, {
       method: 'POST',

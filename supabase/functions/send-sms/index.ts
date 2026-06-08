@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildReceiptMessage } from "../_shared/receiptMessage.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -173,23 +175,6 @@ serve(async (req) => {
       );
     }
 
-    // Format amount
-    const rials = Math.floor(amount_baisas / 1000);
-    const baisas = amount_baisas % 1000;
-    const formattedAmount = `${rials}.${baisas.toString().padStart(3, '0')} ر.ع`;
-
-    // Format date and time
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ar-OM', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit' 
-    });
-    const timeStr = now.toLocaleTimeString('ar-OM', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-
     // Fetch category title from database
     const { data: catData } = await supabaseAdmin
       .from('donation_categories')
@@ -202,22 +187,17 @@ serve(async (req) => {
     // Use the system reference number from the transaction record
     const smsReference = transaction.reference_number || reference_number;
 
-    // Build SMS body in Arabic
-    let smsMessage = `شكراً لتبرعكم!
-الفئة: ${categoryArabic}
-المبلغ: ${formattedAmount}
-التاريخ: ${dateStr} ${timeStr}
-رقم المعاملة: ${smsReference}`;
-
-    if (pos_rrn) {
-      smsMessage += `
-رقم مرجع البنك: ${pos_rrn}`;
-    }
-
-    smsMessage += `
-جزاكم الله خيراً`;
+    // Build the receipt body via the shared helper so SMS and WhatsApp
+    // deliver byte-identical content, ordering, and formatting.
+    const smsMessage = buildReceiptMessage({
+      categoryArabic,
+      amount_baisas,
+      reference: smsReference,
+      pos_rrn: pos_rrn || null,
+    });
 
     console.log('SMS prepared for:', cleanMobile.slice(-4));
+
 
     // Load iSmart credentials from sms_settings
     const { data: smsSettings } = await supabaseAdmin

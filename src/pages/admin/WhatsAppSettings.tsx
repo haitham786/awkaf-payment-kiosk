@@ -141,9 +141,10 @@ const WhatsAppSettings = () => {
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
               <p className="font-semibold">Twilio WhatsApp Business</p>
               <p className="text-muted-foreground">
-                Requires (1) a WhatsApp sender activated in Twilio (Sandbox for testing, an approved Business number for production), and (2) an approved WhatsApp message template in Arabic. Free-form messages outside the 24h session are rejected by WhatsApp.
+                Receipts are sent as free-form messages with the <em>exact same</em> Arabic content and formatting as the SMS receipt. An approved template (ContentSid) is optional — it is used automatically by Twilio when the recipient is outside the 24-hour customer-care window. The template should mirror the SMS layout using the positional variables shown below.
               </p>
             </div>
+
 
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
@@ -217,7 +218,7 @@ const WhatsAppSettings = () => {
                   <Button
                     variant="outline"
                     onClick={handleTest}
-                    disabled={testing || testMobile.replace(/\D/g, '').length < 8 || !settings.from_number || !settings.template_sid}
+                    disabled={testing || testMobile.replace(/\D/g, '').length < 8 || !settings.from_number}
                   >
                     <Send className="w-4 h-4 mr-2" />
                     {testing ? 'Testing...' : 'Send Test WhatsApp'}
