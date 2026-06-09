@@ -309,14 +309,6 @@ const CategoriesManagement = () => {
                 <Textarea id="description_en" value={formData.description_en} onChange={(e) => setFormData({ ...formData, description_en: e.target.value })} placeholder="Category description in English" />
               </div>
               <div>
-                <Label htmlFor="info_text">Info Text (Arabic, optional)</Label>
-                <Textarea id="info_text" value={formData.info_text} onChange={(e) => setFormData({ ...formData, info_text: e.target.value })} placeholder="نص يظهر عند الضغط على زر المعلومات" />
-              </div>
-              <div>
-                <Label htmlFor="info_text_en">Info Text (English, optional)</Label>
-                <Textarea id="info_text_en" value={formData.info_text_en} onChange={(e) => setFormData({ ...formData, info_text_en: e.target.value })} placeholder="Info text shown when tapping the info button" />
-              </div>
-              <div>
                 <Label htmlFor="icon">Category Icon</Label>
                 <div className="mt-2">
                   <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()} className="w-full mb-2"><Upload className="w-4 h-4 mr-2" />Choose Icon</Button>
