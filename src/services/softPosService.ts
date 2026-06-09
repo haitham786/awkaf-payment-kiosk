@@ -12,7 +12,6 @@
  * - Admin panel tracking
  */
 
-import { supabase } from '@/integrations/supabase/client';
 import { loadKioskRuntimeConfig } from '@/lib/kioskConfig';
 
 // ============================================================================
