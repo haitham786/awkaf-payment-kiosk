@@ -58,6 +58,31 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const separateKioskSecret = (configuration: KioskConfiguration) => {
+    const { soft_pos, ...restConfig } = configuration;
+    const authKey = soft_pos?.auth_key?.trim() || '';
+
+    return {
+      publicConfig: {
+        ...restConfig,
+        soft_pos: soft_pos
+          ? {
+              is_production: soft_pos.is_production,
+              mode: soft_pos.mode,
+            }
+          : undefined,
+      },
+      authKey,
+    };
+  };
+
+  const saveKioskSecret = async (kioskId: string, authKey: string) => {
+    const { error } = await supabase
+      .from('kiosk_secrets')
+      .upsert({ kiosk_id: kioskId, soft_pos_auth_key: authKey }, { onConflict: 'kiosk_id' });
+    if (error) throw error;
+  };
+
   useEffect(() => {
     checkAuth();
     loadKiosks();
