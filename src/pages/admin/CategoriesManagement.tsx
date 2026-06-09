@@ -168,7 +168,8 @@ const CategoriesManagement = () => {
 
         toast({ title: "Category updated successfully" });
       } else {
-        const { error } = await supabase.from('donation_categories').insert([dataToSave] as any);
+        const nextOrder = categories.reduce((max, c) => Math.max(max, c.display_order || 0), 0) + 1;
+        const { error } = await supabase.from('donation_categories').insert([{ ...dataToSave, display_order: nextOrder }] as any);
         if (error) throw error;
         toast({ title: "Category added successfully" });
       }
