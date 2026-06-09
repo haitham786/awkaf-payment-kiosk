@@ -112,16 +112,20 @@ const KiosksManagement = () => {
         : { data: [], error: null };
       if (secretsError) throw secretsError;
       const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret.soft_pos_auth_key || '']));
-      const mergedKiosks = (data || []).map((kiosk) => ({
-        ...kiosk,
-        configuration: {
-          ...(kiosk.configuration || {}),
-          soft_pos: {
-            ...((kiosk.configuration as any)?.soft_pos || {}),
-            auth_key: secretsByKiosk.get(kiosk.id) || '',
+      const mergedKiosks = (data || []).map((kiosk) => {
+        const config = kiosk.configuration && typeof kiosk.configuration === 'object' ? kiosk.configuration as Record<string, any> : {};
+        const softPos = config.soft_pos && typeof config.soft_pos === 'object' ? config.soft_pos as Record<string, any> : {};
+        return {
+          ...kiosk,
+          configuration: {
+            ...config,
+            soft_pos: {
+              ...softPos,
+              auth_key: secretsByKiosk.get(kiosk.id) || '',
+            },
           },
-        },
-      }));
+        };
+      });
       setKiosks(mergedKiosks);
     } catch (error: any) {
       toast.error(`Error loading kiosks: ${error.message}`);
