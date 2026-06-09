@@ -8,7 +8,6 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
-import { supabase } from "@/integrations/supabase/client";
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
