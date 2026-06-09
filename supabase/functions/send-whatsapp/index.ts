@@ -78,6 +78,16 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    // Prevent receipt-spam: if the transaction already has a stored phone
+    // number, require the caller to supply the same one.
+    const normalizedSupplied = cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`;
+    if (transaction.mobile_number && transaction.mobile_number !== normalizedSupplied) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Mobile number does not match this transaction' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (transaction.status !== 'completed') {
       return new Response(
         JSON.stringify({ success: false, error: 'WhatsApp can only be sent for completed transactions' }),
