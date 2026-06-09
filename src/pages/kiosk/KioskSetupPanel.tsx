@@ -10,6 +10,7 @@ import { ArrowLeft, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loa
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -41,9 +42,8 @@ const KioskSetupPanel = () => {
     const kioskId = localStorage.getItem('kiosk_id');
     if (!kioskId) return;
     try {
-      const { data, error } = await supabase.from('kiosks').select('configuration').eq('id', kioskId).single();
-      if (error) throw error;
-      applyKioskConfig(data?.configuration);
+      const config = await loadKioskRuntimeConfig(kioskId, { includeSoftPosSecret: true });
+      applyKioskConfig(config);
     } catch (error) { console.error('Error loading kiosk config:', error); }
   };
 
