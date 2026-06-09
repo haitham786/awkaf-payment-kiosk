@@ -150,7 +150,7 @@ const CategoriesManagement = () => {
         const { data: { publicUrl } } = supabase.storage.from('category-icons').getPublicUrl(fileName);
         iconUrl = publicUrl;
       }
-      const dataToSave = { ...formData, category_id: categoryId, icon_url: iconUrl };
+      const dataToSave: any = { ...formData, category_id: categoryId, icon_url: iconUrl };
       if (editingId) {
         const { error } = await supabase.from('donation_categories').update(dataToSave).eq('id', editingId);
         if (error) throw error;
@@ -168,7 +168,8 @@ const CategoriesManagement = () => {
 
         toast({ title: "Category updated successfully" });
       } else {
-        const { error } = await supabase.from('donation_categories').insert([dataToSave] as any);
+        const nextOrder = categories.reduce((max, c) => Math.max(max, c.display_order || 0), 0) + 1;
+        const { error } = await supabase.from('donation_categories').insert([{ ...dataToSave, display_order: nextOrder }] as any);
         if (error) throw error;
         toast({ title: "Category added successfully" });
       }
@@ -306,14 +307,6 @@ const CategoriesManagement = () => {
               <div>
                 <Label htmlFor="description_en">Description (English)</Label>
                 <Textarea id="description_en" value={formData.description_en} onChange={(e) => setFormData({ ...formData, description_en: e.target.value })} placeholder="Category description in English" />
-              </div>
-              <div>
-                <Label htmlFor="info_text">Info Text (Arabic, optional)</Label>
-                <Textarea id="info_text" value={formData.info_text} onChange={(e) => setFormData({ ...formData, info_text: e.target.value })} placeholder="نص يظهر عند الضغط على زر المعلومات" />
-              </div>
-              <div>
-                <Label htmlFor="info_text_en">Info Text (English, optional)</Label>
-                <Textarea id="info_text_en" value={formData.info_text_en} onChange={(e) => setFormData({ ...formData, info_text_en: e.target.value })} placeholder="Info text shown when tapping the info button" />
               </div>
               <div>
                 <Label htmlFor="icon">Category Icon</Label>
