@@ -58,7 +58,7 @@ serve(async (req) => {
     let transaction: any = null;
     const { data: txByRef } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, whatsapp_status, category')
+      .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
       .eq('reference_number', reference_number)
       .maybeSingle();
     if (txByRef) {
@@ -66,7 +66,7 @@ serve(async (req) => {
     } else if (transaction_id) {
       const { data: txById } = await supabaseAdmin
         .from('transactions')
-        .select('id, reference_number, amount_baisas, status, whatsapp_status, category')
+        .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
         .eq('id', transaction_id)
         .maybeSingle();
       transaction = txById;
