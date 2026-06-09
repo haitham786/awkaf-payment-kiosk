@@ -53,7 +53,7 @@ const KioskSetupPanel = () => {
     setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment') || 'soft_pos');
     if (config.soft_pos && typeof config.soft_pos === 'object') {
       const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
-      setSoftPosConfig({ authKey: sp.auth_key || '', isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' });
+      setSoftPosConfig(prev => ({ authKey: sp.auth_key ?? prev.authKey, isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' }));
     }
   };
 
