@@ -106,7 +106,23 @@ const KiosksManagement = () => {
     try {
       const { data, error } = await supabase.from('kiosks').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      setKiosks(data || []);
+      const kioskIds = (data || []).map((kiosk) => kiosk.id);
+      const { data: secrets, error: secretsError } = kioskIds.length > 0
+        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key').in('kiosk_id', kioskIds)
+        : { data: [], error: null };
+      if (secretsError) throw secretsError;
+      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret.soft_pos_auth_key || '']));
+      const mergedKiosks = (data || []).map((kiosk) => ({
+        ...kiosk,
+        configuration: {
+          ...(kiosk.configuration || {}),
+          soft_pos: {
+            ...((kiosk.configuration as any)?.soft_pos || {}),
+            auth_key: secretsByKiosk.get(kiosk.id) || '',
+          },
+        },
+      }));
+      setKiosks(mergedKiosks);
     } catch (error: any) {
       toast.error(`Error loading kiosks: ${error.message}`);
     } finally {
