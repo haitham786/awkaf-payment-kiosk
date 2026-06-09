@@ -147,6 +147,7 @@ const KiosksManagement = () => {
 
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
+      const { publicConfig, authKey } = separateKioskSecret(formData.configuration);
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
@@ -154,7 +155,7 @@ const KiosksManagement = () => {
           name: formData.name,
           location: formData.location,
           status: formData.status,
-          configuration: formData.configuration,
+          configuration: publicConfig,
         };
 
         if (referenceNumber !== currentReferenceNumber) {
@@ -175,6 +176,7 @@ const KiosksManagement = () => {
 
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
+        await saveKioskSecret(editingId, authKey);
         toast.success("Kiosk updated successfully");
       } else {
         if (referenceNumber) {
@@ -188,12 +190,13 @@ const KiosksManagement = () => {
           if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
         }
 
-        const { error } = await supabase.from('kiosks').insert([{
+        const { data: createdKiosk, error } = await supabase.from('kiosks').insert([{
           name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
-          configuration: formData.configuration
-        } as any]);
+          configuration: publicConfig
+        } as any]).select('id').single();
         if (error) throw error;
+        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey);
         toast.success("Kiosk added successfully");
       }
       resetForm();
