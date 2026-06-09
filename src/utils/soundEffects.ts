@@ -100,15 +100,10 @@ class SoundEffectManager {
         return;
       }
 
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase
-        .from('kiosks')
-        .select('configuration')
-        .eq('id', kioskId)
-        .single();
+      const { loadKioskRuntimeConfig } = await import('@/lib/kioskConfig');
+      const config = await loadKioskRuntimeConfig(kioskId);
 
-      if (!error && data?.configuration) {
-        const config = data.configuration as any;
+      if (config) {
         this.enabled = config.sound_enabled !== false;
         console.log(`🔊 Sound ${this.enabled ? 'enabled' : 'disabled'} for kiosk`);
       }
