@@ -26,7 +26,7 @@ async function resolveChannel(): Promise<ReceiptChannel> {
     const kioskId = localStorage.getItem("kiosk_id");
     if (!kioskId) return "sms";
     const cfg = await loadKioskRuntimeConfig(kioskId);
-    const value = cfg.receipt_channel;
+    const value = cfg?.receipt_channel;
     if (value === "sms" || value === "whatsapp" || value === "both") return value;
     return "sms";
   } catch {
