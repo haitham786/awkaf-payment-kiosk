@@ -150,7 +150,7 @@ const CategoriesManagement = () => {
         const { data: { publicUrl } } = supabase.storage.from('category-icons').getPublicUrl(fileName);
         iconUrl = publicUrl;
       }
-      const dataToSave = { ...formData, category_id: categoryId, icon_url: iconUrl };
+      const dataToSave: any = { ...formData, category_id: categoryId, icon_url: iconUrl };
       if (editingId) {
         const { error } = await supabase.from('donation_categories').update(dataToSave).eq('id', editingId);
         if (error) throw error;
