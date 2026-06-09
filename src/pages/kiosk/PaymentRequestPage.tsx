@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 
 
@@ -16,13 +16,7 @@ const PaymentRequestPage = () => {
       const kioskId = localStorage.getItem('kiosk_id');
       
       if (kioskId) {
-        const { data: kioskData } = await supabase
-          .from('kiosks')
-          .select('configuration')
-          .eq('id', kioskId)
-          .single();
-        
-        const config = (kioskData?.configuration as any);
+        const config = await loadKioskRuntimeConfig(kioskId);
         const paymentMode = config?.payment_mode;
 
         if (paymentMode === 'test_payment') {
