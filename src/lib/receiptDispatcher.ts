@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-
-export type ReceiptChannel = "sms" | "whatsapp" | "both";
+import { loadKioskRuntimeConfig, ReceiptChannel } from "@/lib/kioskConfig";
 
 export interface DispatchPayload {
   mobile_number: string; // 968XXXXXXXX
@@ -26,12 +25,7 @@ async function resolveChannel(): Promise<ReceiptChannel> {
   try {
     const kioskId = localStorage.getItem("kiosk_id");
     if (!kioskId) return "sms";
-    const { data } = await supabase
-      .from("kiosks")
-      .select("configuration")
-      .eq("id", kioskId)
-      .maybeSingle();
-    const cfg = (data?.configuration ?? {}) as { receipt_channel?: ReceiptChannel };
+    const cfg = await loadKioskRuntimeConfig(kioskId);
     const value = cfg.receipt_channel;
     if (value === "sms" || value === "whatsapp" || value === "both") return value;
     return "sms";
