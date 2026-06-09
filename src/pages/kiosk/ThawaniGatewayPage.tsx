@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const PENDING_GATEWAY_KEY = "kiosk_pending_gateway_payment";
 
@@ -79,13 +80,7 @@ const ThawaniGatewayPage = () => {
       if (!kioskId) { setGatewayConfigReady(true); return; }
 
       try {
-        const { data } = await supabase
-          .from('kiosks')
-          .select('configuration')
-          .eq('id', kioskId)
-          .maybeSingle();
-
-        const config = data?.configuration as any;
+        const config = await loadKioskRuntimeConfig(kioskId);
         setGatewayMode(config?.payment_gateway?.mode === 'live' ? 'live' : 'test');
       } catch (error) {
         console.error('Error loading gateway mode:', error);

@@ -75,17 +75,17 @@ const KioskHomepage = () => {
         setKioskMessage('يرجى تسجيل هذا الكشك من خلال لوحة الإعدادات للبدء.');
         return;
       }
-      const { data, error } = await supabase.from('kiosks').select('status').eq('id', kioskId).maybeSingle();
+      const { data, error } = await supabase.functions.invoke('get-kiosk-config', { body: { kioskId } });
       if (error) throw error;
-      if (!data) {
+      if (!data?.kiosk) {
         setKioskStatus('disconnected');
         setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
         return;
       }
-      setKioskStatus(data.status);
-      if (data.status === 'pending_approval') setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
-      else if (data.status === 'inactive') setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
-      else if (data.status === 'maintenance') setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
+      setKioskStatus(data.kiosk.status);
+      if (data.kiosk.status === 'pending_approval') setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
+      else if (data.kiosk.status === 'inactive') setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
+      else if (data.kiosk.status === 'maintenance') setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
     } catch (error) {
       console.error('Error checking kiosk status:', error);
     }

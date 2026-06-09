@@ -65,6 +65,38 @@ export type Database = {
         }
         Relationships: []
       }
+      kiosk_secrets: {
+        Row: {
+          access_token: string
+          created_at: string
+          kiosk_id: string
+          soft_pos_auth_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string
+          created_at?: string
+          kiosk_id: string
+          soft_pos_auth_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          kiosk_id?: string
+          soft_pos_auth_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiosk_secrets_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kiosk_settings: {
         Row: {
           background_image_url: string | null

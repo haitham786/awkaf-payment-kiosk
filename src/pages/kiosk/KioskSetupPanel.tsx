@@ -10,6 +10,7 @@ import { ArrowLeft, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loa
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -41,9 +42,8 @@ const KioskSetupPanel = () => {
     const kioskId = localStorage.getItem('kiosk_id');
     if (!kioskId) return;
     try {
-      const { data, error } = await supabase.from('kiosks').select('configuration').eq('id', kioskId).single();
-      if (error) throw error;
-      applyKioskConfig(data?.configuration);
+      const config = await loadKioskRuntimeConfig(kioskId, { includeSoftPosSecret: true });
+      applyKioskConfig(config);
     } catch (error) { console.error('Error loading kiosk config:', error); }
   };
 
@@ -53,7 +53,7 @@ const KioskSetupPanel = () => {
     setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment') || 'soft_pos');
     if (config.soft_pos && typeof config.soft_pos === 'object') {
       const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
-      setSoftPosConfig({ authKey: sp.auth_key || '', isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' });
+      setSoftPosConfig(prev => ({ authKey: sp.auth_key ?? prev.authKey, isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' }));
     }
   };
 

@@ -7,6 +7,7 @@ import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
@@ -42,8 +43,7 @@ const ConfirmationPage = () => {
     const kioskId = localStorage.getItem('kiosk_id');
     if (kioskId) {
       try {
-        const { data: kioskData } = await supabase.from('kiosks').select('configuration').eq('id', kioskId).maybeSingle();
-        const config = kioskData?.configuration as any;
+        const config = await loadKioskRuntimeConfig(kioskId);
         if (config?.payment_mode === 'test_payment') {
           navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
           return;

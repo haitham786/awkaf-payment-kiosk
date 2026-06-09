@@ -58,6 +58,31 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const separateKioskSecret = (configuration: KioskConfiguration) => {
+    const { soft_pos, ...restConfig } = configuration;
+    const authKey = soft_pos?.auth_key?.trim() || '';
+
+    return {
+      publicConfig: {
+        ...restConfig,
+        soft_pos: soft_pos
+          ? {
+              is_production: soft_pos.is_production,
+              mode: soft_pos.mode,
+            }
+          : undefined,
+      },
+      authKey,
+    };
+  };
+
+  const saveKioskSecret = async (kioskId: string, authKey: string) => {
+    const { error } = await supabase
+      .from('kiosk_secrets')
+      .upsert({ kiosk_id: kioskId, soft_pos_auth_key: authKey }, { onConflict: 'kiosk_id' });
+    if (error) throw error;
+  };
+
   useEffect(() => {
     checkAuth();
     loadKiosks();
@@ -81,7 +106,27 @@ const KiosksManagement = () => {
     try {
       const { data, error } = await supabase.from('kiosks').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      setKiosks(data || []);
+      const kioskIds = (data || []).map((kiosk) => kiosk.id);
+      const { data: secrets, error: secretsError } = kioskIds.length > 0
+        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key').in('kiosk_id', kioskIds)
+        : { data: [], error: null };
+      if (secretsError) throw secretsError;
+      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret.soft_pos_auth_key || '']));
+      const mergedKiosks = (data || []).map((kiosk) => {
+        const config = kiosk.configuration && typeof kiosk.configuration === 'object' ? kiosk.configuration as Record<string, any> : {};
+        const softPos = config.soft_pos && typeof config.soft_pos === 'object' ? config.soft_pos as Record<string, any> : {};
+        return {
+          ...kiosk,
+          configuration: {
+            ...config,
+            soft_pos: {
+              ...softPos,
+              auth_key: secretsByKiosk.get(kiosk.id) || '',
+            },
+          },
+        };
+      });
+      setKiosks(mergedKiosks);
     } catch (error: any) {
       toast.error(`Error loading kiosks: ${error.message}`);
     } finally {
@@ -122,6 +167,7 @@ const KiosksManagement = () => {
 
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
+      const { publicConfig, authKey } = separateKioskSecret(formData.configuration);
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
@@ -129,7 +175,7 @@ const KiosksManagement = () => {
           name: formData.name,
           location: formData.location,
           status: formData.status,
-          configuration: formData.configuration,
+          configuration: publicConfig,
         };
 
         if (referenceNumber !== currentReferenceNumber) {
@@ -150,6 +196,7 @@ const KiosksManagement = () => {
 
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
+        await saveKioskSecret(editingId, authKey);
         toast.success("Kiosk updated successfully");
       } else {
         if (referenceNumber) {
@@ -163,12 +210,13 @@ const KiosksManagement = () => {
           if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
         }
 
-        const { error } = await supabase.from('kiosks').insert([{
+        const { data: createdKiosk, error } = await supabase.from('kiosks').insert([{
           name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
-          configuration: formData.configuration
-        } as any]);
+          configuration: publicConfig
+        } as any]).select('id').single();
         if (error) throw error;
+        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey);
         toast.success("Kiosk added successfully");
       }
       resetForm();
@@ -655,7 +703,8 @@ const KiosksManagement = () => {
                           variant={kiosk.configuration?.sound_enabled !== false ? "default" : "outline"}
                           onClick={async () => {
                             const currentSoundEnabled = kiosk.configuration?.sound_enabled !== false;
-                            await supabase.from('kiosks').update({ configuration: { ...kiosk.configuration, sound_enabled: !currentSoundEnabled } }).eq('id', kiosk.id);
+                            const { publicConfig } = separateKioskSecret({ ...kiosk.configuration, sound_enabled: !currentSoundEnabled });
+                            await supabase.from('kiosks').update({ configuration: publicConfig }).eq('id', kiosk.id);
                             toast.success(`Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`);
                             loadKiosks();
                           }}

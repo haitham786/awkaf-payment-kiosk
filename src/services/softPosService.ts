@@ -12,7 +12,7 @@
  * - Admin panel tracking
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { loadKioskRuntimeConfig } from '@/lib/kioskConfig';
 
 // ============================================================================
 // SOFT POS MODE CONFIGURATION
@@ -80,22 +80,15 @@ export const loadKioskSoftPosConfig = async (kioskId: string): Promise<SoftPOSCo
   console.log('[SoftPOS] Loading config for kiosk:', kioskId);
   
   try {
-    const { data: kioskData, error } = await supabase
-      .from('kiosks')
-      .select('configuration')
-      .eq('id', kioskId)
-      .single();
-    
-    if (error) throw error;
-    
-    const config = kioskData?.configuration as any;
+    const config = await loadKioskRuntimeConfig(kioskId, { includeSoftPosSecret: true });
     
     if (config?.payment_mode !== 'soft_pos') {
       console.log('[SoftPOS] Kiosk is not configured for Soft POS');
       return null;
     }
     
-    // Get Thawani Lamsa config
+    // Get Thawani Lamsa config. The auth key is loaded through an edge
+    // function so it is no longer exposed in the public kiosks table.
     const softPosConfig = config?.soft_pos || {};
     const mode: SoftPosMode = softPosConfig.mode || 'test';
     
