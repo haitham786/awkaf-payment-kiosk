@@ -58,7 +58,7 @@ serve(async (req) => {
     let transaction: any = null;
     const { data: txByRef } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, whatsapp_status, category')
+      .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
       .eq('reference_number', reference_number)
       .maybeSingle();
     if (txByRef) {
@@ -66,7 +66,7 @@ serve(async (req) => {
     } else if (transaction_id) {
       const { data: txById } = await supabaseAdmin
         .from('transactions')
-        .select('id, reference_number, amount_baisas, status, whatsapp_status, category')
+        .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
         .eq('id', transaction_id)
         .maybeSingle();
       transaction = txById;
@@ -78,6 +78,16 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    // Prevent receipt-spam: if the transaction already has a stored phone
+    // number, require the caller to supply the same one.
+    const normalizedSupplied = cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`;
+    if (transaction.mobile_number && transaction.mobile_number !== normalizedSupplied) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Mobile number does not match this transaction' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (transaction.status !== 'completed') {
       return new Response(
         JSON.stringify({ success: false, error: 'WhatsApp can only be sent for completed transactions' }),

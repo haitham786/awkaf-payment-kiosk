@@ -1,0 +1,2 @@
+CREATE POLICY "Admins can insert kiosk settings" ON public.kiosk_settings FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can delete kiosk settings" ON public.kiosk_settings FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'::app_role));

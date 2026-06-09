@@ -119,7 +119,7 @@ serve(async (req) => {
 
     const { data: txByRef, error: refError } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, sms_status, category')
+      .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number')
       .eq('reference_number', reference_number)
       .maybeSingle();
 
@@ -128,7 +128,7 @@ serve(async (req) => {
     } else if (transaction_id) {
       const { data: txById, error: idError } = await supabaseAdmin
         .from('transactions')
-        .select('id, reference_number, amount_baisas, status, sms_status, category')
+        .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number')
         .eq('id', transaction_id)
         .maybeSingle();
       transaction = txById;
@@ -150,6 +150,18 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: 'Transaction not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If the transaction already has a stored mobile_number, require the
+    // caller-supplied number to match. This prevents anyone who learns a
+    // reference from sending the receipt to an arbitrary phone number.
+    const normalizedSupplied = cleanMobile.startsWith('968') ? cleanMobile : `968${cleanMobile}`;
+    if (transaction.mobile_number && transaction.mobile_number !== normalizedSupplied) {
+      console.error('Mobile number mismatch for transaction', transaction.id);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Mobile number does not match this transaction' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

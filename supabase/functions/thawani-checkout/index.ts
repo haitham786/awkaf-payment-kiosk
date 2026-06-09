@@ -78,6 +78,37 @@ serve(async (req) => {
         );
       }
 
+      // Validate caller-supplied redirect URLs against an allowlist of
+      // trusted origins. This blocks "open redirect" abuse where an
+      // attacker tricks Thawani into bouncing the donor to a phishing
+      // site after a legitimate payment.
+      const ALLOWED_REDIRECT_ORIGINS = new Set<string>([
+        'https://awkaf-payment-kiosk.lovable.app',
+        'http://localhost:8080',
+        'http://localhost:5173',
+        'http://localhost:4173',
+      ]);
+      const isAllowedRedirect = (raw: string | undefined): boolean => {
+        if (!raw) return true; // optional → server-side default used
+        try {
+          const u = new URL(raw);
+          if (ALLOWED_REDIRECT_ORIGINS.has(u.origin)) return true;
+          if (u.hostname.endsWith('.lovable.app')) return true;
+          if (u.hostname.endsWith('.lovableproject.com')) return true;
+          if (u.protocol === 'capacitor:' || u.protocol === 'ionic:' || u.protocol === 'file:') return true;
+          return false;
+        } catch {
+          return false;
+        }
+      };
+      if (!isAllowedRedirect(successUrl) || !isAllowedRedirect(cancelUrl)) {
+        console.warn('Rejected non-allowlisted redirect URL', { successUrl, cancelUrl });
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid redirect URL' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
       // Thawani expects amount in baisas (smallest unit)
       const amountInBaisas = Math.round(amount);
 
