@@ -119,7 +119,7 @@ serve(async (req) => {
 
     const { data: txByRef, error: refError } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, sms_status, category')
+      .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number')
       .eq('reference_number', reference_number)
       .maybeSingle();
 
