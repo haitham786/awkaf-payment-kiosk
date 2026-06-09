@@ -67,18 +67,21 @@ export type Database = {
       }
       kiosk_secrets: {
         Row: {
+          access_token: string
           created_at: string
           kiosk_id: string
           soft_pos_auth_key: string | null
           updated_at: string
         }
         Insert: {
+          access_token?: string
           created_at?: string
           kiosk_id: string
           soft_pos_auth_key?: string | null
           updated_at?: string
         }
         Update: {
+          access_token?: string
           created_at?: string
           kiosk_id?: string
           soft_pos_auth_key?: string | null
