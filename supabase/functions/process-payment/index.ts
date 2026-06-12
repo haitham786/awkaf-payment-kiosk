@@ -162,7 +162,7 @@ serve(async (req) => {
       );
     }
 
-    const { transactionId, kioskId, amount, category, mobileNumber, posResponse, softPosResult, paymentType, provider, thawaniReference } = requestData;
+    const { transactionId, kioskId, amount, category, mobileNumber, posResponse, softPosResult, paymentType, provider, thawaniReference, offlineProcessed, offlinePaymentResult } = requestData;
     const normalizedCategory = normalizeTransactionCategory(category);
     
     // Check kiosk-based rate limit
