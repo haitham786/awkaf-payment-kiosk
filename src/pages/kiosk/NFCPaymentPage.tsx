@@ -260,9 +260,7 @@ const NFCPaymentPage = () => {
     );
   }
 
-  // Don't render any loading UI in waiting/processing on native — the official
-  // Thawani Lamsa Activity takes over the screen immediately, so the previous
-  // page stays visible until that happens.
+  // Fallback (e.g. success stage right before navigation completes).
   return null;
 };
 
