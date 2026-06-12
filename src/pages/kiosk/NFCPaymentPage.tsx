@@ -17,6 +17,14 @@ import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCac
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
+type CategoryData = {
+  category_reference?: string | null;
+};
+
+const getUnknownErrorMessage = (error: unknown, fallback: string): string => {
+  return error instanceof Error ? error.message : fallback;
+};
+
 const NFCPaymentPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,7 +34,7 @@ const NFCPaymentPage = () => {
   const [stage, setStage] = useState<PaymentStage>('waiting');
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
-  const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
+  const [categoryData, setCategoryData] = useState<CategoryData | null>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isPaymentReady, setIsPaymentReady] = useState(false);
   
@@ -81,9 +89,9 @@ const NFCPaymentPage = () => {
       onSoftPOSFailure((error, errorCode) => { setStage('declined'); setTransactionResult({ success: false, error, errorCode }); });
       setStage('waiting');
       setIsPaymentReady(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to initialize payment:', error);
-      const raw = error?.message || 'Failed to initialize payment terminal';
+      const raw = getUnknownErrorMessage(error, 'Failed to initialize payment terminal');
       let friendly = raw;
       if (/PLUGIN_NOT_REGISTERED/i.test(raw)) {
         friendly = 'Native Thawani plugin is not registered in this APK. Rebuild from GitHub Actions and reinstall.';
@@ -116,7 +124,7 @@ const NFCPaymentPage = () => {
         const { data, error } = await supabase.functions.invoke('process-payment', { body: { transactionId, kioskId, amount, category, mobileNumber: null, softPosResult: result, paymentType: 'soft_pos', provider: 'thawani', thawaniReference: result.thawaniReference } });
         if (error) throw error;
         navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction?.reference_number || transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
-      } catch (error: any) {
+      } catch {
         queueTransaction(transactionData);
         toast.info('Payment saved. Will sync when online.');
         navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
@@ -137,10 +145,10 @@ const NFCPaymentPage = () => {
       paymentInFlightRef.current = false;
       if (result.success) { /* handled by callback */ }
       else { setStage('declined'); setTransactionResult(result); }
-    } catch (error: any) {
+    } catch (error: unknown) {
       paymentInFlightRef.current = false;
       setStage('declined');
-      setTransactionResult({ success: false, error: error.message || 'Payment launch failed', errorCode: 'PAYMENT_EXCEPTION' });
+      setTransactionResult({ success: false, error: getUnknownErrorMessage(error, 'Payment launch failed'), errorCode: 'PAYMENT_EXCEPTION' });
     }
   }, [amount, category, transactionId]);
 

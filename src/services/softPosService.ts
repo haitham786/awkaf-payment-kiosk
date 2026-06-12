@@ -70,11 +70,17 @@ let onPaymentStartCallback: (() => void) | null = null;
 let onApprovalCallback: ((result: SoftPOSTransactionResult) => void) | null = null;
 let onFailureCallback: ((error: string, errorCode?: string) => void) | null = null;
 
+const getUnknownErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error || 'Unknown error');
+};
+
 const isNativeAndroidRuntime = (): boolean => {
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   } catch {
-    const capacitor = typeof window !== 'undefined' ? (window as any).Capacitor : null;
+    const capacitor = typeof window !== 'undefined'
+      ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string } }).Capacitor
+      : null;
     return !!capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === 'android';
   }
 };
@@ -164,7 +170,7 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
     isInitialized = false;
     // Encode the precise reason in the thrown error so the UI can show it.
     throw new Error(`${code}: ${reason}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[SoftPOS] Failed to initialize Lamsa SDK on native device:', error);
     isInitialized = false;
     if (error instanceof Error) throw error;
@@ -380,12 +386,12 @@ export const startSoftPOSTransaction = async (
         errorCode: lamsaResult.errorCode,
         isTest: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[SoftPOS] Lamsa SDK payment error:', error);
       result = {
         success: false,
         transactionId,
-        error: error.message || 'Lamsa SDK payment failed',
+        error: getUnknownErrorMessage(error) || 'Lamsa SDK payment failed',
         errorCode: 'SDK_ERROR',
         timestamp: new Date().toISOString(),
         isTest: false,
