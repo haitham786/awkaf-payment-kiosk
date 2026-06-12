@@ -13,7 +13,6 @@ import {
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
-import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
