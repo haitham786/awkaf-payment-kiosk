@@ -73,7 +73,6 @@ const NFCPaymentPage = () => {
         setStage('error');
         return;
       }
-      const status = getSoftPOSStatus();
       const nfcStatus = await checkNFCAvailability();
       if (!nfcStatus.isAvailable) { setErrorMessage('NFC is not available on this device.'); setStage('error'); return; }
       if (!nfcStatus.isEnabled) { setErrorMessage('NFC is disabled. Please enable NFC in device settings.'); setStage('error'); return; }
