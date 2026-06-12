@@ -20,6 +20,16 @@ export interface KioskRuntimeConfig {
 // Simple in-memory cache to prevent redundant Edge Function calls
 let cachedConfig: { config: KioskRuntimeConfig; timestamp: number } | null = null;
 const CACHE_TTL = 30000; // 30 seconds
+const CONFIG_TIMEOUT_MS = 2500;
+
+function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error("Kiosk config request timed out")), CONFIG_TIMEOUT_MS);
+    }),
+  ]);
+}
 
 export async function loadKioskRuntimeConfig(
   kioskId: string,
@@ -32,12 +42,14 @@ export async function loadKioskRuntimeConfig(
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke("get-kiosk-config", {
-      body: {
-        kioskId,
-        includeSoftPosSecret: options.includeSoftPosSecret === true,
-      },
-    });
+    const { data, error } = await withConfigTimeout(
+      supabase.functions.invoke("get-kiosk-config", {
+        body: {
+          kioskId,
+          includeSoftPosSecret: options.includeSoftPosSecret === true,
+        },
+      }),
+    );
 
     if (error) {
       console.error('[KioskConfig] Error invoking get-kiosk-config:', error);
