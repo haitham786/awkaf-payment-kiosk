@@ -146,9 +146,10 @@ const CategoriesManagement = () => {
         (c) => (c.category_reference || '').trim().toLowerCase() === trimmedRef.toLowerCase() && c.id !== editingId
       );
       if (duplicate) {
+        const usedBy = duplicate.title_en || duplicate.title || 'another category';
         toast({
-          title: "Duplicate Category Reference",
-          description: `"${trimmedRef}" is already used by "${duplicate.title_en || duplicate.title}". Please enter a different reference code.`,
+          title: "This Category Reference is already in use",
+          description: `The reference "${trimmedRef}" is already assigned to the category "${usedBy}". Please choose a different, unique reference code (for example: ${trimmedRef}-2) and try again.`,
           variant: "destructive",
         });
         return;
@@ -346,10 +347,6 @@ const CategoriesManagement = () => {
                     <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setIconFile(null); setIconPreview(''); setFormData({ ...formData, icon_url: '' }); }}><X className="h-3 w-3" /></Button>
                   </div>
                 )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="is_visible" checked={formData.is_visible} onCheckedChange={(checked) => setFormData({ ...formData, is_visible: checked })} />
-                <Label htmlFor="is_visible">Visible to public</Label>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">{editingId ? 'Update' : 'Add'} Category</Button>
