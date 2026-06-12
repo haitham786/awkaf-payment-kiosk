@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
-
-
 const PaymentRequestPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -15,29 +13,31 @@ const PaymentRequestPage = () => {
     const checkPaymentMode = async () => {
       const kioskId = localStorage.getItem('kiosk_id');
       
-      if (kioskId) {
-        const config = await loadKioskRuntimeConfig(kioskId);
-        const paymentMode = config?.payment_mode;
+      try {
+        if (kioskId) {
+          const config = await loadKioskRuntimeConfig(kioskId);
+          const paymentMode = config?.payment_mode;
 
-        if (paymentMode === 'test_payment') {
-          navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
-          return;
+          if (paymentMode === 'test_payment') {
+            navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
+            return;
+          }
+          
+          if (paymentMode === 'payment_gateway') {
+            navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
+            return;
+          }
+          
+          if (paymentMode === 'soft_pos') {
+            navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+            return;
+          }
         }
-        
-        if (paymentMode === 'payment_gateway') {
-          // Route to Thawani Payment Gateway
-          navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
-          return;
-        }
-        
-        if (paymentMode === 'soft_pos') {
-          // Route to NFC payment page for Soft POS (Thawani Lamsa)
-          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
-          return;
-        }
+      } catch (error) {
+        console.error('PaymentRequestPage: Error loading config, defaulting to NFC', error);
       }
       
-      // Default: go to Soft POS
+      // Default or fallback: go to Soft POS
       navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
     };
     
