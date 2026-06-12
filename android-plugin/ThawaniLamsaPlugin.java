@@ -67,7 +67,12 @@ public class ThawaniLamsaPlugin extends Plugin {
             lamsaSdkClass = Class.forName(SDK_CLASS, false, cl);
             optionsClass = Class.forName(OPTIONS_CLASS, false, cl);
             paymentOptionsClass = Class.forName(PAYMENT_OPTIONS_CLASS, false, cl);
-            paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS, false, cl);
+            try {
+                paymentServiceClass = Class.forName(PAYMENT_SERVICE_CLASS, false, cl);
+            } catch (Throwable optionalMissing) {
+                paymentServiceClass = null;
+                Log.d(TAG, "Optional PaymentService enum not present in this Lamsa SDK version");
+            }
             sdkAvailable = true;
             Log.d(TAG, "Lamsa SDK classes detected on classpath");
         } catch (Throwable e) {
@@ -79,6 +84,31 @@ public class ThawaniLamsaPlugin extends Plugin {
             paymentServiceClass = null;
             sdkAvailable = false;
         }
+    }
+
+    private Object createInitOptions(double amount, String remarks) throws Exception {
+        Object paymentOption = Enum.valueOf((Class<Enum>) paymentOptionsClass.asSubclass(Enum.class), "CARD_ACCEPT");
+
+        try {
+            Constructor<?> documentedCtor = optionsClass.getConstructor(
+                double.class, String.class, String.class, boolean.class,
+                paymentOptionsClass, Integer.class
+            );
+            return documentedCtor.newInstance(amount, authKey, remarks, isProduction, paymentOption, Integer.valueOf(3000));
+        } catch (NoSuchMethodException missingDocumentedCtor) {
+            Log.w(TAG, "Documented InitOptionsModel constructor not found, trying extended constructor", missingDocumentedCtor);
+        }
+
+        if (paymentServiceClass != null) {
+            Object paymentService = Enum.valueOf((Class<Enum>) paymentServiceClass.asSubclass(Enum.class), "LAMSA");
+            Constructor<?> extendedCtor = optionsClass.getConstructor(
+                double.class, String.class, boolean.class, String.class,
+                paymentOptionsClass, Integer.class, java.time.LocalDateTime.class, Integer.class, paymentServiceClass
+            );
+            return extendedCtor.newInstance(amount, authKey, isProduction, remarks, paymentOption, null, null, Integer.valueOf(3000), paymentService);
+        }
+
+        throw new NoSuchMethodException("No supported InitOptionsModel constructor found for this Lamsa SDK version");
     }
 
     @PluginMethod
@@ -150,7 +180,7 @@ public class ThawaniLamsaPlugin extends Plugin {
 
         detectSdk();
 
-        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null || paymentOptionsClass == null || paymentServiceClass == null) {
+        if (!sdkAvailable || lamsaSdkClass == null || optionsClass == null || paymentOptionsClass == null) {
             Log.w(TAG, "SDK not available - returning error");
             JSObject result = new JSObject();
             result.put("success", false);
@@ -179,17 +209,10 @@ public class ThawaniLamsaPlugin extends Plugin {
         lamsaActivityOpened = false;
 
         try {
-            // Create InitOptionsModel via reflection using the official 0.0.31 constructor:
-            // (double amount, String authKey, boolean isProduction, String remarks,
-            //  PaymentOptions paymentOption, Integer paymentRequestId,
-            //  LocalDateTime expiryDate, Integer autoCloseInMillis, PaymentService paymentService)
-            Object paymentOption = Enum.valueOf((Class<Enum>) paymentOptionsClass.asSubclass(Enum.class), "CARD_ACCEPT");
-            Object paymentService = Enum.valueOf((Class<Enum>) paymentServiceClass.asSubclass(Enum.class), "LAMSA");
-            Constructor<?> ctor = optionsClass.getConstructor(
-                double.class, String.class, boolean.class, String.class,
-                paymentOptionsClass, Integer.class, java.time.LocalDateTime.class, Integer.class, paymentServiceClass
-            );
-            Object options = ctor.newInstance(amount, authKey, isProduction, remarks, paymentOption, null, null, Integer.valueOf(3000), paymentService);
+            // Official docs use: amount, authKey, remarks, isProduction,
+            // paymentOption, autoCloseInMillis. Some SDK builds expose an
+            // extended constructor, so createInitOptions falls back safely.
+            Object options = createInitOptions(amount, remarks);
 
             Intent intent = new Intent(getContext(), lamsaSdkClass);
             intent.putExtra("SDKInitOptions", (Serializable) options);
