@@ -56,25 +56,14 @@ const AdminDashboard = () => {
 
     initializeAdmin();
 
-    // Subscribe to realtime transactions
-    const channel = supabase
-      .channel('transactions-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'transactions'
-        },
-        () => {
-          loadTransactions();
-        }
-      )
-      .subscribe();
+    // Poll for new transactions (realtime broadcast disabled to prevent PII leakage to subscribers)
+    const pollInterval = setInterval(() => {
+      if (mounted) loadTransactions();
+    }, 30000);
 
     return () => {
       mounted = false;
-      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, []);
 
