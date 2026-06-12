@@ -11,7 +11,7 @@ import {
   cancelTransaction, getSoftPOSStatus, SoftPOSTransactionResult,
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
-import { Wifi, WifiOff, AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
@@ -29,7 +29,6 @@ const NFCPaymentPage = () => {
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
   const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isNativeMode, setIsNativeMode] = useState(false);
   const [isPaymentReady, setIsPaymentReady] = useState(false);
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
@@ -76,7 +75,6 @@ const NFCPaymentPage = () => {
         return;
       }
       const status = getSoftPOSStatus();
-      setIsNativeMode(status.isNativeAvailable);
       const nfcStatus = await checkNFCAvailability();
       if (!nfcStatus.isAvailable) { setErrorMessage('NFC is not available on this device.'); setStage('error'); return; }
       if (!nfcStatus.isEnabled) { setErrorMessage('NFC is disabled. Please enable NFC in device settings.'); setStage('error'); return; }
@@ -176,14 +174,27 @@ const NFCPaymentPage = () => {
   };
 
   const status = getSoftPOSStatus();
-  // Always render the Tap Card UI during waiting/processing so the user has
-  // visual feedback. On native Android the official Thawani Lamsa Activity
-  // overlays this screen when (and if) it launches; if the Activity fails to
-  // appear we still avoid leaving the user staring at a blank background.
-  const useFullScreenUI = ['waiting', 'processing'].includes(stage);
+  // The app must not replace Thawani Lamsa on Android. Use the local tap-card
+  // simulation only in browser/web preview; native Android immediately hands off
+  // to the official Lamsa Activity through the Capacitor bridge.
+  const useFullScreenUI = ['waiting', 'processing'].includes(stage) && !status.isNativeAvailable;
 
   if (useFullScreenUI) {
     return <ThawaniTapCardScreen amount={amount} category={category} stage={stage as 'waiting' | 'processing'} isTrialMode={true} onCancel={handleCancel} onTimeout={handleTimeout} />;
+  }
+
+  if (['waiting', 'processing'].includes(stage)) {
+    return (
+      <KioskLayout showHomeButton={false}>
+        <div className="flex flex-col items-center justify-center gap-3 text-gray-900">
+          <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+          <div className="text-center leading-tight">
+            <p className="text-lg font-bold">جاري فتح ثواني لمسة</p>
+            <p className="text-sm text-gray-600">Opening Thawani Lamsa</p>
+          </div>
+        </div>
+      </KioskLayout>
+    );
   }
 
   if (stage === 'error') {
