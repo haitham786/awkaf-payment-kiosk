@@ -363,6 +363,30 @@ serve(async (req) => {
       pos_rrn: transaction.pos_rrn, // Bank reference
     });
 
+    // If this transaction was originally queued offline, record a tracking
+    // row in offline_transaction_queue using the service role. This replaces
+    // the previous direct client insert and keeps the table closed to anon.
+    if (offlineProcessed) {
+      const { error: queueError } = await supabaseClient
+        .from('offline_transaction_queue')
+        .upsert({
+          transaction_data: {
+            transactionId,
+            kioskId,
+            amount,
+            category: normalizedCategory,
+            mobileNumber,
+            paymentResult: offlinePaymentResult ?? paymentResponse ?? null,
+          },
+          status: isSuccess ? 'synced' : 'failed',
+          kiosk_id: kioskId,
+          synced_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      if (queueError) {
+        console.warn('Offline queue tracking insert failed:', queueError);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: isSuccess,
