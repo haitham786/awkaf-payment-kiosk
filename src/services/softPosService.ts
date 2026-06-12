@@ -12,6 +12,7 @@
  * - Admin panel tracking
  */
 
+import { Capacitor } from '@capacitor/core';
 import { loadKioskRuntimeConfig } from '@/lib/kioskConfig';
 
 // ============================================================================
@@ -68,6 +69,21 @@ let currentMode: SoftPosMode = DEFAULT_MODE;
 let onPaymentStartCallback: (() => void) | null = null;
 let onApprovalCallback: ((result: SoftPOSTransactionResult) => void) | null = null;
 let onFailureCallback: ((error: string, errorCode?: string) => void) | null = null;
+
+const getUnknownErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error || 'Unknown error');
+};
+
+const isNativeAndroidRuntime = (): boolean => {
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  } catch {
+    const capacitor = typeof window !== 'undefined'
+      ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string } }).Capacitor
+      : null;
+    return !!capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === 'android';
+  }
+};
 
 // ============================================================================
 // CONFIGURATION LOADING
@@ -126,7 +142,7 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
   currentMode = config.mode || 'test';
   currentConfig = config;
 
-  const isNativePlatform = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+  const isNativePlatform = isNativeAndroidRuntime();
 
   // On the web preview (no Capacitor native bridge), force simulation regardless
   // of mode, so designers/admins can still walk through the flow on desktop.
@@ -154,7 +170,7 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
     isInitialized = false;
     // Encode the precise reason in the thrown error so the UI can show it.
     throw new Error(`${code}: ${reason}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[SoftPOS] Failed to initialize Lamsa SDK on native device:', error);
     isInitialized = false;
     if (error instanceof Error) throw error;
@@ -171,18 +187,10 @@ export const initializeSoftPOS = async (config: SoftPOSConfig): Promise<boolean>
  */
 export const checkNFCAvailability = async (): Promise<NFCReaderStatus> => {
   console.log('[SoftPOS] Checking NFC availability (mode:', currentMode, ')');
-  
-  // Try to detect real NFC first (for native Android)
-  const isNativeAndroid = typeof (window as any).Android !== 'undefined' || 
-                          (navigator.userAgent.includes('Android') && typeof (window as any).ThawaniLamsa !== 'undefined');
-  
-  if (isNativeAndroid && currentMode === 'live') {
-    console.log('[SoftPOS] Native Android detected - would check real NFC');
-    return {
-      isAvailable: true,
-      isEnabled: true,
-      errorMessage: undefined,
-    };
+
+  if (isNativeAndroidRuntime()) {
+    const { thawaniLamsaService } = await import('@/services/thawaniLamsaPlugin');
+    return thawaniLamsaService.checkNFCReadiness();
   }
   
   // For test mode, always simulate NFC as available
@@ -354,7 +362,7 @@ export const startSoftPOSTransaction = async (
   
   let result: SoftPOSTransactionResult;
   
-  if (currentMode === 'test') {
+  if (currentMode === 'test' && !isNativeAndroidRuntime()) {
     // TEST MODE - Simulate payment
     result = await processTestPayment(amountBaisas, transactionId, remarks);
   } else {
@@ -378,12 +386,12 @@ export const startSoftPOSTransaction = async (
         errorCode: lamsaResult.errorCode,
         isTest: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[SoftPOS] Lamsa SDK payment error:', error);
       result = {
         success: false,
         transactionId,
-        error: error.message || 'Lamsa SDK payment failed',
+        error: getUnknownErrorMessage(error) || 'Lamsa SDK payment failed',
         errorCode: 'SDK_ERROR',
         timestamp: new Date().toISOString(),
         isTest: false,
@@ -444,7 +452,7 @@ export const getSoftPOSStatus = (): {
   return {
     isInitialized,
     config: currentConfig,
-    isNativeAvailable: typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.(),
+    isNativeAvailable: isNativeAndroidRuntime(),
     mode: currentMode,
   };
 };

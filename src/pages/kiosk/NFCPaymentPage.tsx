@@ -11,12 +11,19 @@ import {
   cancelTransaction, getSoftPOSStatus, SoftPOSTransactionResult,
 } from "@/services/softPosService";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
-import { Wifi, WifiOff, AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
-import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
+
+type CategoryData = {
+  category_reference?: string | null;
+};
+
+const getUnknownErrorMessage = (error: unknown, fallback: string): string => {
+  return error instanceof Error ? error.message : fallback;
+};
 
 const NFCPaymentPage = () => {
   const navigate = useNavigate();
@@ -27,9 +34,8 @@ const NFCPaymentPage = () => {
   const [stage, setStage] = useState<PaymentStage>('waiting');
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [transactionResult, setTransactionResult] = useState<SoftPOSTransactionResult | null>(null);
-  const [categoryData, setCategoryData] = useState<any>(() => readCachedCategory(category));
+  const [categoryData, setCategoryData] = useState<CategoryData | null>(() => readCachedCategory(category));
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isNativeMode, setIsNativeMode] = useState(false);
   const [isPaymentReady, setIsPaymentReady] = useState(false);
   
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
@@ -75,8 +81,6 @@ const NFCPaymentPage = () => {
         setStage('error');
         return;
       }
-      const status = getSoftPOSStatus();
-      setIsNativeMode(status.isNativeAvailable);
       const nfcStatus = await checkNFCAvailability();
       if (!nfcStatus.isAvailable) { setErrorMessage('NFC is not available on this device.'); setStage('error'); return; }
       if (!nfcStatus.isEnabled) { setErrorMessage('NFC is disabled. Please enable NFC in device settings.'); setStage('error'); return; }
@@ -85,9 +89,9 @@ const NFCPaymentPage = () => {
       onSoftPOSFailure((error, errorCode) => { setStage('declined'); setTransactionResult({ success: false, error, errorCode }); });
       setStage('waiting');
       setIsPaymentReady(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to initialize payment:', error);
-      const raw = error?.message || 'Failed to initialize payment terminal';
+      const raw = getUnknownErrorMessage(error, 'Failed to initialize payment terminal');
       let friendly = raw;
       if (/PLUGIN_NOT_REGISTERED/i.test(raw)) {
         friendly = 'Native Thawani plugin is not registered in this APK. Rebuild from GitHub Actions and reinstall.';
@@ -120,7 +124,7 @@ const NFCPaymentPage = () => {
         const { data, error } = await supabase.functions.invoke('process-payment', { body: { transactionId, kioskId, amount, category, mobileNumber: null, softPosResult: result, paymentType: 'soft_pos', provider: 'thawani', thawaniReference: result.thawaniReference } });
         if (error) throw error;
         navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction?.reference_number || transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
-      } catch (error: any) {
+      } catch {
         queueTransaction(transactionData);
         toast.info('Payment saved. Will sync when online.');
         navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=soft_pos&catRef=${categoryData?.category_reference || ''}`);
@@ -141,10 +145,10 @@ const NFCPaymentPage = () => {
       paymentInFlightRef.current = false;
       if (result.success) { /* handled by callback */ }
       else { setStage('declined'); setTransactionResult(result); }
-    } catch (error: any) {
+    } catch (error: unknown) {
       paymentInFlightRef.current = false;
       setStage('declined');
-      setTransactionResult({ success: false, error: error.message || 'Payment launch failed', errorCode: 'PAYMENT_EXCEPTION' });
+      setTransactionResult({ success: false, error: getUnknownErrorMessage(error, 'Payment launch failed'), errorCode: 'PAYMENT_EXCEPTION' });
     }
   }, [amount, category, transactionId]);
 
@@ -176,14 +180,27 @@ const NFCPaymentPage = () => {
   };
 
   const status = getSoftPOSStatus();
-  // Always render the Tap Card UI during waiting/processing so the user has
-  // visual feedback. On native Android the official Thawani Lamsa Activity
-  // overlays this screen when (and if) it launches; if the Activity fails to
-  // appear we still avoid leaving the user staring at a blank background.
-  const useFullScreenUI = ['waiting', 'processing'].includes(stage);
+  // The app must not replace Thawani Lamsa on Android. Use the local tap-card
+  // simulation only in browser/web preview; native Android immediately hands off
+  // to the official Lamsa Activity through the Capacitor bridge.
+  const useFullScreenUI = ['waiting', 'processing'].includes(stage) && !status.isNativeAvailable;
 
   if (useFullScreenUI) {
     return <ThawaniTapCardScreen amount={amount} category={category} stage={stage as 'waiting' | 'processing'} isTrialMode={true} onCancel={handleCancel} onTimeout={handleTimeout} />;
+  }
+
+  if (['waiting', 'processing'].includes(stage)) {
+    return (
+      <KioskLayout showHomeButton={false}>
+        <div className="flex flex-col items-center justify-center gap-3 text-gray-900">
+          <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+          <div className="text-center leading-tight">
+            <p className="text-lg font-bold">جاري فتح ثواني لمسة</p>
+            <p className="text-sm text-gray-600">Opening Thawani Lamsa</p>
+          </div>
+        </div>
+      </KioskLayout>
+    );
   }
 
   if (stage === 'error') {

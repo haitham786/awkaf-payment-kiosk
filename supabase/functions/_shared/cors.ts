@@ -3,6 +3,8 @@
 
 const STATIC_ALLOWED = new Set<string>([
   'https://awkaf-payment-kiosk.lovable.app',
+  'http://localhost',
+  'https://localhost',
   'http://localhost:8080',
   'http://localhost:5173',
   'http://localhost:4173',
