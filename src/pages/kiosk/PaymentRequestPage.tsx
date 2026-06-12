@@ -2,8 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
-
-
+import { Loader2 } from "lucide-react";
 
 const PaymentRequestPage = () => {
   const navigate = useNavigate();
@@ -14,39 +13,53 @@ const PaymentRequestPage = () => {
   useEffect(() => {
     const checkPaymentMode = async () => {
       const kioskId = localStorage.getItem('kiosk_id');
+      const softPosUrl = `/kiosk/nfc-payment?category=${category}&amount=${amount}`;
       
-      if (kioskId) {
-        const config = await loadKioskRuntimeConfig(kioskId);
-        const paymentMode = config?.payment_mode;
+      try {
+        if (kioskId) {
+          const config = await Promise.race([
+            loadKioskRuntimeConfig(kioskId),
+            new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 2500)),
+          ]);
+          const paymentMode = config?.payment_mode;
 
-        if (paymentMode === 'test_payment') {
-          navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
-          return;
+          if (paymentMode === 'test_payment') {
+            navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
+            return;
+          }
+          
+          if (paymentMode === 'payment_gateway') {
+            navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
+            return;
+          }
+          
+          if (paymentMode === 'soft_pos') {
+            navigate(softPosUrl);
+            return;
+          }
         }
-        
-        if (paymentMode === 'payment_gateway') {
-          // Route to Thawani Payment Gateway
-          navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
-          return;
-        }
-        
-        if (paymentMode === 'soft_pos') {
-          // Route to NFC payment page for Soft POS (Thawani Lamsa)
-          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
-          return;
-        }
+      } catch (error) {
+        console.error('PaymentRequestPage: Error loading config, defaulting to NFC', error);
       }
       
-      // Default: go to Soft POS
-      navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+      // Default or fallback: Soft POS must never be blocked by config lookup failure.
+      navigate(softPosUrl);
     };
     
     checkPaymentMode();
   }, [navigate, category, amount]);
 
-  // Keep kiosk background visible while we resolve the payment mode to avoid
-  // a black/white flash between submission and the gateway screen.
-  return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
+  return (
+    <KioskLayout showHomeButton={false}>
+      <div className="flex flex-col items-center justify-center gap-3 text-gray-900">
+        <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+        <div className="text-center leading-tight">
+          <p className="text-lg font-bold">جاري فتح الدفع</p>
+          <p className="text-sm text-gray-600">Opening payment</p>
+        </div>
+      </div>
+    </KioskLayout>
+  );
 };
 
 export default PaymentRequestPage;
