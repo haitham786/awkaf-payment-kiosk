@@ -100,17 +100,12 @@ const syncTransaction = async (item: QueuedTransaction): Promise<boolean> => {
     });
     
     if (error) throw error;
-    
-    // Also save to the offline_transaction_queue table for tracking
-    await supabase.from('offline_transaction_queue').insert({
-      id: item.id,
-      transaction_data: item.transactionData as any,
-      status: 'synced',
-      retry_count: item.retryCount,
-      synced_at: new Date().toISOString(),
-      kiosk_id: item.transactionData.kioskId,
-    });
-    
+
+    // Note: the offline_transaction_queue tracking row is now written
+    // server-side by the process-payment edge function (service role).
+    // The client no longer writes to that table directly so the table can
+    // stay locked down to anonymous users at the RLS layer.
+
     console.log('[OfflineQueue] Transaction synced successfully:', item.id);
     return true;
   } catch (error: any) {
