@@ -139,6 +139,22 @@ const CategoriesManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (categories.length >= 8 && !editingId) { toast({ title: "Maximum categories reached", description: "You can only have up to 8 categories.", variant: "destructive" }); return; }
+
+    const trimmedRef = (formData.category_reference || '').trim();
+    if (trimmedRef) {
+      const duplicate = categories.find(
+        (c) => (c.category_reference || '').trim().toLowerCase() === trimmedRef.toLowerCase() && c.id !== editingId
+      );
+      if (duplicate) {
+        toast({
+          title: "Duplicate Category Reference",
+          description: `"${trimmedRef}" is already used by "${duplicate.title_en || duplicate.title}". Please enter a different reference code.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       const existingCategory = editingId ? categories.find((category) => category.id === editingId) : null;
       const categoryId = existingCategory?.category_id || generateCategoryId(formData.title_en, formData.title);
@@ -150,7 +166,7 @@ const CategoriesManagement = () => {
         const { data: { publicUrl } } = supabase.storage.from('category-icons').getPublicUrl(fileName);
         iconUrl = publicUrl;
       }
-      const dataToSave: any = { ...formData, category_id: categoryId, icon_url: iconUrl };
+      const dataToSave: any = { ...formData, category_id: categoryId, icon_url: iconUrl, category_reference: trimmedRef || null };
       if (editingId) {
         const { error } = await supabase.from('donation_categories').update(dataToSave).eq('id', editingId);
         if (error) throw error;
@@ -175,7 +191,16 @@ const CategoriesManagement = () => {
       }
       resetForm();
       loadCategories();
-    } catch (error: any) { toast({ title: "Error saving category", description: error.message, variant: "destructive" }); }
+    } catch (error: any) {
+      const isDup = error?.code === '23505' || /duplicate key/i.test(error?.message || '');
+      toast({
+        title: isDup ? "Duplicate Category Reference" : "Error saving category",
+        description: isDup
+          ? `"${trimmedRef}" is already used by another category. Please enter a different reference code.`
+          : error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEdit = (category: any) => {
