@@ -21,6 +21,7 @@ export interface KioskRuntimeConfig {
 let cachedConfig: { config: KioskRuntimeConfig; timestamp: number } | null = null;
 const CACHE_TTL = 30000; // 30 seconds
 const CONFIG_TIMEOUT_MS = 2500;
+const PAYMENT_MODE_LS_KEY = (kioskId: string) => `kiosk:payment_mode:${kioskId}`;
 
 function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
@@ -29,6 +30,28 @@ function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
       window.setTimeout(() => reject(new Error("Kiosk config request timed out")), CONFIG_TIMEOUT_MS);
     }),
   ]);
+}
+
+/**
+ * Synchronously read the last-known payment mode for a kiosk from localStorage.
+ * Used to route the donor to the correct payment screen with ZERO network wait.
+ */
+export function getCachedPaymentMode(kioskId: string): KioskPaymentMode | null {
+  try {
+    const v = localStorage.getItem(PAYMENT_MODE_LS_KEY(kioskId));
+    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment") return v;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persistPaymentMode(kioskId: string, mode: KioskPaymentMode | undefined) {
+  try {
+    if (mode) localStorage.setItem(PAYMENT_MODE_LS_KEY(kioskId), mode);
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function loadKioskRuntimeConfig(
@@ -59,7 +82,10 @@ export async function loadKioskRuntimeConfig(
     }
 
     const config = (data?.kiosk?.configuration ?? null) as KioskRuntimeConfig | null;
-    
+
+    // Persist the (non-secret) payment mode so the next donation can route instantly.
+    if (config?.payment_mode) persistPaymentMode(kioskId, config.payment_mode);
+
     // Only cache if we didn't request secrets (to keep cache clean/safe)
     if (config && !options.includeSoftPosSecret) {
       cachedConfig = { config, timestamp: Date.now() };
