@@ -67,13 +67,32 @@ const NFCPaymentPage = () => {
 
   const initializePayment = useCallback(async () => {
     setErrorMessage('');
-    setIsPaymentReady(false);
     autoStartRef.current = false;
     paymentInFlightRef.current = false;
     if (!Number.isFinite(amount) || amount <= 0) { setErrorMessage('Invalid donation amount. Please select or enter an amount again.'); setStage('error'); return; }
     if (!kioskId) { setErrorMessage('Kiosk is not registered. Please set up the kiosk first.'); setStage('error'); return; }
+
+    // FAST PATH: if the SDK is already initialized in this session, skip the
+    // edge-function round-trip and the NFC re-check so the next donation launches
+    // Thawani Lamsa instantly.
+    const existing = getSoftPOSStatus();
+    if (existing.isInitialized && existing.config) {
+      onPaymentStart(() => setStage('processing'));
+      onSoftPOSApproval((result) => { setTransactionResult(result); handlePaymentSuccess(result); });
+      onSoftPOSFailure((error, errorCode) => { setStage('declined'); setTransactionResult({ success: false, error, errorCode }); });
+      setStage('waiting');
+      setIsPaymentReady(true);
+      return;
+    }
+
+    setIsPaymentReady(false);
     try {
-      const config = await loadKioskSoftPosConfig(kioskId);
+      // Run config fetch and NFC availability check in parallel — neither
+      // depends on the other for the first stage.
+      const [config, nfcStatus] = await Promise.all([
+        loadKioskSoftPosConfig(kioskId),
+        checkNFCAvailability(),
+      ]);
       if (!config) { setErrorMessage('Soft POS is not configured for this kiosk.'); setStage('error'); return; }
       const initialized = await initializeSoftPOS(config);
       if (!initialized) {
@@ -81,7 +100,6 @@ const NFCPaymentPage = () => {
         setStage('error');
         return;
       }
-      const nfcStatus = await checkNFCAvailability();
       if (!nfcStatus.isAvailable) { setErrorMessage('NFC is not available on this device.'); setStage('error'); return; }
       if (!nfcStatus.isEnabled) { setErrorMessage('NFC is disabled. Please enable NFC in device settings.'); setStage('error'); return; }
       onPaymentStart(() => setStage('processing'));
