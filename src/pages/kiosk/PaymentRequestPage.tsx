@@ -1,8 +1,15 @@
 import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { loadKioskRuntimeConfig, getCachedPaymentMode, type KioskPaymentMode } from "@/lib/kioskConfig";
 import { Loader2 } from "lucide-react";
+
+const routeFor = (mode: KioskPaymentMode | null | undefined, category: string, amount: number): string => {
+  if (mode === 'test_payment') return `/kiosk/test-payment?category=${category}&amount=${amount}`;
+  if (mode === 'payment_gateway') return `/kiosk/thawani-gateway?category=${category}&amount=${amount}`;
+  // Default to Soft POS (Thawani Lamsa) — the primary payment path.
+  return `/kiosk/nfc-payment?category=${category}&amount=${amount}`;
+};
 
 const PaymentRequestPage = () => {
   const navigate = useNavigate();
@@ -11,42 +18,20 @@ const PaymentRequestPage = () => {
   const amount = parseFloat(searchParams.get('amount') || '0');
 
   useEffect(() => {
-    const checkPaymentMode = async () => {
-      const kioskId = localStorage.getItem('kiosk_id');
-      const softPosUrl = `/kiosk/nfc-payment?category=${category}&amount=${amount}`;
-      
-      try {
-        if (kioskId) {
-          const config = await Promise.race([
-            loadKioskRuntimeConfig(kioskId),
-            new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 2500)),
-          ]);
-          const paymentMode = config?.payment_mode;
+    const kioskId = localStorage.getItem('kiosk_id');
 
-          if (paymentMode === 'test_payment') {
-            navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
-            return;
-          }
-          
-          if (paymentMode === 'payment_gateway') {
-            navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
-            return;
-          }
-          
-          if (paymentMode === 'soft_pos') {
-            navigate(softPosUrl);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('PaymentRequestPage: Error loading config, defaulting to NFC', error);
-      }
-      
-      // Default or fallback: Soft POS must never be blocked by config lookup failure.
-      navigate(softPosUrl);
-    };
-    
-    checkPaymentMode();
+    // INSTANT ROUTING: use the last-known payment mode from localStorage so the
+    // donor lands on the Thawani Lamsa screen immediately — no waiting for the
+    // edge-function round-trip. We refresh the cache in the background.
+    const cachedMode = kioskId ? getCachedPaymentMode(kioskId) : null;
+    navigate(routeFor(cachedMode, category, amount), { replace: true });
+
+    if (kioskId) {
+      // Background refresh — keeps the cached payment_mode fresh for next time.
+      loadKioskRuntimeConfig(kioskId).catch((err) => {
+        console.warn('[PaymentRequestPage] Background config refresh failed:', err);
+      });
+    }
   }, [navigate, category, amount]);
 
   return (
