@@ -1,69 +1,31 @@
+# Plan: Draft reply email to Bank Muscat
 
-# Twilio WhatsApp Receipts (alongside Infocomm SMS)
+No code or database changes. Deliverable is a single ready-to-send email you can copy into your mail client (or forward to Bank Muscat as-is), based on the "App-to-App Integration Guide v1.17" (Mosambee CPOC Intent Integration) they sent.
 
-Add WhatsApp delivery of donation receipts via Twilio, with an admin switch to choose **SMS (Infocomm)**, **WhatsApp (Twilio)**, or **Both** — globally or per kiosk.
+## Deliverable
 
-## 1. Connector & Secrets
+A concise, professional email covering:
 
-- Use the Lovable **Twilio connector** (gateway-based, handles auth refresh, no manual key handling).
-- After connect, `TWILIO_API_KEY` + `LOVABLE_API_KEY` become available to edge functions automatically.
-- User must complete two Twilio-side prerequisites before live use:
-  1. Activate a **WhatsApp Sender** (Twilio Sandbox for testing, or an approved Business number for production).
-  2. Submit an **approved WhatsApp message template** in Arabic for the donation receipt (free-form messages outside the 24h session window are rejected).
+1. **Acknowledgement** — confirm we've reviewed the v1.17 spec and that the Android **Intent-based app-to-app** model is compatible with our kiosk application.
+2. **Context** — one short paragraph explaining that we're migrating from Thawani Lamsa SoftPOS to Bank Muscat's SoftPOS on unattended Android donation kiosks operating in OMR.
+3. **Items requested to begin integration** (clearly numbered so Bank Muscat / Mosambee can respond point-by-point):
+   1. Mosambee SoftPOS **APK** for stage and production, plus the exact Android **`package_name`** used in the intent calls.
+   2. **AES-256 encryption key** (and any public key) for password-token generation, and the **AAR package** referenced in section "Password Token Generation" for offline token generation.
+   3. **Test merchant credentials**: username, PIN, `partnerId`, MID/TID.
+   4. **Sandbox / Stage environment** access, test cards, and instructions for switching between Debug / Stage / Production from the intent call.
+   5. **Complete response-code catalogue** (including `SPOCB13`/`CPOCB13` and ISO error codes referenced in the version history) and the full list of intent-extra fields returned for Sale, Refund, Void and Settlement (RRN, masked PAN, receipt string, etc.).
+   6. **Device / OS requirements** — confirmed minimum Android version, NFC and Google Play Services requirements, and whether the Mosambee app must be pre-installed and logged in per device.
+   7. **Refund / Void policy** — whether original RRN/txn reference is required, and settlement cut-off timing.
+   8. **Certification path** — UAT test scripts, sign-off criteria, and go-live approval process.
+   9. **Commercial** — MDR, settlement account setup, and confirmation OMR live settlement to the Awkaf account is provisioned.
+4. **Deployment context** — brief note that our kiosks are unattended Android devices with NFC, currently in production with Thawani Lamsa, and we plan a controlled pilot on 1–2 kiosks before full rollout.
+5. **Next steps** — request a technical kick-off call between Mosambee's integration team and our development team, and a single point of contact for technical questions.
+6. **Signature block** — placeholder fields for your name, title, organisation, and contact details.
 
-## 2. Database
+## Format
 
-New table `whatsapp_settings` (admin-managed, mirrors `sms_settings` pattern):
-- `from_number` (e.g. `whatsapp:+14155238886`)
-- `template_sid` (approved template ID)
-- `template_language` (default `ar`)
-- `is_enabled` boolean
+Plain email body (subject line + greeting + numbered request + closing). Neutral, professional tone. English. No attachments assumed.
 
-Extend `transactions`:
-- `whatsapp_status` text default `'not_sent'` (`sent` / `failed` / `not_sent`)
+## Where the draft will live
 
-Extend `kiosks.configuration` JSON (no schema change) with:
-- `receipt_channel`: `'sms' | 'whatsapp' | 'both'` (default `'sms'`)
-
-All new tables get explicit GRANTs and admin-only RLS.
-
-## 3. Edge Function: `send-whatsapp`
-
-Mirrors `send-sms`:
-- Validates transaction is `completed` and not already sent on this channel
-- Calls Twilio via gateway: `POST https://connector-gateway.lovable.dev/twilio/Messages.json`
-  - `To: whatsapp:+968XXXXXXXX`
-  - `From: <from_number>`
-  - `ContentSid: <template_sid>` + `ContentVariables` JSON (amount, category, ref, date)
-- Updates `transactions.whatsapp_status`
-- Returns the same shape as `send-sms` for UI parity
-
-## 4. Dispatcher Update
-
-Where the kiosk currently calls `send-sms` after a successful transaction, replace with a small dispatcher that reads `receipt_channel` (kiosk config, falling back to a global default) and invokes `send-sms`, `send-whatsapp`, or both in parallel.
-
-## 5. Admin UI
-
-**New page:** `/admin/whatsapp-settings` (`WhatsAppSettings.tsx`) — same layout as `SMSSettings.tsx`:
-- From number, Template SID, Language, Enabled toggle
-- "Send test WhatsApp" using the donor's number
-
-**Kiosks → Edit Kiosk:** add a `Receipt Channel` selector (SMS / WhatsApp / Both), stored in `kiosks.configuration.receipt_channel`.
-
-**Admin Dashboard nav:** add WhatsApp Settings link next to SMS Settings.
-
-## 6. Out of Scope
-
-- No Twilio billing/usage dashboard (separate request).
-- No voice/IVR or Twilio Pay.
-- WhatsApp template approval is done by the user inside the Twilio console; we only store the SID.
-
----
-
-### Implementation order
-1. Connect Twilio connector + confirm `TWILIO_API_KEY` present.
-2. Migration: `whatsapp_settings` table + `transactions.whatsapp_status` column + GRANTs/RLS.
-3. `send-whatsapp` edge function.
-4. Admin WhatsApp Settings page + nav entry.
-5. Per-kiosk `receipt_channel` selector in Edit Kiosk.
-6. Dispatcher wiring in the post-transaction flow.
+Saved as `docs/bank-muscat-reply-email.md` in the project so you can copy it out easily and we retain a record. No source code, no `.env`, no database, no edge functions touched.
