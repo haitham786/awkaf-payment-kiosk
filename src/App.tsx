@@ -16,6 +16,7 @@ import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
 import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
 import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
 import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
+import HardwarePosPaymentPage from "./pages/kiosk/HardwarePosPaymentPage";
 import TestPaymentPage from "./pages/kiosk/TestPaymentPage";
 import ThawaniGatewayPage from "./pages/kiosk/ThawaniGatewayPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
