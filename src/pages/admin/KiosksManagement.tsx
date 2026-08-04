@@ -307,6 +307,7 @@ const KiosksManagement = () => {
         payment_mode: 'soft_pos',
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
+        hardware_pos: emptyHardwarePos(),
         test_payment: { auto_approve: true },
         sound_enabled: true,
         receipt_channel: 'sms',
