@@ -209,7 +209,7 @@ const KiosksManagement = () => {
 
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
-      const { publicConfig, authKey } = separateKioskSecret(formData.configuration);
+      const { publicConfig, authKey, apexSecureKey } = separateKioskSecret(formData.configuration);
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
