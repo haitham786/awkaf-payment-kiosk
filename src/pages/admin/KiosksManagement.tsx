@@ -656,6 +656,102 @@ const KiosksManagement = () => {
                 </div>
               )}
 
+              {/* Hardware POS (ApexECR) Configuration */}
+              {formData.configuration.payment_mode === 'hardware_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Hardware POS Terminal (ApexECR) Configuration
+                  </h4>
+
+                  <div>
+                    <Label htmlFor="apex_service_url">ApexECR Service URL</Label>
+                    <Input
+                      id="apex_service_url"
+                      value={formData.configuration.hardware_pos?.service_url || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, service_url: e.target.value } } })}
+                      placeholder="https://.../ApexEcrService.svc"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">HTTPS endpoint supplied by AFS / Ahli Bank.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="apex_mid">Merchant ID (MID)</Label>
+                      <Input
+                        id="apex_mid"
+                        value={formData.configuration.hardware_pos?.mid || ''}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, mid: e.target.value } } })}
+                        placeholder="MID"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="apex_tid">Terminal ID (TID)</Label>
+                      <Input
+                        id="apex_tid"
+                        value={formData.configuration.hardware_pos?.tid || ''}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, tid: e.target.value } } })}
+                        placeholder="TID"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="apex_secure_key">Merchant Secure Key</Label>
+                    <Input
+                      id="apex_secure_key"
+                      type="password"
+                      value={formData.configuration.hardware_pos?.secure_key || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, secure_key: e.target.value } } })}
+                      placeholder="Stored privately, never sent to the kiosk"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="apex_currency">Currency Code (ISO numeric)</Label>
+                      <Input
+                        id="apex_currency"
+                        value={formData.configuration.hardware_pos?.currency_code || '512'}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, currency_code: e.target.value } } })}
+                        placeholder="512"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">OMR = 512</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="apex_timeout">Card Tap Timeout (seconds)</Label>
+                      <Input
+                        id="apex_timeout"
+                        type="number"
+                        min={15}
+                        max={300}
+                        value={formData.configuration.hardware_pos?.timeout_seconds ?? 90}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, timeout_seconds: Number(e.target.value) } } })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Environment</Label>
+                    <RadioGroup
+                      value={formData.configuration.hardware_pos?.environment || 'uat'}
+                      onValueChange={(value: 'uat' | 'production') => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, environment: value } } })}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="uat" id="apex_uat" />
+                        <Label htmlFor="apex_uat" className="cursor-pointer">UAT</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="production" id="apex_prod" />
+                        <Label htmlFor="apex_prod" className="cursor-pointer">Production</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              )}
+
+
               {formData.configuration.payment_mode === 'test_payment' && (
                 <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
                   <h4 className="font-medium text-sm flex items-center gap-2">
