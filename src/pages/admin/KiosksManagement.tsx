@@ -410,6 +410,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
+    if (paymentMode === 'hardware_pos') return 'Hardware POS Terminal (ApexECR)';
     if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
