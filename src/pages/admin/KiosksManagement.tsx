@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
@@ -25,12 +25,31 @@ interface KioskConfiguration {
   payment_gateway?: {
     mode: 'test' | 'live';
   };
+  hardware_pos?: {
+    tid: string;
+    mid: string;
+    service_url: string;
+    secure_key: string;
+    currency_code: string;
+    environment: 'uat' | 'production';
+    timeout_seconds: number;
+  };
   test_payment?: {
     auto_approve?: boolean;
   };
   sound_enabled?: boolean;
   receipt_channel?: ReceiptChannel;
 }
+
+const emptyHardwarePos = () => ({
+  tid: '',
+  mid: '',
+  service_url: '',
+  secure_key: '',
+  currency_code: '512',
+  environment: 'uat' as 'uat' | 'production',
+  timeout_seconds: 90,
+});
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
