@@ -238,7 +238,7 @@ const KiosksManagement = () => {
 
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
-        await saveKioskSecret(editingId, authKey);
+        await saveKioskSecret(editingId, authKey, apexSecureKey);
         toast.success("Kiosk updated successfully");
       } else {
         if (referenceNumber) {
