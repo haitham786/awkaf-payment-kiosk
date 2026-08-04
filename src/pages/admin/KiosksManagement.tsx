@@ -547,6 +547,17 @@ const KiosksManagement = () => {
                   </div>
 
                   <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="hardware_pos" id="hardware_pos" />
+                    <Label htmlFor="hardware_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <CreditCard className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Hardware POS Terminal (ApexECR / AFS)</p>
+                        <p className="text-xs text-muted-foreground">External EFTPOS terminal over the internet</p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                     <RadioGroupItem value="test_payment" id="test_payment" />
                     <Label htmlFor="test_payment" className="flex items-center gap-2 cursor-pointer flex-1">
                       <FlaskConical className="w-4 h-4" />
