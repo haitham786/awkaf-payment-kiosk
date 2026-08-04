@@ -16,6 +16,7 @@ import ConfirmationPage from "./pages/kiosk/ConfirmationPage";
 import KioskSetupPanel from "./pages/kiosk/KioskSetupPanel";
 import PaymentRequestPage from "./pages/kiosk/PaymentRequestPage";
 import NFCPaymentPage from "./pages/kiosk/NFCPaymentPage";
+import HardwarePosPaymentPage from "./pages/kiosk/HardwarePosPaymentPage";
 import TestPaymentPage from "./pages/kiosk/TestPaymentPage";
 import ThawaniGatewayPage from "./pages/kiosk/ThawaniGatewayPage";
 import ThankYouPage from "./pages/kiosk/ThankYouPage";
@@ -76,6 +77,7 @@ const AppContent = () => {
             <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
             <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
             <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
+            <Route path="/kiosk/hardware-pos" element={<HardwarePosPaymentPage />} />
             <Route path="/kiosk/test-payment" element={<TestPaymentPage />} />
             <Route path="/kiosk/thawani-gateway" element={<ThawaniGatewayPage />} />
             <Route path="/kiosk/thank-you" element={<ThankYouPage />} />

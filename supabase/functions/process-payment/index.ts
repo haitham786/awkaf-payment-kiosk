@@ -268,6 +268,20 @@ serve(async (req) => {
       }
     }
 
+    // Hardware POS results are authoritative only when they come from the
+    // apex-ecr-payment edge function (server-to-server), never from a device.
+    if (paymentType === 'hardware_pos') {
+      const expectedToken = Deno.env.get('INTERNAL_PAYMENT_TOKEN') ?? '';
+      const providedToken = req.headers.get('x-internal-token') ?? '';
+      if (!expectedToken || providedToken !== expectedToken) {
+        console.warn('Rejected hardware_pos: missing or invalid internal token');
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized payment source' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 },
+        );
+      }
+    }
+
     // Extract POS data from request (Soft POS, test mode, or Payment Gateway)
     const paymentResponse = posResponse || softPosResult || {};
     const posRRN = paymentResponse?.rrn || paymentResponse?.RRN || paymentResponse?.paymentId || null;
@@ -318,7 +332,9 @@ serve(async (req) => {
       ? (provider === 'thawani' ? 'thawani_lamsa' : 'soft_pos')
       : paymentType === 'test_payment'
         ? 'test_payment'
-        : cardType || 'card';
+        : paymentType === 'hardware_pos'
+          ? 'hardware_pos'
+          : cardType || 'card';
 
     console.log('POS Response Data:', { posRRN, posAuthCode, posTID, posMID, posResponseCode, isSuccess, verifiedSuccess });
 

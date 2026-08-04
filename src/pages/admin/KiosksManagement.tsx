@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
@@ -25,12 +25,31 @@ interface KioskConfiguration {
   payment_gateway?: {
     mode: 'test' | 'live';
   };
+  hardware_pos?: {
+    tid: string;
+    mid: string;
+    service_url: string;
+    secure_key: string;
+    currency_code: string;
+    environment: 'uat' | 'production';
+    timeout_seconds: number;
+  };
   test_payment?: {
     auto_approve?: boolean;
   };
   sound_enabled?: boolean;
   receipt_channel?: ReceiptChannel;
 }
+
+const emptyHardwarePos = () => ({
+  tid: '',
+  mid: '',
+  service_url: '',
+  secure_key: '',
+  currency_code: '512',
+  environment: 'uat' as 'uat' | 'production',
+  timeout_seconds: 90,
+});
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -48,6 +67,7 @@ const KiosksManagement = () => {
       payment_mode: 'soft_pos' as PaymentMode,
       soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
       payment_gateway: { mode: 'test' as 'test' | 'live' },
+      hardware_pos: emptyHardwarePos(),
       sound_enabled: true,
       receipt_channel: 'sms' as ReceiptChannel,
     } as KioskConfiguration
@@ -59,8 +79,9 @@ const KiosksManagement = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
-    const { soft_pos, ...restConfig } = configuration;
+    const { soft_pos, hardware_pos, ...restConfig } = configuration;
     const authKey = soft_pos?.auth_key?.trim() || '';
+    const apexSecureKey = hardware_pos?.secure_key?.trim() || '';
 
     return {
       publicConfig: {
@@ -71,15 +92,29 @@ const KiosksManagement = () => {
               mode: soft_pos.mode,
             }
           : undefined,
+        hardware_pos: hardware_pos
+          ? {
+              tid: hardware_pos.tid?.trim() || '',
+              mid: hardware_pos.mid?.trim() || '',
+              service_url: hardware_pos.service_url?.trim() || '',
+              currency_code: hardware_pos.currency_code?.trim() || '512',
+              environment: hardware_pos.environment || 'uat',
+              timeout_seconds: Number(hardware_pos.timeout_seconds) > 0 ? Number(hardware_pos.timeout_seconds) : 90,
+            }
+          : undefined,
       },
       authKey,
+      apexSecureKey,
     };
   };
 
-  const saveKioskSecret = async (kioskId: string, authKey: string) => {
+  const saveKioskSecret = async (kioskId: string, authKey: string, apexSecureKey = '') => {
     const { error } = await supabase
       .from('kiosk_secrets')
-      .upsert({ kiosk_id: kioskId, soft_pos_auth_key: authKey }, { onConflict: 'kiosk_id' });
+      .upsert(
+        { kiosk_id: kioskId, soft_pos_auth_key: authKey, apex_secure_key: apexSecureKey },
+        { onConflict: 'kiosk_id' },
+      );
     if (error) throw error;
   };
 
@@ -108,20 +143,27 @@ const KiosksManagement = () => {
       if (error) throw error;
       const kioskIds = (data || []).map((kiosk) => kiosk.id);
       const { data: secrets, error: secretsError } = kioskIds.length > 0
-        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key').in('kiosk_id', kioskIds)
+        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key, apex_secure_key').in('kiosk_id', kioskIds)
         : { data: [], error: null };
       if (secretsError) throw secretsError;
-      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret.soft_pos_auth_key || '']));
+      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret]));
       const mergedKiosks = (data || []).map((kiosk) => {
         const config = kiosk.configuration && typeof kiosk.configuration === 'object' ? kiosk.configuration as Record<string, any> : {};
         const softPos = config.soft_pos && typeof config.soft_pos === 'object' ? config.soft_pos as Record<string, any> : {};
+        const hardwarePos = config.hardware_pos && typeof config.hardware_pos === 'object' ? config.hardware_pos as Record<string, any> : {};
+        const secret = secretsByKiosk.get(kiosk.id) as { soft_pos_auth_key?: string; apex_secure_key?: string } | undefined;
         return {
           ...kiosk,
           configuration: {
             ...config,
             soft_pos: {
               ...softPos,
-              auth_key: secretsByKiosk.get(kiosk.id) || '',
+              auth_key: secret?.soft_pos_auth_key || '',
+            },
+            hardware_pos: {
+              ...emptyHardwarePos(),
+              ...hardwarePos,
+              secure_key: secret?.apex_secure_key || '',
             },
           },
         };
@@ -167,7 +209,7 @@ const KiosksManagement = () => {
 
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
-      const { publicConfig, authKey } = separateKioskSecret(formData.configuration);
+      const { publicConfig, authKey, apexSecureKey } = separateKioskSecret(formData.configuration);
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
@@ -196,7 +238,7 @@ const KiosksManagement = () => {
 
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
-        await saveKioskSecret(editingId, authKey);
+        await saveKioskSecret(editingId, authKey, apexSecureKey);
         toast.success("Kiosk updated successfully");
       } else {
         if (referenceNumber) {
@@ -216,7 +258,7 @@ const KiosksManagement = () => {
           configuration: publicConfig
         } as any]).select('id').single();
         if (error) throw error;
-        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey);
+        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey, apexSecureKey);
         toast.success("Kiosk added successfully");
       }
       resetForm();
@@ -236,6 +278,7 @@ const KiosksManagement = () => {
         payment_mode: config.payment_mode || 'soft_pos',
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
+        hardware_pos: { ...emptyHardwarePos(), ...(config.hardware_pos || {}) },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
         receipt_channel: (config.receipt_channel as ReceiptChannel) || 'sms',
@@ -264,6 +307,7 @@ const KiosksManagement = () => {
         payment_mode: 'soft_pos',
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
+        hardware_pos: emptyHardwarePos(),
         test_payment: { auto_approve: true },
         sound_enabled: true,
         receipt_channel: 'sms',
@@ -366,6 +410,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
+    if (paymentMode === 'hardware_pos') return 'Hardware POS Terminal (ApexECR)';
     if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
@@ -502,6 +547,17 @@ const KiosksManagement = () => {
                   </div>
 
                   <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="hardware_pos" id="hardware_pos" />
+                    <Label htmlFor="hardware_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <CreditCard className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Hardware POS Terminal (ApexECR / AFS)</p>
+                        <p className="text-xs text-muted-foreground">External EFTPOS terminal over the internet</p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                     <RadioGroupItem value="test_payment" id="test_payment" />
                     <Label htmlFor="test_payment" className="flex items-center gap-2 cursor-pointer flex-1">
                       <FlaskConical className="w-4 h-4" />
@@ -599,6 +655,102 @@ const KiosksManagement = () => {
 
                 </div>
               )}
+
+              {/* Hardware POS (ApexECR) Configuration */}
+              {formData.configuration.payment_mode === 'hardware_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Hardware POS Terminal (ApexECR) Configuration
+                  </h4>
+
+                  <div>
+                    <Label htmlFor="apex_service_url">ApexECR Service URL</Label>
+                    <Input
+                      id="apex_service_url"
+                      value={formData.configuration.hardware_pos?.service_url || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, service_url: e.target.value } } })}
+                      placeholder="https://.../ApexEcrService.svc"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">HTTPS endpoint supplied by AFS / Ahli Bank.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="apex_mid">Merchant ID (MID)</Label>
+                      <Input
+                        id="apex_mid"
+                        value={formData.configuration.hardware_pos?.mid || ''}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, mid: e.target.value } } })}
+                        placeholder="MID"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="apex_tid">Terminal ID (TID)</Label>
+                      <Input
+                        id="apex_tid"
+                        value={formData.configuration.hardware_pos?.tid || ''}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, tid: e.target.value } } })}
+                        placeholder="TID"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="apex_secure_key">Merchant Secure Key</Label>
+                    <Input
+                      id="apex_secure_key"
+                      type="password"
+                      value={formData.configuration.hardware_pos?.secure_key || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, secure_key: e.target.value } } })}
+                      placeholder="Stored privately, never sent to the kiosk"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="apex_currency">Currency Code (ISO numeric)</Label>
+                      <Input
+                        id="apex_currency"
+                        value={formData.configuration.hardware_pos?.currency_code || '512'}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, currency_code: e.target.value } } })}
+                        placeholder="512"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">OMR = 512</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="apex_timeout">Card Tap Timeout (seconds)</Label>
+                      <Input
+                        id="apex_timeout"
+                        type="number"
+                        min={15}
+                        max={300}
+                        value={formData.configuration.hardware_pos?.timeout_seconds ?? 90}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, timeout_seconds: Number(e.target.value) } } })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Environment</Label>
+                    <RadioGroup
+                      value={formData.configuration.hardware_pos?.environment || 'uat'}
+                      onValueChange={(value: 'uat' | 'production') => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, environment: value } } })}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="uat" id="apex_uat" />
+                        <Label htmlFor="apex_uat" className="cursor-pointer">UAT</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="production" id="apex_prod" />
+                        <Label htmlFor="apex_prod" className="cursor-pointer">Production</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              )}
+
 
               {formData.configuration.payment_mode === 'test_payment' && (
                 <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
