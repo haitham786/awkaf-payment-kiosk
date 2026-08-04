@@ -79,8 +79,9 @@ const KiosksManagement = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
-    const { soft_pos, ...restConfig } = configuration;
+    const { soft_pos, hardware_pos, ...restConfig } = configuration;
     const authKey = soft_pos?.auth_key?.trim() || '';
+    const apexSecureKey = hardware_pos?.secure_key?.trim() || '';
 
     return {
       publicConfig: {
@@ -91,15 +92,29 @@ const KiosksManagement = () => {
               mode: soft_pos.mode,
             }
           : undefined,
+        hardware_pos: hardware_pos
+          ? {
+              tid: hardware_pos.tid?.trim() || '',
+              mid: hardware_pos.mid?.trim() || '',
+              service_url: hardware_pos.service_url?.trim() || '',
+              currency_code: hardware_pos.currency_code?.trim() || '512',
+              environment: hardware_pos.environment || 'uat',
+              timeout_seconds: Number(hardware_pos.timeout_seconds) > 0 ? Number(hardware_pos.timeout_seconds) : 90,
+            }
+          : undefined,
       },
       authKey,
+      apexSecureKey,
     };
   };
 
-  const saveKioskSecret = async (kioskId: string, authKey: string) => {
+  const saveKioskSecret = async (kioskId: string, authKey: string, apexSecureKey = '') => {
     const { error } = await supabase
       .from('kiosk_secrets')
-      .upsert({ kiosk_id: kioskId, soft_pos_auth_key: authKey }, { onConflict: 'kiosk_id' });
+      .upsert(
+        { kiosk_id: kioskId, soft_pos_auth_key: authKey, apex_secure_key: apexSecureKey },
+        { onConflict: 'kiosk_id' },
+      );
     if (error) throw error;
   };
 
