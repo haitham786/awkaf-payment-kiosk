@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "test_payment";
+export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "test_payment" | "hardware_pos";
 export type ReceiptChannel = "sms" | "whatsapp" | "both";
 
 export interface KioskRuntimeConfig {
@@ -12,6 +12,14 @@ export interface KioskRuntimeConfig {
   };
   payment_gateway?: {
     mode?: "test" | "live";
+  };
+  hardware_pos?: {
+    tid?: string;
+    mid?: string;
+    service_url?: string;
+    currency_code?: string;
+    environment?: "uat" | "production";
+    timeout_seconds?: number;
   };
   sound_enabled?: boolean;
   receipt_channel?: ReceiptChannel;
