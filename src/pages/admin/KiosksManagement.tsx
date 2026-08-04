@@ -143,20 +143,27 @@ const KiosksManagement = () => {
       if (error) throw error;
       const kioskIds = (data || []).map((kiosk) => kiosk.id);
       const { data: secrets, error: secretsError } = kioskIds.length > 0
-        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key').in('kiosk_id', kioskIds)
+        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key, apex_secure_key').in('kiosk_id', kioskIds)
         : { data: [], error: null };
       if (secretsError) throw secretsError;
-      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret.soft_pos_auth_key || '']));
+      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret]));
       const mergedKiosks = (data || []).map((kiosk) => {
         const config = kiosk.configuration && typeof kiosk.configuration === 'object' ? kiosk.configuration as Record<string, any> : {};
         const softPos = config.soft_pos && typeof config.soft_pos === 'object' ? config.soft_pos as Record<string, any> : {};
+        const hardwarePos = config.hardware_pos && typeof config.hardware_pos === 'object' ? config.hardware_pos as Record<string, any> : {};
+        const secret = secretsByKiosk.get(kiosk.id) as { soft_pos_auth_key?: string; apex_secure_key?: string } | undefined;
         return {
           ...kiosk,
           configuration: {
             ...config,
             soft_pos: {
               ...softPos,
-              auth_key: secretsByKiosk.get(kiosk.id) || '',
+              auth_key: secret?.soft_pos_auth_key || '',
+            },
+            hardware_pos: {
+              ...emptyHardwarePos(),
+              ...hardwarePos,
+              secure_key: secret?.apex_secure_key || '',
             },
           },
         };
