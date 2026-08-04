@@ -258,7 +258,7 @@ const KiosksManagement = () => {
           configuration: publicConfig
         } as any]).select('id').single();
         if (error) throw error;
-        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey);
+        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey, apexSecureKey);
         toast.success("Kiosk added successfully");
       }
       resetForm();
