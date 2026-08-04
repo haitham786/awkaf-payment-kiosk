@@ -278,6 +278,7 @@ const KiosksManagement = () => {
         payment_mode: config.payment_mode || 'soft_pos',
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
+        hardware_pos: { ...emptyHardwarePos(), ...(config.hardware_pos || {}) },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
         receipt_channel: (config.receipt_channel as ReceiptChannel) || 'sms',
