@@ -76,7 +76,7 @@ const AppContent = () => {
             <Route path="/kiosk/amount" element={<AmountPage />} />
             <Route path="/kiosk/confirmation" element={<ConfirmationPage />} />
             <Route path="/kiosk/payment-request" element={<PaymentRequestPage />} />
-            <Route path="/kiosk/nfc-payment" element={<NFCPaymentPage />} />
+            <Route path="/kiosk/hardware-pos" element={<HardwarePosPaymentPage />} />
             <Route path="/kiosk/test-payment" element={<TestPaymentPage />} />
             <Route path="/kiosk/thawani-gateway" element={<ThawaniGatewayPage />} />
             <Route path="/kiosk/thank-you" element={<ThankYouPage />} />
