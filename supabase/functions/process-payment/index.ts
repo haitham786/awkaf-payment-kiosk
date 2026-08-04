@@ -332,7 +332,9 @@ serve(async (req) => {
       ? (provider === 'thawani' ? 'thawani_lamsa' : 'soft_pos')
       : paymentType === 'test_payment'
         ? 'test_payment'
-        : cardType || 'card';
+        : paymentType === 'hardware_pos'
+          ? 'hardware_pos'
+          : cardType || 'card';
 
     console.log('POS Response Data:', { posRRN, posAuthCode, posTID, posMID, posResponseCode, isSuccess, verifiedSuccess });
 
