@@ -14,6 +14,16 @@ function stripSensitiveConfig(configRaw: unknown) {
     config.soft_pos = softPos;
   }
 
+  if (config.hardware_pos && typeof config.hardware_pos === "object") {
+    const hardware = { ...(config.hardware_pos as Record<string, unknown>) };
+    delete hardware.secure_key;
+    delete hardware.secureKey;
+    delete hardware.service_url;
+    delete hardware.mid;
+    delete hardware.tid;
+    config.hardware_pos = hardware;
+  }
+
   return config;
 }
 
