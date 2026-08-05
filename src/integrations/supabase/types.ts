@@ -172,6 +172,30 @@ export type Database = {
         }
         Relationships: []
       }
+      messaging_rates: {
+        Row: {
+          created_at: string
+          id: string
+          sms_unit_cost_omr: number
+          updated_at: string
+          whatsapp_unit_cost_omr: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sms_unit_cost_omr?: number
+          updated_at?: string
+          whatsapp_unit_cost_omr?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sms_unit_cost_omr?: number
+          updated_at?: string
+          whatsapp_unit_cost_omr?: number
+        }
+        Relationships: []
+      }
       offline_transaction_queue: {
         Row: {
           created_at: string

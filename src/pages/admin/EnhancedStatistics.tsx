@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, Printer, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ReceiptDeliveryCostCard from "@/components/admin/ReceiptDeliveryCostCard";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
@@ -304,6 +305,10 @@ const EnhancedStatistics = () => {
             </Select>
           </div>
         </div>
+
+        {/* Receipt delivery & estimated messaging cost */}
+        <ReceiptDeliveryCostCard transactions={transactions} />
+
 
         {/* Search with Dual Reference Support */}
         <Card className="p-4 mb-8">
