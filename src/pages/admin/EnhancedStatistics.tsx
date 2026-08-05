@@ -306,6 +306,10 @@ const EnhancedStatistics = () => {
           </div>
         </div>
 
+        {/* Receipt delivery & estimated messaging cost */}
+        <ReceiptDeliveryCostCard transactions={transactions} />
+
+
         {/* Search with Dual Reference Support */}
         <Card className="p-4 mb-8">
           <div className="flex items-center gap-4">
