@@ -203,6 +203,47 @@ const KiosksManagement = () => {
     return trimmedReference.length > 0 ? trimmedReference : null;
   };
 
+  const findTerminalConflict = (tid: string, excludeId: string | null) => {
+    const target = tid.trim();
+    if (!target) return null;
+    return (
+      kiosks.find((kiosk) => {
+        if (excludeId && kiosk.id === excludeId) return false;
+        const config = kiosk.configuration || {};
+        if (config.payment_mode !== 'hardware_pos') return false;
+        return String(config.hardware_pos?.tid || '').trim() === target;
+      }) || null
+    );
+  };
+
+  const handleVerifyTerminal = async () => {
+    const hardware = formData.configuration.hardware_pos;
+    if (!editingId) {
+      toast.error('Save the kiosk first, then verify its terminal.');
+      return;
+    }
+    if (!hardware?.tid?.trim() || !hardware?.mid?.trim()) {
+      toast.error('Enter both MID and TID before verifying.');
+      return;
+    }
+    setVerifyingTerminal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
+        body: { action: 'enquiry', kioskId: editingId, transactionId: crypto.randomUUID() },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Terminal ${hardware.tid} responded${data.responseText ? `: ${data.responseText}` : ''}`);
+      } else {
+        toast.error(data?.error || 'The terminal did not confirm this TID/MID pair.');
+      }
+    } catch (error: any) {
+      toast.error(`Terminal verification failed: ${error.message}`);
+    } finally {
+      setVerifyingTerminal(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -210,6 +251,24 @@ const KiosksManagement = () => {
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
       const { publicConfig, authKey, apexSecureKey } = separateKioskSecret(formData.configuration);
+
+      if (formData.configuration.payment_mode === 'hardware_pos') {
+        const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
+        if (!tid) {
+          setValidationError('A Terminal ID (TID) is required so this kiosk is paired with its own POS terminal.');
+          toast.error('Terminal ID (TID) is required for Hardware POS kiosks.');
+          return;
+        }
+        const conflict = findTerminalConflict(tid, editingId);
+        if (conflict) {
+          const message = `Terminal ID ${tid} is already paired with "${conflict.name}". Each kiosk must use its own terminal.`;
+          setValidationError(message);
+          toast.error(message);
+          return;
+        }
+      }
+
+
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
