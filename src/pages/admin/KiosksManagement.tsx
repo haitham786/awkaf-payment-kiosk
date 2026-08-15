@@ -77,6 +77,8 @@ const KiosksManagement = () => {
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [verifyingTerminal, setVerifyingTerminal] = useState(false);
+
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
     const { soft_pos, hardware_pos, ...restConfig } = configuration;
@@ -203,6 +205,47 @@ const KiosksManagement = () => {
     return trimmedReference.length > 0 ? trimmedReference : null;
   };
 
+  const findTerminalConflict = (tid: string, excludeId: string | null) => {
+    const target = tid.trim();
+    if (!target) return null;
+    return (
+      kiosks.find((kiosk) => {
+        if (excludeId && kiosk.id === excludeId) return false;
+        const config = kiosk.configuration || {};
+        if (config.payment_mode !== 'hardware_pos') return false;
+        return String(config.hardware_pos?.tid || '').trim() === target;
+      }) || null
+    );
+  };
+
+  const handleVerifyTerminal = async () => {
+    const hardware = formData.configuration.hardware_pos;
+    if (!editingId) {
+      toast.error('Save the kiosk first, then verify its terminal.');
+      return;
+    }
+    if (!hardware?.tid?.trim() || !hardware?.mid?.trim()) {
+      toast.error('Enter both MID and TID before verifying.');
+      return;
+    }
+    setVerifyingTerminal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
+        body: { action: 'enquiry', kioskId: editingId, transactionId: crypto.randomUUID() },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Terminal ${hardware.tid} responded${data.responseText ? `: ${data.responseText}` : ''}`);
+      } else {
+        toast.error(data?.error || 'The terminal did not confirm this TID/MID pair.');
+      }
+    } catch (error: any) {
+      toast.error(`Terminal verification failed: ${error.message}`);
+    } finally {
+      setVerifyingTerminal(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -210,6 +253,24 @@ const KiosksManagement = () => {
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
       const { publicConfig, authKey, apexSecureKey } = separateKioskSecret(formData.configuration);
+
+      if (formData.configuration.payment_mode === 'hardware_pos') {
+        const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
+        if (!tid) {
+          setValidationError('A Terminal ID (TID) is required so this kiosk is paired with its own POS terminal.');
+          toast.error('Terminal ID (TID) is required for Hardware POS kiosks.');
+          return;
+        }
+        const conflict = findTerminalConflict(tid, editingId);
+        if (conflict) {
+          const message = `Terminal ID ${tid} is already paired with "${conflict.name}". Each kiosk must use its own terminal.`;
+          setValidationError(message);
+          toast.error(message);
+          return;
+        }
+      }
+
+
       if (editingId) {
         const existingKiosk = kiosks.find((kiosk) => kiosk.id === editingId);
         const currentReferenceNumber = normalizeReferenceNumber(existingKiosk?.reference_number || '');
@@ -748,8 +809,34 @@ const KiosksManagement = () => {
                       </div>
                     </RadioGroup>
                   </div>
+
+                  <div className="border-t pt-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      This kiosk is paired 1:1 with the terminal registered under this TID. A terminal ID can
+                      only be assigned to one kiosk, so a sale can never reach another kiosk's terminal.
+                    </p>
+                    {(() => {
+                      const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
+                      const conflict = findTerminalConflict(tid, editingId);
+                      return conflict ? (
+                        <p className="text-xs font-medium text-destructive">
+                          Terminal ID {tid} is already paired with "{conflict.name}".
+                        </p>
+                      ) : null;
+                    })()}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleVerifyTerminal}
+                      disabled={verifyingTerminal}
+                    >
+                      {verifyingTerminal ? 'Verifying terminal…' : 'Verify Terminal'}
+                    </Button>
+                  </div>
                 </div>
               )}
+
 
 
               {formData.configuration.payment_mode === 'test_payment' && (
@@ -847,6 +934,27 @@ const KiosksManagement = () => {
                         )}
                         <p className="text-xs text-muted-foreground">{getPaymentModeLabel(kiosk)}</p>
                       </div>
+                      {/* Paired terminal */}
+                      {kiosk.configuration?.payment_mode === 'hardware_pos' && (() => {
+                        const tid = String(kiosk.configuration?.hardware_pos?.tid || '').trim();
+                        const conflict = findTerminalConflict(tid, kiosk.id);
+                        return (
+                          <div className="mt-2 text-xs">
+                            <span className="text-muted-foreground">Paired terminal: </span>
+                            {tid ? (
+                              <span className={conflict ? 'text-destructive font-medium' : 'font-medium'}>
+                                TID {tid}
+                                {kiosk.configuration?.hardware_pos?.mid ? ` · MID ${kiosk.configuration.hardware_pos.mid}` : ''}
+                                {kiosk.configuration?.hardware_pos?.environment ? ` · ${kiosk.configuration.hardware_pos.environment.toUpperCase()}` : ''}
+                                {conflict ? ` — also used by "${conflict.name}"` : ''}
+                              </span>
+                            ) : (
+                              <span className="text-destructive font-medium">Not configured</span>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* Sound */}
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs text-muted-foreground">Sound Effects:</span>
