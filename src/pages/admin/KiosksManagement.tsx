@@ -809,8 +809,34 @@ const KiosksManagement = () => {
                       </div>
                     </RadioGroup>
                   </div>
+
+                  <div className="border-t pt-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      This kiosk is paired 1:1 with the terminal registered under this TID. A terminal ID can
+                      only be assigned to one kiosk, so a sale can never reach another kiosk's terminal.
+                    </p>
+                    {(() => {
+                      const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
+                      const conflict = findTerminalConflict(tid, editingId);
+                      return conflict ? (
+                        <p className="text-xs font-medium text-destructive">
+                          Terminal ID {tid} is already paired with "{conflict.name}".
+                        </p>
+                      ) : null;
+                    })()}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleVerifyTerminal}
+                      disabled={verifyingTerminal}
+                    >
+                      {verifyingTerminal ? 'Verifying terminal…' : 'Verify Terminal'}
+                    </Button>
+                  </div>
                 </div>
               )}
+
 
 
               {formData.configuration.payment_mode === 'test_payment' && (
