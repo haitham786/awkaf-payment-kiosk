@@ -934,6 +934,27 @@ const KiosksManagement = () => {
                         )}
                         <p className="text-xs text-muted-foreground">{getPaymentModeLabel(kiosk)}</p>
                       </div>
+                      {/* Paired terminal */}
+                      {kiosk.configuration?.payment_mode === 'hardware_pos' && (() => {
+                        const tid = String(kiosk.configuration?.hardware_pos?.tid || '').trim();
+                        const conflict = findTerminalConflict(tid, kiosk.id);
+                        return (
+                          <div className="mt-2 text-xs">
+                            <span className="text-muted-foreground">Paired terminal: </span>
+                            {tid ? (
+                              <span className={conflict ? 'text-destructive font-medium' : 'font-medium'}>
+                                TID {tid}
+                                {kiosk.configuration?.hardware_pos?.mid ? ` · MID ${kiosk.configuration.hardware_pos.mid}` : ''}
+                                {kiosk.configuration?.hardware_pos?.environment ? ` · ${kiosk.configuration.hardware_pos.environment.toUpperCase()}` : ''}
+                                {conflict ? ` — also used by "${conflict.name}"` : ''}
+                              </span>
+                            ) : (
+                              <span className="text-destructive font-medium">Not configured</span>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* Sound */}
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-xs text-muted-foreground">Sound Effects:</span>
