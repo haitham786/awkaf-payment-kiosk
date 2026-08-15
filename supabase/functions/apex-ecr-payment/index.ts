@@ -92,9 +92,36 @@ serve(async (req) => {
       );
     }
 
+    // Pairing guard: a terminal (TID) must belong to exactly one kiosk, otherwise a
+    // sale could be pushed to a terminal standing next to a different kiosk.
+    const { data: sameTidKiosks } = await supabase
+      .from("kiosks")
+      .select("id, name, configuration")
+      .neq("id", kioskId);
+
+    const conflict = (sameTidKiosks ?? []).find((row) => {
+      const cfg = (row.configuration ?? {}) as Record<string, unknown>;
+      if (cfg.payment_mode !== "hardware_pos") return false;
+      const hw = (cfg.hardware_pos ?? {}) as Record<string, unknown>;
+      return String(hw.tid || "").trim() === config.tid;
+    });
+
+    if (conflict) {
+      console.error("Terminal pairing conflict for TID", config.tid, "kiosks:", kioskId, conflict.id);
+      return json(
+        {
+          success: false,
+          error: `Terminal ${config.tid} is paired with more than one kiosk. Fix the kiosk configuration before taking payments.`,
+        },
+        400,
+        corsHeaders,
+      );
+    }
+
     if (!/^https:\/\//i.test(config.serviceUrl)) {
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
+
 
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
