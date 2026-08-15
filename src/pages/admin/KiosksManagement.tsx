@@ -77,6 +77,8 @@ const KiosksManagement = () => {
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [verifyingTerminal, setVerifyingTerminal] = useState(false);
+
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
     const { soft_pos, hardware_pos, ...restConfig } = configuration;
