@@ -33,10 +33,6 @@ interface KioskConfiguration {
     currency_code: string;
     environment: 'uat' | 'production';
     timeout_seconds: number;
-    soap_version?: '1.1' | '1.2';
-    tem_namespace?: string;
-    data_namespace?: string;
-    contract_name?: string;
   };
   test_payment?: {
     auto_approve?: boolean;
@@ -53,12 +49,7 @@ const emptyHardwarePos = () => ({
   currency_code: '512',
   environment: 'uat' as 'uat' | 'production',
   timeout_seconds: 90,
-  soap_version: '1.1' as '1.1' | '1.2',
-  tem_namespace: '',
-  data_namespace: '',
-  contract_name: '',
 });
-
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
@@ -87,8 +78,6 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [verifyingTerminal, setVerifyingTerminal] = useState(false);
-  const [probing, setProbing] = useState(false);
-  const [probeResult, setProbeResult] = useState<any>(null);
 
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
@@ -113,10 +102,6 @@ const KiosksManagement = () => {
               currency_code: hardware_pos.currency_code?.trim() || '512',
               environment: hardware_pos.environment || 'uat',
               timeout_seconds: Number(hardware_pos.timeout_seconds) > 0 ? Number(hardware_pos.timeout_seconds) : 90,
-              soap_version: hardware_pos.soap_version === '1.2' ? '1.2' : '1.1',
-              tem_namespace: hardware_pos.tem_namespace?.trim() || '',
-              data_namespace: hardware_pos.data_namespace?.trim() || '',
-              contract_name: hardware_pos.contract_name?.trim() || '',
             }
           : undefined,
       },
@@ -259,54 +244,6 @@ const KiosksManagement = () => {
     } finally {
       setVerifyingTerminal(false);
     }
-  };
-
-  const handleProbeService = async () => {
-    if (!editingId) {
-      toast.error('Save the kiosk first, then run the service diagnostics.');
-      return;
-    }
-    if (!formData.configuration.hardware_pos?.service_url?.trim()) {
-      toast.error('Enter the ApexECR service URL first.');
-      return;
-    }
-    setProbing(true);
-    setProbeResult(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'probe', kioskId: editingId },
-      });
-      if (error) throw error;
-      setProbeResult(data?.probe || null);
-      if (data?.success) {
-        toast.success('WCF contract read from the service.');
-      } else {
-        toast.error(data?.probe?.error || data?.error || 'Could not read the WSDL from that URL.');
-      }
-    } catch (error: any) {
-      toast.error(`Diagnostics failed: ${error.message}`);
-    } finally {
-      setProbing(false);
-    }
-  };
-
-  const applyProbeToForm = () => {
-    if (!probeResult?.ok) return;
-    setFormData((prev) => ({
-      ...prev,
-      configuration: {
-        ...prev.configuration,
-        hardware_pos: {
-          ...emptyHardwarePos(),
-          ...prev.configuration.hardware_pos!,
-          tem_namespace: probeResult.targetNamespace || prev.configuration.hardware_pos?.tem_namespace || '',
-          data_namespace: probeResult.dataNamespaces?.[0] || prev.configuration.hardware_pos?.data_namespace || '',
-          contract_name: probeResult.contractName || prev.configuration.hardware_pos?.contract_name || '',
-          soap_version: probeResult.soapVersion === '1.2' ? '1.2' : '1.1',
-        },
-      },
-    }));
-    toast.success('Discovered settings applied. Save the kiosk to keep them.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -871,92 +808,6 @@ const KiosksManagement = () => {
                         <Label htmlFor="apex_prod" className="cursor-pointer">Production</Label>
                       </div>
                     </RadioGroup>
-                  </div>
-
-                  {/* WCF contract settings */}
-                  <div className="border-t pt-3 space-y-3">
-                    <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      WCF Contract (advanced)
-                    </h5>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="apex_tem_ns">Service Namespace</Label>
-                        <Input
-                          id="apex_tem_ns"
-                          value={formData.configuration.hardware_pos?.tem_namespace || ''}
-                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, tem_namespace: e.target.value } } })}
-                          placeholder="http://tempuri.org/"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="apex_data_ns">Data Contract Namespace</Label>
-                        <Input
-                          id="apex_data_ns"
-                          value={formData.configuration.hardware_pos?.data_namespace || ''}
-                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, data_namespace: e.target.value } } })}
-                          placeholder="http://schemas.datacontract.org/2004/07/..."
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="apex_contract">Contract Name</Label>
-                        <Input
-                          id="apex_contract"
-                          value={formData.configuration.hardware_pos?.contract_name || ''}
-                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, contract_name: e.target.value } } })}
-                          placeholder="IApexEcr"
-                        />
-                      </div>
-                      <div>
-                        <Label>SOAP Version</Label>
-                        <RadioGroup
-                          value={formData.configuration.hardware_pos?.soap_version || '1.1'}
-                          onValueChange={(value: '1.1' | '1.2') => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, soap_version: value } } })}
-                          className="flex gap-4 mt-2"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="1.1" id="apex_soap11" />
-                            <Label htmlFor="apex_soap11" className="cursor-pointer text-sm">1.1 (basicHttpBinding)</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="1.2" id="apex_soap12" />
-                            <Label htmlFor="apex_soap12" className="cursor-pointer text-sm">1.2 (wsHttpBinding)</Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleProbeService}
-                      disabled={probing}
-                    >
-                      {probing ? 'Reading service contract…' : 'Test Connection / Read WSDL'}
-                    </Button>
-
-                    {probeResult && (
-                      <div className="rounded-md border bg-background p-3 text-xs space-y-1">
-                        {probeResult.ok ? (
-                          <>
-                            <p><span className="font-medium">WSDL:</span> {probeResult.wsdlUrl}</p>
-                            <p><span className="font-medium">Target namespace:</span> {probeResult.targetNamespace || '—'}</p>
-                            <p><span className="font-medium">Data contract:</span> {probeResult.dataNamespaces?.join(', ') || '—'}</p>
-                            <p><span className="font-medium">Contract:</span> {probeResult.contractName || '—'}</p>
-                            <p><span className="font-medium">SOAP version:</span> {probeResult.soapVersion}</p>
-                            <p><span className="font-medium">Bindings:</span> {probeResult.bindings?.join(', ') || '—'}</p>
-                            <p><span className="font-medium">Operations:</span> {probeResult.operations?.join(', ') || '—'}</p>
-                            <Button type="button" size="sm" className="mt-2" onClick={applyProbeToForm}>
-                              Apply discovered settings
-                            </Button>
-                          </>
-                        ) : (
-                          <p className="text-destructive">{probeResult.error || 'The service did not return a WSDL.'}</p>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   <div className="border-t pt-3 space-y-2">

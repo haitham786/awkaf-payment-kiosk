@@ -14,9 +14,6 @@
 
 export const APEX_DEFAULT_TEM_NS = "http://tempuri.org/";
 export const APEX_DEFAULT_DATA_NS = "http://schemas.datacontract.org/2004/07/";
-export const APEX_DEFAULT_CONTRACT = "IApexEcr";
-
-export type SoapVersion = "1.1" | "1.2";
 
 export interface ApexEcrConfig {
   serviceUrl: string;
@@ -28,10 +25,6 @@ export interface ApexEcrConfig {
   tellerFullName?: string;
   temNamespace?: string;
   dataNamespace?: string;
-  /** WCF service contract name used to build the SOAPAction, e.g. "IApexEcr". */
-  contractName?: string;
-  /** WCF basicHttpBinding = 1.1, wsHttpBinding / SOAP 1.2 bindings = 1.2. */
-  soapVersion?: SoapVersion;
   /** Seconds to wait for the donor to tap the card at the terminal. */
   timeoutSeconds?: number;
 }
@@ -41,7 +34,6 @@ export interface ApexSaleRequest {
   invoiceNumber: string;
   referenceNumber: string;
 }
-
 
 export interface ApexEcrResult {
   webResponseStatus: string;
@@ -105,28 +97,15 @@ export function baisasToDecimalString(baisas: number): string {
   return `${rials}.${String(remainder).padStart(3, "0")}`;
 }
 
-/**
- * WCF's DataContractSerializer expects data members in alphabetical order, so
- * every complex block below is emitted sorted by member name.
- */
-function members(ns: string, fields: Record<string, string>, indent: string): string {
-  return Object.keys(fields)
-    .sort((a, b) => a.localeCompare(b, "en"))
-    .map((key) => `${indent}<${ns}${key}>${escapeXml(fields[key])}</${ns}${key}>`)
-    .join("\n");
-}
-
 function configBlock(config: ApexEcrConfig, ns: string): string {
   return `
       <${ns}Config>
-${members(ns, {
-    EcrCurrencyCode: config.currencyCode,
-    EcrTillerFullName: config.tellerFullName || "KIOSK",
-    EcrTillerUserName: config.tellerUserName || "KIOSK",
-    MerchantSecureKey: config.secureKey,
-    Mid: config.mid,
-    Tid: config.tid,
-  }, "        ")}
+        <${ns}EcrCurrencyCode>${escapeXml(config.currencyCode)}</${ns}EcrCurrencyCode>
+        <${ns}EcrTillerFullName>${escapeXml(config.tellerFullName || "KIOSK")}</${ns}EcrTillerFullName>
+        <${ns}EcrTillerUserName>${escapeXml(config.tellerUserName || "KIOSK")}</${ns}EcrTillerUserName>
+        <${ns}MerchantSecureKey>${escapeXml(config.secureKey)}</${ns}MerchantSecureKey>
+        <${ns}Mid>${escapeXml(config.mid)}</${ns}Mid>
+        <${ns}Tid>${escapeXml(config.tid)}</${ns}Tid>
       </${ns}Config>`;
 }
 
@@ -137,84 +116,30 @@ ${members(ns, {
 function printerBlock(ns: string, invoiceNumber: string, referenceNumber: string): string {
   return `
       <${ns}Printer>
-${members(ns, {
-    EnablePrintPosReceipt: "0",
-    EnablePrintReceiptNote: "0",
-    InvoiceNumber: invoiceNumber,
-    PrinterWidth: "0",
-    ReceiptNote: "",
-    ReferenceNumber: referenceNumber,
-  }, "        ")}
+        <${ns}EnablePrintPosReceipt>0</${ns}EnablePrintPosReceipt>
+        <${ns}EnablePrintReceiptNote>0</${ns}EnablePrintReceiptNote>
+        <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
+        <${ns}PrinterWidth>0</${ns}PrinterWidth>
+        <${ns}ReceiptNote></${ns}ReceiptNote>
+        <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
       </${ns}Printer>`;
 }
 
-/**
- * Builds a WCF request envelope. `blocks` are complex members (Config, Printer)
- * and `simple` are scalar members; both are merged and emitted alphabetically.
- */
-function buildEnvelope(
-  config: ApexEcrConfig,
-  operation: string,
-  blocks: Record<string, string>,
-  simple: Record<string, string>,
-): string {
+export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
   const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
   const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
-  const soap12 = config.soapVersion === "1.2";
-  const envNs = soap12
-    ? "http://www.w3.org/2003/05/soap-envelope"
-    : "http://schemas.xmlsoap.org/soap/envelope/";
-
-  const ordered = [
-    ...Object.keys(blocks).map((k) => ({ key: k, xml: blocks[k] })),
-    ...Object.keys(simple).map((k) => ({
-      key: k,
-      xml: `\n        <ns:${k}>${escapeXml(simple[k])}</ns:${k}>`,
-    })),
-  ].sort((a, b) => a.key.localeCompare(b.key, "en"));
-
-  const header = soap12
-    ? `
-  <soapenv:Header>
-    <wsa:Action soapenv:mustUnderstand="true">${escapeXml(soapActionFor(config, operation))}</wsa:Action>
-    <wsa:To soapenv:mustUnderstand="true">${escapeXml(config.serviceUrl)}</wsa:To>
-  </soapenv:Header>`
-    : "";
-
-  const wsaAttr = soap12 ? ` xmlns:wsa="http://www.w3.org/2005/08/addressing"` : "";
-
   return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="${envNs}" xmlns:tem="${tem}" xmlns:ns="${data}"${wsaAttr}>${header}
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
   <soapenv:Body>
-    <tem:${operation}>
-      <tem:webReq>${ordered.map((m) => m.xml).join("")}
+    <tem:PerformFinancialTransaction>
+      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", request.invoiceNumber, request.referenceNumber)}
+        <ns:TransactionType>SALE</ns:TransactionType>
+        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>
+        <ns:InvoiceNumber>${escapeXml(request.invoiceNumber)}</ns:InvoiceNumber>
       </tem:webReq>
-    </tem:${operation}>
+    </tem:PerformFinancialTransaction>
   </soapenv:Body>
 </soapenv:Envelope>`;
-}
-
-/** WCF SOAPAction: <targetNamespace><ContractName>/<Operation> */
-export function soapActionFor(config: ApexEcrConfig, operation: string): string {
-  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
-  const base = tem.endsWith("/") ? tem : `${tem}/`;
-  return `${base}${config.contractName || APEX_DEFAULT_CONTRACT}/${operation}`;
-}
-
-export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
-  return buildEnvelope(
-    config,
-    "PerformFinancialTransaction",
-    {
-      Config: configBlock(config, "ns:"),
-      Printer: printerBlock("ns:", request.invoiceNumber, request.referenceNumber),
-    },
-    {
-      EcrAmount: request.amount,
-      InvoiceNumber: request.invoiceNumber,
-      TransactionType: "SALE",
-    },
-  );
 }
 
 export function buildEnquiryByRefEnvelope(
@@ -223,37 +148,35 @@ export function buildEnquiryByRefEnvelope(
   origRrn: string,
   origAuthCode = "",
 ): string {
-  return buildEnvelope(
-    config,
-    "EnquiryByRef",
-    {
-      Config: configBlock(config, "ns:"),
-      Printer: printerBlock("ns:", origInvoiceNumber, origInvoiceNumber),
-    },
-    {
-      OrigAuthCode: origAuthCode,
-      OrigInvoiceNumber: origInvoiceNumber,
-      OrigRrn: origRrn,
-    },
-  );
+  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
+  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
+  <soapenv:Body>
+    <tem:EnquiryByRef>
+      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", origInvoiceNumber, origInvoiceNumber)}
+        <ns:OrigAuthCode>${escapeXml(origAuthCode)}</ns:OrigAuthCode>
+        <ns:OrigInvoiceNumber>${escapeXml(origInvoiceNumber)}</ns:OrigInvoiceNumber>
+        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>
+      </tem:webReq>
+    </tem:EnquiryByRef>
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 export function buildCancelEnvelope(config: ApexEcrConfig): string {
-  return buildEnvelope(config, "CancelLastRequest", { Config: configBlock(config, "ns:") }, {});
+  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
+  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
+  <soapenv:Body>
+    <tem:CancelLastRequest>
+      <tem:webReq>${configBlock(config, "ns:")}
+      </tem:webReq>
+    </tem:CancelLastRequest>
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
-
-/** Extracts a SOAP 1.1 / 1.2 fault message, if the response is a fault. */
-export function parseSoapFault(xml: string): string | null {
-  if (!/<(?:[A-Za-z0-9_.-]+:)?Fault\b/i.test(xml)) return null;
-  const faultString = pickTag(xml, "faultstring") ||
-    pickTag(xml, "Text") ||
-    pickTag(xml, "Reason");
-  const faultCode = pickTag(xml, "faultcode") || pickTag(xml, "Value");
-  const detail = pickTag(xml, "ExceptionDetail") || pickTag(xml, "Message") || pickTag(xml, "detail");
-  const parts = [faultString || detail, faultCode ? `(${faultCode})` : ""].filter(Boolean);
-  return parts.join(" ").trim() || "SOAP Fault returned by the ApexECR service";
-}
-
 
 export function parseApexResponse(xml: string): ApexEcrResult {
   const posRespStatus = pickTag(xml, "PosRespStatus");
@@ -303,36 +226,24 @@ export async function callApexEcr(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  const soap12 = config.soapVersion === "1.2";
-  const headers: Record<string, string> = soap12
-    ? { "Content-Type": `application/soap+xml; charset=utf-8; action="${soapAction}"` }
-    : { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": `"${soapAction}"` };
-
   try {
     const response = await fetch(config.serviceUrl, {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": soapAction,
+      },
       body: envelope,
       signal: controller.signal,
     });
 
     const text = await response.text();
-    const fault = parseSoapFault(text);
-
-    if (fault) {
-      return {
-        ...parseApexResponse(text),
-        webResponseStatus: "99",
-        webResponseErrorDesc: `ApexECR SOAP Fault: ${fault}`,
-        approved: false,
-      };
-    }
 
     if (!response.ok) {
       return {
         ...parseApexResponse(text),
         webResponseStatus: "99",
-        webResponseErrorDesc: `ApexECR HTTP ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`,
+        webResponseErrorDesc: `ApexECR HTTP ${response.status}`,
         approved: false,
       };
     }
@@ -342,102 +253,3 @@ export async function callApexEcr(
     clearTimeout(timer);
   }
 }
-
-export interface ApexWsdlProbe {
-  ok: boolean;
-  wsdlUrl?: string;
-  targetNamespace?: string;
-  contractName?: string;
-  dataNamespaces?: string[];
-  operations?: string[];
-  soapActions?: string[];
-  soapVersion?: SoapVersion;
-  bindings?: string[];
-  error?: string;
-}
-
-/**
- * Fetches ?wsdl / ?singleWsdl from a WCF endpoint and extracts the contract
- * details we need (namespaces, operations, SOAPActions, SOAP version) so the
- * kiosk configuration can be aligned with the real service instead of guesses.
- */
-export async function probeApexWsdl(serviceUrl: string, timeoutSeconds = 20): Promise<ApexWsdlProbe> {
-  const base = serviceUrl.split("?")[0];
-  const candidates = [`${base}?singleWsdl`, `${base}?wsdl`];
-  let lastError = "No WSDL could be retrieved";
-
-  for (const wsdlUrl of candidates) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(5, timeoutSeconds) * 1000);
-    try {
-      const res = await fetch(wsdlUrl, { headers: { Accept: "text/xml" }, signal: controller.signal });
-      const xml = await res.text();
-      if (!res.ok || !/<(?:[A-Za-z0-9_.-]+:)?definitions\b/i.test(xml)) {
-        lastError = `HTTP ${res.status} at ${wsdlUrl}`;
-        continue;
-      }
-
-      const targetNamespace = xml.match(/targetNamespace\s*=\s*"([^"]+)"/i)?.[1];
-
-      const soapActions = Array.from(
-        xml.matchAll(/soapAction\s*=\s*"([^"]*)"/gi),
-        (m) => m[1],
-      ).filter((a) => a.length > 0);
-
-      const operations = Array.from(
-        new Set(
-          Array.from(
-            xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?operation\b[^>]*\bname\s*=\s*"([^"]+)"/gi),
-            (m) => m[1],
-          ),
-        ),
-      );
-
-      const dataNamespaces = Array.from(
-        new Set(
-          Array.from(xml.matchAll(/"(https?:\/\/schemas\.datacontract\.org\/[^"]*)"/gi), (m) => m[1]),
-        ),
-      );
-
-      const bindings = Array.from(
-        new Set(
-          Array.from(
-            xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?binding\b[^>]*\bname\s*=\s*"([^"]+)"/gi),
-            (m) => m[1],
-          ),
-        ),
-      );
-
-      const soapVersion: SoapVersion =
-        /http:\/\/schemas\.xmlsoap\.org\/wsdl\/soap12\//i.test(xml) &&
-        !/http:\/\/schemas\.xmlsoap\.org\/wsdl\/soap\/"/i.test(xml)
-          ? "1.2"
-          : "1.1";
-
-      // SOAPAction shape is <ns><Contract>/<Operation>.
-      const contractName = soapActions
-        .map((a) => a.split("/").slice(-2)[0])
-        .find((c) => !!c);
-
-      clearTimeout(timer);
-      return {
-        ok: true,
-        wsdlUrl,
-        targetNamespace,
-        contractName,
-        dataNamespaces,
-        operations,
-        soapActions,
-        soapVersion,
-        bindings,
-      };
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  return { ok: false, error: lastError };
-}
-
