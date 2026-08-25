@@ -105,15 +105,28 @@ export function baisasToDecimalString(baisas: number): string {
   return `${rials}.${String(remainder).padStart(3, "0")}`;
 }
 
+/**
+ * WCF's DataContractSerializer expects data members in alphabetical order, so
+ * every complex block below is emitted sorted by member name.
+ */
+function members(ns: string, fields: Record<string, string>, indent: string): string {
+  return Object.keys(fields)
+    .sort((a, b) => a.localeCompare(b, "en"))
+    .map((key) => `${indent}<${ns}${key}>${escapeXml(fields[key])}</${ns}${key}>`)
+    .join("\n");
+}
+
 function configBlock(config: ApexEcrConfig, ns: string): string {
   return `
       <${ns}Config>
-        <${ns}EcrCurrencyCode>${escapeXml(config.currencyCode)}</${ns}EcrCurrencyCode>
-        <${ns}EcrTillerFullName>${escapeXml(config.tellerFullName || "KIOSK")}</${ns}EcrTillerFullName>
-        <${ns}EcrTillerUserName>${escapeXml(config.tellerUserName || "KIOSK")}</${ns}EcrTillerUserName>
-        <${ns}MerchantSecureKey>${escapeXml(config.secureKey)}</${ns}MerchantSecureKey>
-        <${ns}Mid>${escapeXml(config.mid)}</${ns}Mid>
-        <${ns}Tid>${escapeXml(config.tid)}</${ns}Tid>
+${members(ns, {
+    EcrCurrencyCode: config.currencyCode,
+    EcrTillerFullName: config.tellerFullName || "KIOSK",
+    EcrTillerUserName: config.tellerUserName || "KIOSK",
+    MerchantSecureKey: config.secureKey,
+    Mid: config.mid,
+    Tid: config.tid,
+  }, "        ")}
       </${ns}Config>`;
 }
 
@@ -124,30 +137,84 @@ function configBlock(config: ApexEcrConfig, ns: string): string {
 function printerBlock(ns: string, invoiceNumber: string, referenceNumber: string): string {
   return `
       <${ns}Printer>
-        <${ns}EnablePrintPosReceipt>0</${ns}EnablePrintPosReceipt>
-        <${ns}EnablePrintReceiptNote>0</${ns}EnablePrintReceiptNote>
-        <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
-        <${ns}PrinterWidth>0</${ns}PrinterWidth>
-        <${ns}ReceiptNote></${ns}ReceiptNote>
-        <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
+${members(ns, {
+    EnablePrintPosReceipt: "0",
+    EnablePrintReceiptNote: "0",
+    InvoiceNumber: invoiceNumber,
+    PrinterWidth: "0",
+    ReceiptNote: "",
+    ReferenceNumber: referenceNumber,
+  }, "        ")}
       </${ns}Printer>`;
 }
 
-export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
+/**
+ * Builds a WCF request envelope. `blocks` are complex members (Config, Printer)
+ * and `simple` are scalar members; both are merged and emitted alphabetically.
+ */
+function buildEnvelope(
+  config: ApexEcrConfig,
+  operation: string,
+  blocks: Record<string, string>,
+  simple: Record<string, string>,
+): string {
   const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
   const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
+  const soap12 = config.soapVersion === "1.2";
+  const envNs = soap12
+    ? "http://www.w3.org/2003/05/soap-envelope"
+    : "http://schemas.xmlsoap.org/soap/envelope/";
+
+  const ordered = [
+    ...Object.keys(blocks).map((k) => ({ key: k, xml: blocks[k] })),
+    ...Object.keys(simple).map((k) => ({
+      key: k,
+      xml: `\n        <ns:${k}>${escapeXml(simple[k])}</ns:${k}>`,
+    })),
+  ].sort((a, b) => a.key.localeCompare(b.key, "en"));
+
+  const header = soap12
+    ? `
+  <soapenv:Header>
+    <wsa:Action soapenv:mustUnderstand="true">${escapeXml(soapActionFor(config, operation))}</wsa:Action>
+    <wsa:To soapenv:mustUnderstand="true">${escapeXml(config.serviceUrl)}</wsa:To>
+  </soapenv:Header>`
+    : "";
+
+  const wsaAttr = soap12 ? ` xmlns:wsa="http://www.w3.org/2005/08/addressing"` : "";
+
   return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
+<soapenv:Envelope xmlns:soapenv="${envNs}" xmlns:tem="${tem}" xmlns:ns="${data}"${wsaAttr}>${header}
   <soapenv:Body>
-    <tem:PerformFinancialTransaction>
-      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", request.invoiceNumber, request.referenceNumber)}
-        <ns:TransactionType>SALE</ns:TransactionType>
-        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>
-        <ns:InvoiceNumber>${escapeXml(request.invoiceNumber)}</ns:InvoiceNumber>
+    <tem:${operation}>
+      <tem:webReq>${ordered.map((m) => m.xml).join("")}
       </tem:webReq>
-    </tem:PerformFinancialTransaction>
+    </tem:${operation}>
   </soapenv:Body>
 </soapenv:Envelope>`;
+}
+
+/** WCF SOAPAction: <targetNamespace><ContractName>/<Operation> */
+export function soapActionFor(config: ApexEcrConfig, operation: string): string {
+  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
+  const base = tem.endsWith("/") ? tem : `${tem}/`;
+  return `${base}${config.contractName || APEX_DEFAULT_CONTRACT}/${operation}`;
+}
+
+export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
+  return buildEnvelope(
+    config,
+    "PerformFinancialTransaction",
+    {
+      Config: configBlock(config, "ns:"),
+      Printer: printerBlock("ns:", request.invoiceNumber, request.referenceNumber),
+    },
+    {
+      EcrAmount: request.amount,
+      InvoiceNumber: request.invoiceNumber,
+      TransactionType: "SALE",
+    },
+  );
 }
 
 export function buildEnquiryByRefEnvelope(
@@ -156,35 +223,37 @@ export function buildEnquiryByRefEnvelope(
   origRrn: string,
   origAuthCode = "",
 ): string {
-  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
-  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
-  <soapenv:Body>
-    <tem:EnquiryByRef>
-      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", origInvoiceNumber, origInvoiceNumber)}
-        <ns:OrigAuthCode>${escapeXml(origAuthCode)}</ns:OrigAuthCode>
-        <ns:OrigInvoiceNumber>${escapeXml(origInvoiceNumber)}</ns:OrigInvoiceNumber>
-        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>
-      </tem:webReq>
-    </tem:EnquiryByRef>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+  return buildEnvelope(
+    config,
+    "EnquiryByRef",
+    {
+      Config: configBlock(config, "ns:"),
+      Printer: printerBlock("ns:", origInvoiceNumber, origInvoiceNumber),
+    },
+    {
+      OrigAuthCode: origAuthCode,
+      OrigInvoiceNumber: origInvoiceNumber,
+      OrigRrn: origRrn,
+    },
+  );
 }
 
 export function buildCancelEnvelope(config: ApexEcrConfig): string {
-  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
-  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
-  <soapenv:Body>
-    <tem:CancelLastRequest>
-      <tem:webReq>${configBlock(config, "ns:")}
-      </tem:webReq>
-    </tem:CancelLastRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+  return buildEnvelope(config, "CancelLastRequest", { Config: configBlock(config, "ns:") }, {});
 }
+
+/** Extracts a SOAP 1.1 / 1.2 fault message, if the response is a fault. */
+export function parseSoapFault(xml: string): string | null {
+  if (!/<(?:[A-Za-z0-9_.-]+:)?Fault\b/i.test(xml)) return null;
+  const faultString = pickTag(xml, "faultstring") ||
+    pickTag(xml, "Text") ||
+    pickTag(xml, "Reason");
+  const faultCode = pickTag(xml, "faultcode") || pickTag(xml, "Value");
+  const detail = pickTag(xml, "ExceptionDetail") || pickTag(xml, "Message") || pickTag(xml, "detail");
+  const parts = [faultString || detail, faultCode ? `(${faultCode})` : ""].filter(Boolean);
+  return parts.join(" ").trim() || "SOAP Fault returned by the ApexECR service";
+}
+
 
 export function parseApexResponse(xml: string): ApexEcrResult {
   const posRespStatus = pickTag(xml, "PosRespStatus");
