@@ -261,6 +261,54 @@ const KiosksManagement = () => {
     }
   };
 
+  const handleProbeService = async () => {
+    if (!editingId) {
+      toast.error('Save the kiosk first, then run the service diagnostics.');
+      return;
+    }
+    if (!formData.configuration.hardware_pos?.service_url?.trim()) {
+      toast.error('Enter the ApexECR service URL first.');
+      return;
+    }
+    setProbing(true);
+    setProbeResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
+        body: { action: 'probe', kioskId: editingId },
+      });
+      if (error) throw error;
+      setProbeResult(data?.probe || null);
+      if (data?.success) {
+        toast.success('WCF contract read from the service.');
+      } else {
+        toast.error(data?.probe?.error || data?.error || 'Could not read the WSDL from that URL.');
+      }
+    } catch (error: any) {
+      toast.error(`Diagnostics failed: ${error.message}`);
+    } finally {
+      setProbing(false);
+    }
+  };
+
+  const applyProbeToForm = () => {
+    if (!probeResult?.ok) return;
+    setFormData((prev) => ({
+      ...prev,
+      configuration: {
+        ...prev.configuration,
+        hardware_pos: {
+          ...emptyHardwarePos(),
+          ...prev.configuration.hardware_pos!,
+          tem_namespace: probeResult.targetNamespace || prev.configuration.hardware_pos?.tem_namespace || '',
+          data_namespace: probeResult.dataNamespaces?.[0] || prev.configuration.hardware_pos?.data_namespace || '',
+          contract_name: probeResult.contractName || prev.configuration.hardware_pos?.contract_name || '',
+          soap_version: probeResult.soapVersion === '1.2' ? '1.2' : '1.1',
+        },
+      },
+    }));
+    toast.success('Discovered settings applied. Save the kiosk to keep them.');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
