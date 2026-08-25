@@ -9,7 +9,10 @@ import {
   buildSaleEnvelope,
   callApexEcr,
   panLastFour,
+  probeApexWsdl,
+  soapActionFor,
 } from "../_shared/apexEcr.ts";
+
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,7 +45,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (action !== "cancel" && !UUID_REGEX.test(transactionId)) {
+    if (action !== "cancel" && action !== "probe" && !UUID_REGEX.test(transactionId)) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
@@ -81,10 +84,24 @@ serve(async (req) => {
       tellerFullName: "KIOSK",
       temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
       dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+      contractName: hardware.contract_name ? String(hardware.contract_name) : undefined,
+      soapVersion: String(hardware.soap_version) === "1.2" ? "1.2" : "1.1",
       timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
     };
 
+    // ----------------------------------------------------------------- probe
+    // Reads the WCF contract straight from the service so admins can align the
+    // kiosk configuration with the real UAT endpoint.
+    if (action === "probe") {
+      if (!/^https:\/\//i.test(config.serviceUrl)) {
+        return json({ success: false, error: "Enter an HTTPS ApexECR service URL first." }, 200, corsHeaders);
+      }
+      const probe = await probeApexWsdl(config.serviceUrl);
+      return json({ success: probe.ok, probe }, 200, corsHeaders);
+    }
+
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
+
       return json(
         { success: false, error: "Hardware POS is not fully configured for this kiosk." },
         400,
@@ -129,7 +146,7 @@ serve(async (req) => {
         const result = await callApexEcr(
           config,
           buildCancelEnvelope(config),
-          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+          soapActionFor(config, "CancelLastRequest"),
         );
         return json({ success: true, cancelled: result.webResponseStatus !== "99" }, 200, corsHeaders);
       } catch (_err) {
@@ -144,8 +161,16 @@ serve(async (req) => {
       const result = await callApexEcr(
         config,
         buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
-        `${config.temNamespace || "http://tempuri.org/"}IApexEcr/EnquiryByRef`,
+        soapActionFor(config, "EnquiryByRef"),
       );
+      if (result.webResponseStatus === "99") {
+        console.error("ApexECR enquiry failure:", result.webResponseErrorDesc);
+        return json(
+          { success: false, approved: false, invoiceNumber, error: result.webResponseErrorDesc },
+          200,
+          corsHeaders,
+        );
+      }
       return json(
         {
           success: true,
@@ -158,6 +183,7 @@ serve(async (req) => {
         200,
         corsHeaders,
       );
+
     }
 
     // ------------------------------------------------------------------ sale
@@ -172,7 +198,7 @@ serve(async (req) => {
         invoiceNumber,
         referenceNumber: transactionId,
       }),
-      `${config.temNamespace || "http://tempuri.org/"}IApexEcr/PerformFinancialTransaction`,
+      soapActionFor(config, "PerformFinancialTransaction"),
     );
 
     if (saleResult.webResponseStatus === "99") {
