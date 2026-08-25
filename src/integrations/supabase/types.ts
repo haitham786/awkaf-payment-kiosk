@@ -109,7 +109,6 @@ export type Database = {
           pos_type: string | null
           quranic_verse: string | null
           quranic_verse_surah: string | null
-          soft_pos_config: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -120,7 +119,6 @@ export type Database = {
           pos_type?: string | null
           quranic_verse?: string | null
           quranic_verse_surah?: string | null
-          soft_pos_config?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -131,7 +129,6 @@ export type Database = {
           pos_type?: string | null
           quranic_verse?: string | null
           quranic_verse_surah?: string | null
-          soft_pos_config?: Json | null
           updated_at?: string | null
         }
         Relationships: []
