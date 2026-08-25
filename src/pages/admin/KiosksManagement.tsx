@@ -873,6 +873,92 @@ const KiosksManagement = () => {
                     </RadioGroup>
                   </div>
 
+                  {/* WCF contract settings */}
+                  <div className="border-t pt-3 space-y-3">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      WCF Contract (advanced)
+                    </h5>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="apex_tem_ns">Service Namespace</Label>
+                        <Input
+                          id="apex_tem_ns"
+                          value={formData.configuration.hardware_pos?.tem_namespace || ''}
+                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, tem_namespace: e.target.value } } })}
+                          placeholder="http://tempuri.org/"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="apex_data_ns">Data Contract Namespace</Label>
+                        <Input
+                          id="apex_data_ns"
+                          value={formData.configuration.hardware_pos?.data_namespace || ''}
+                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, data_namespace: e.target.value } } })}
+                          placeholder="http://schemas.datacontract.org/2004/07/..."
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="apex_contract">Contract Name</Label>
+                        <Input
+                          id="apex_contract"
+                          value={formData.configuration.hardware_pos?.contract_name || ''}
+                          onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, contract_name: e.target.value } } })}
+                          placeholder="IApexEcr"
+                        />
+                      </div>
+                      <div>
+                        <Label>SOAP Version</Label>
+                        <RadioGroup
+                          value={formData.configuration.hardware_pos?.soap_version || '1.1'}
+                          onValueChange={(value: '1.1' | '1.2') => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, soap_version: value } } })}
+                          className="flex gap-4 mt-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="1.1" id="apex_soap11" />
+                            <Label htmlFor="apex_soap11" className="cursor-pointer text-sm">1.1 (basicHttpBinding)</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="1.2" id="apex_soap12" />
+                            <Label htmlFor="apex_soap12" className="cursor-pointer text-sm">1.2 (wsHttpBinding)</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleProbeService}
+                      disabled={probing}
+                    >
+                      {probing ? 'Reading service contract…' : 'Test Connection / Read WSDL'}
+                    </Button>
+
+                    {probeResult && (
+                      <div className="rounded-md border bg-background p-3 text-xs space-y-1">
+                        {probeResult.ok ? (
+                          <>
+                            <p><span className="font-medium">WSDL:</span> {probeResult.wsdlUrl}</p>
+                            <p><span className="font-medium">Target namespace:</span> {probeResult.targetNamespace || '—'}</p>
+                            <p><span className="font-medium">Data contract:</span> {probeResult.dataNamespaces?.join(', ') || '—'}</p>
+                            <p><span className="font-medium">Contract:</span> {probeResult.contractName || '—'}</p>
+                            <p><span className="font-medium">SOAP version:</span> {probeResult.soapVersion}</p>
+                            <p><span className="font-medium">Bindings:</span> {probeResult.bindings?.join(', ') || '—'}</p>
+                            <p><span className="font-medium">Operations:</span> {probeResult.operations?.join(', ') || '—'}</p>
+                            <Button type="button" size="sm" className="mt-2" onClick={applyProbeToForm}>
+                              Apply discovered settings
+                            </Button>
+                          </>
+                        ) : (
+                          <p className="text-destructive">{probeResult.error || 'The service did not return a WSDL.'}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="border-t pt-3 space-y-2">
                     <p className="text-xs text-muted-foreground">
                       This kiosk is paired 1:1 with the terminal registered under this TID. A terminal ID can
