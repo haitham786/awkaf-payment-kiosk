@@ -146,7 +146,7 @@ serve(async (req) => {
         const result = await callApexEcr(
           config,
           buildCancelEnvelope(config),
-          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+          soapActionFor(config, "CancelLastRequest"),
         );
         return json({ success: true, cancelled: result.webResponseStatus !== "99" }, 200, corsHeaders);
       } catch (_err) {
@@ -161,7 +161,7 @@ serve(async (req) => {
       const result = await callApexEcr(
         config,
         buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
-        `${config.temNamespace || "http://tempuri.org/"}IApexEcr/EnquiryByRef`,
+        soapActionFor(config, "EnquiryByRef"),
       );
       return json(
         {
@@ -189,7 +189,7 @@ serve(async (req) => {
         invoiceNumber,
         referenceNumber: transactionId,
       }),
-      `${config.temNamespace || "http://tempuri.org/"}IApexEcr/PerformFinancialTransaction`,
+      soapActionFor(config, "PerformFinancialTransaction"),
     );
 
     if (saleResult.webResponseStatus === "99") {
