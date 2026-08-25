@@ -303,24 +303,36 @@ export async function callApexEcr(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  const soap12 = config.soapVersion === "1.2";
+  const headers: Record<string, string> = soap12
+    ? { "Content-Type": `application/soap+xml; charset=utf-8; action="${soapAction}"` }
+    : { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": `"${soapAction}"` };
+
   try {
     const response = await fetch(config.serviceUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": soapAction,
-      },
+      headers,
       body: envelope,
       signal: controller.signal,
     });
 
     const text = await response.text();
+    const fault = parseSoapFault(text);
+
+    if (fault) {
+      return {
+        ...parseApexResponse(text),
+        webResponseStatus: "99",
+        webResponseErrorDesc: `ApexECR SOAP Fault: ${fault}`,
+        approved: false,
+      };
+    }
 
     if (!response.ok) {
       return {
         ...parseApexResponse(text),
         webResponseStatus: "99",
-        webResponseErrorDesc: `ApexECR HTTP ${response.status}`,
+        webResponseErrorDesc: `ApexECR HTTP ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`,
         approved: false,
       };
     }
@@ -330,3 +342,102 @@ export async function callApexEcr(
     clearTimeout(timer);
   }
 }
+
+export interface ApexWsdlProbe {
+  ok: boolean;
+  wsdlUrl?: string;
+  targetNamespace?: string;
+  contractName?: string;
+  dataNamespaces?: string[];
+  operations?: string[];
+  soapActions?: string[];
+  soapVersion?: SoapVersion;
+  bindings?: string[];
+  error?: string;
+}
+
+/**
+ * Fetches ?wsdl / ?singleWsdl from a WCF endpoint and extracts the contract
+ * details we need (namespaces, operations, SOAPActions, SOAP version) so the
+ * kiosk configuration can be aligned with the real service instead of guesses.
+ */
+export async function probeApexWsdl(serviceUrl: string, timeoutSeconds = 20): Promise<ApexWsdlProbe> {
+  const base = serviceUrl.split("?")[0];
+  const candidates = [`${base}?singleWsdl`, `${base}?wsdl`];
+  let lastError = "No WSDL could be retrieved";
+
+  for (const wsdlUrl of candidates) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(5, timeoutSeconds) * 1000);
+    try {
+      const res = await fetch(wsdlUrl, { headers: { Accept: "text/xml" }, signal: controller.signal });
+      const xml = await res.text();
+      if (!res.ok || !/<(?:[A-Za-z0-9_.-]+:)?definitions\b/i.test(xml)) {
+        lastError = `HTTP ${res.status} at ${wsdlUrl}`;
+        continue;
+      }
+
+      const targetNamespace = xml.match(/targetNamespace\s*=\s*"([^"]+)"/i)?.[1];
+
+      const soapActions = Array.from(
+        xml.matchAll(/soapAction\s*=\s*"([^"]*)"/gi),
+        (m) => m[1],
+      ).filter((a) => a.length > 0);
+
+      const operations = Array.from(
+        new Set(
+          Array.from(
+            xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?operation\b[^>]*\bname\s*=\s*"([^"]+)"/gi),
+            (m) => m[1],
+          ),
+        ),
+      );
+
+      const dataNamespaces = Array.from(
+        new Set(
+          Array.from(xml.matchAll(/"(https?:\/\/schemas\.datacontract\.org\/[^"]*)"/gi), (m) => m[1]),
+        ),
+      );
+
+      const bindings = Array.from(
+        new Set(
+          Array.from(
+            xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?binding\b[^>]*\bname\s*=\s*"([^"]+)"/gi),
+            (m) => m[1],
+          ),
+        ),
+      );
+
+      const soapVersion: SoapVersion =
+        /http:\/\/schemas\.xmlsoap\.org\/wsdl\/soap12\//i.test(xml) &&
+        !/http:\/\/schemas\.xmlsoap\.org\/wsdl\/soap\/"/i.test(xml)
+          ? "1.2"
+          : "1.1";
+
+      // SOAPAction shape is <ns><Contract>/<Operation>.
+      const contractName = soapActions
+        .map((a) => a.split("/").slice(-2)[0])
+        .find((c) => !!c);
+
+      clearTimeout(timer);
+      return {
+        ok: true,
+        wsdlUrl,
+        targetNamespace,
+        contractName,
+        dataNamespaces,
+        operations,
+        soapActions,
+        soapVersion,
+        bindings,
+      };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return { ok: false, error: lastError };
+}
+
