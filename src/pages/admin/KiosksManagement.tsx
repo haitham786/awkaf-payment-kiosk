@@ -87,6 +87,8 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [verifyingTerminal, setVerifyingTerminal] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const [probeResult, setProbeResult] = useState<any>(null);
 
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
