@@ -33,6 +33,10 @@ interface KioskConfiguration {
     currency_code: string;
     environment: 'uat' | 'production';
     timeout_seconds: number;
+    soap_version?: '1.1' | '1.2';
+    tem_namespace?: string;
+    data_namespace?: string;
+    contract_name?: string;
   };
   test_payment?: {
     auto_approve?: boolean;
@@ -49,7 +53,12 @@ const emptyHardwarePos = () => ({
   currency_code: '512',
   environment: 'uat' as 'uat' | 'production',
   timeout_seconds: 90,
+  soap_version: '1.1' as '1.1' | '1.2',
+  tem_namespace: '',
+  data_namespace: '',
+  contract_name: '',
 });
+
 
 const KiosksManagement = () => {
   const navigate = useNavigate();
