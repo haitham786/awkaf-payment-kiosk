@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resolveProfilePictureUrl } from "@/lib/profilePicture";
+
 
 export const AdminHeader = () => {
   const navigate = useNavigate();
@@ -27,9 +29,10 @@ export const AdminHeader = () => {
       if (error) throw error;
 
       if (data) {
-        setProfilePicture(data.profile_picture_url || "");
+        setProfilePicture(await resolveProfilePictureUrl(data.profile_picture_url));
         setFullName(data.full_name || "");
       }
+
     } catch (error) {
       console.error("Error loading profile:", error);
     }
