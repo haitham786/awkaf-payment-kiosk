@@ -14,6 +14,9 @@
 
 export const APEX_DEFAULT_TEM_NS = "http://tempuri.org/";
 export const APEX_DEFAULT_DATA_NS = "http://schemas.datacontract.org/2004/07/";
+export const APEX_DEFAULT_CONTRACT = "IApexEcr";
+
+export type SoapVersion = "1.1" | "1.2";
 
 export interface ApexEcrConfig {
   serviceUrl: string;
@@ -25,6 +28,10 @@ export interface ApexEcrConfig {
   tellerFullName?: string;
   temNamespace?: string;
   dataNamespace?: string;
+  /** WCF service contract name used to build the SOAPAction, e.g. "IApexEcr". */
+  contractName?: string;
+  /** WCF basicHttpBinding = 1.1, wsHttpBinding / SOAP 1.2 bindings = 1.2. */
+  soapVersion?: SoapVersion;
   /** Seconds to wait for the donor to tap the card at the terminal. */
   timeoutSeconds?: number;
 }
@@ -34,6 +41,7 @@ export interface ApexSaleRequest {
   invoiceNumber: string;
   referenceNumber: string;
 }
+
 
 export interface ApexEcrResult {
   webResponseStatus: string;
