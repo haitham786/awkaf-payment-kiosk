@@ -84,10 +84,24 @@ serve(async (req) => {
       tellerFullName: "KIOSK",
       temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
       dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+      contractName: hardware.contract_name ? String(hardware.contract_name) : undefined,
+      soapVersion: String(hardware.soap_version) === "1.2" ? "1.2" : "1.1",
       timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
     };
 
+    // ----------------------------------------------------------------- probe
+    // Reads the WCF contract straight from the service so admins can align the
+    // kiosk configuration with the real UAT endpoint.
+    if (action === "probe") {
+      if (!/^https:\/\//i.test(config.serviceUrl)) {
+        return json({ success: false, error: "Enter an HTTPS ApexECR service URL first." }, 200, corsHeaders);
+      }
+      const probe = await probeApexWsdl(config.serviceUrl);
+      return json({ success: probe.ok, probe }, 200, corsHeaders);
+    }
+
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
+
       return json(
         { success: false, error: "Hardware POS is not fully configured for this kiosk." },
         400,
