@@ -111,6 +111,10 @@ const KiosksManagement = () => {
               currency_code: hardware_pos.currency_code?.trim() || '512',
               environment: hardware_pos.environment || 'uat',
               timeout_seconds: Number(hardware_pos.timeout_seconds) > 0 ? Number(hardware_pos.timeout_seconds) : 90,
+              soap_version: hardware_pos.soap_version === '1.2' ? '1.2' : '1.1',
+              tem_namespace: hardware_pos.tem_namespace?.trim() || '',
+              data_namespace: hardware_pos.data_namespace?.trim() || '',
+              contract_name: hardware_pos.contract_name?.trim() || '',
             }
           : undefined,
       },
