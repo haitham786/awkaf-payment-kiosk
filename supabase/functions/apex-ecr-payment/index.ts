@@ -9,7 +9,10 @@ import {
   buildSaleEnvelope,
   callApexEcr,
   panLastFour,
+  probeApexWsdl,
+  soapActionFor,
 } from "../_shared/apexEcr.ts";
+
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
