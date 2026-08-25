@@ -163,6 +163,14 @@ serve(async (req) => {
         buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
         soapActionFor(config, "EnquiryByRef"),
       );
+      if (result.webResponseStatus === "99") {
+        console.error("ApexECR enquiry failure:", result.webResponseErrorDesc);
+        return json(
+          { success: false, approved: false, invoiceNumber, error: result.webResponseErrorDesc },
+          200,
+          corsHeaders,
+        );
+      }
       return json(
         {
           success: true,
@@ -175,6 +183,7 @@ serve(async (req) => {
         200,
         corsHeaders,
       );
+
     }
 
     // ------------------------------------------------------------------ sale
