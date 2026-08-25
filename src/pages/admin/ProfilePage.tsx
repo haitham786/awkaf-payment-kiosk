@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Lock, Save, User } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
+import { resolveProfilePictureUrl } from "@/lib/profilePicture";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const ProfilePage = () => {
     mobile_number: '',
     profile_picture_url: ''
   });
+  const [picturePreviewUrl, setPicturePreviewUrl] = useState('');
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
     confirmPassword: ''
@@ -60,6 +62,7 @@ const ProfilePage = () => {
         mobile_number: data.mobile_number || '',
         profile_picture_url: data.profile_picture_url || ''
       });
+      setPicturePreviewUrl(await resolveProfilePictureUrl(data.profile_picture_url));
     }
   };
 
@@ -133,11 +136,8 @@ const ProfilePage = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(filePath);
-
-      setProfile({ ...profile, profile_picture_url: publicUrl });
+      setProfile({ ...profile, profile_picture_url: filePath });
+      setPicturePreviewUrl(await resolveProfilePictureUrl(filePath));
 
       toast({
         title: "Profile picture uploaded",
@@ -229,9 +229,9 @@ const ProfilePage = () => {
             {/* Profile Picture */}
             <div className="flex items-center gap-6 pb-6 border-b">
               <div className="relative">
-                {profile.profile_picture_url ? (
+                {picturePreviewUrl ? (
                   <img
-                    src={profile.profile_picture_url}
+                    src={picturePreviewUrl}
                     alt="Profile"
                     className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
                   />
