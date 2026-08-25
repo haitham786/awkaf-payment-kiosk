@@ -45,7 +45,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (action !== "cancel" && !UUID_REGEX.test(transactionId)) {
+    if (action !== "cancel" && action !== "probe" && !UUID_REGEX.test(transactionId)) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
