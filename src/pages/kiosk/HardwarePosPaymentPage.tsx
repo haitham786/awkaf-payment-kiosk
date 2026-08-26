@@ -18,6 +18,9 @@ interface ApexResponse {
   rrn?: string | null;
   responseText?: string | null;
   timedOut?: boolean;
+  correlationId?: string;
+  failureType?: string;
+  outcomeUnknown?: boolean;
 }
 
 const HardwarePosPaymentPage = () => {
@@ -89,7 +92,11 @@ const HardwarePosPaymentPage = () => {
       }
 
       if (result.success === false && result.error) {
-        setErrorMessage(result.error);
+        const arabic = result.failureType === "afs_network_block"
+          ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
+          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+        const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
+        setErrorMessage(`${arabic}\n${result.error}${reference}`);
         setStage("error");
         return;
       }
@@ -124,8 +131,8 @@ const HardwarePosPaymentPage = () => {
   };
 
   const handleTimeout = () => {
-    cancelAtTerminal();
-    navigate("/kiosk");
+    setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
+    setStage("error");
   };
 
   const handleTryAgain = () => {

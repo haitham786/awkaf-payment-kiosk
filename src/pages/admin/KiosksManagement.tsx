@@ -78,6 +78,7 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [verifyingTerminal, setVerifyingTerminal] = useState(false);
+  const [terminalDiagnostic, setTerminalDiagnostic] = useState<string | null>(null);
 
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
@@ -229,15 +230,22 @@ const KiosksManagement = () => {
       return;
     }
     setVerifyingTerminal(true);
+    setTerminalDiagnostic(null);
     try {
       const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'enquiry', kioskId: editingId, transactionId: crypto.randomUUID() },
+        body: { action: 'diagnose', kioskId: editingId },
       });
       if (error) throw error;
       if (data?.success) {
-        toast.success(`Terminal ${hardware.tid} responded${data.responseText ? `: ${data.responseText}` : ''}`);
+        const message = `AFS service and SOAP routing responded. Reference: ${data.correlationId}`;
+        setTerminalDiagnostic(message);
+        toast.success(message);
       } else {
-        toast.error(data?.error || 'The terminal did not confirm this TID/MID pair.');
+        const soapProbe = Array.isArray(data?.probes) ? data.probes.find((probe: any) => probe?.probe === 'soap') : null;
+        const detail = soapProbe?.webResponseErrorDesc || soapProbe?.faultMessage || data?.error;
+        const message = `${detail || 'AFS did not accept the SOAP request.'}${data?.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
+        setTerminalDiagnostic(message);
+        toast.error(message);
       }
     } catch (error: any) {
       toast.error(`Terminal verification failed: ${error.message}`);
@@ -831,8 +839,11 @@ const KiosksManagement = () => {
                       onClick={handleVerifyTerminal}
                       disabled={verifyingTerminal}
                     >
-                      {verifyingTerminal ? 'Verifying terminal…' : 'Verify Terminal'}
+                      {verifyingTerminal ? 'Checking AFS connection…' : 'Test AFS Connection'}
                     </Button>
+                    {terminalDiagnostic && (
+                      <p className="text-xs text-muted-foreground break-words">{terminalDiagnostic}</p>
+                    )}
                   </div>
                 </div>
               )}
