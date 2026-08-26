@@ -42,7 +42,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (action !== "cancel" && action !== "diagnose" && !UUID_REGEX.test(transactionId)) {
+    if (action !== "cancel" && action !== "diagnose" && action !== "wsdl" && !UUID_REGEX.test(transactionId)) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
@@ -122,6 +122,19 @@ serve(async (req) => {
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
 
+
+    // ------------------------------------------------------------------ wsdl
+    // Fetches the service contract (or an imported schema) so the exact SOAP
+    // operations and namespaces can be verified against the live service.
+    if (action === "wsdl") {
+      const target = String(body?.url || `${config.serviceUrl}?wsdl`);
+      if (!target.startsWith(config.serviceUrl.split("/").slice(0, 3).join("/"))) {
+        return json({ success: false, error: "URL outside the ApexECR host" }, 400, corsHeaders);
+      }
+      const res = await fetch(target, { method: "GET" });
+      const text = await res.text();
+      return json({ success: true, status: res.status, length: text.length, body: text.slice(0, 90000) }, 200, corsHeaders);
+    }
 
     // -------------------------------------------------------------- diagnose
     // Connectivity check used by the admin panel. Never touches a card; it just
