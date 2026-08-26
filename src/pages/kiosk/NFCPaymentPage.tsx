@@ -101,7 +101,18 @@ const NFCPaymentPage = () => {
         loadKioskSoftPosConfig(kioskId),
         checkNFCAvailability(),
       ]);
-      if (!config) { setErrorMessage('Soft POS is not configured for this kiosk.'); setStage('error'); return; }
+      if (!config) {
+        // Confirm the live mode before blaming Soft POS — the kiosk may now be
+        // paired with an ApexECR hardware terminal.
+        const live = await loadKioskRuntimeConfig(kioskId, { forceRefresh: true }).catch(() => null);
+        if (live?.payment_mode === 'hardware_pos') {
+          navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`, { replace: true });
+          return;
+        }
+        setErrorMessage('Soft POS is not configured for this kiosk.');
+        setStage('error');
+        return;
+      }
       const initialized = await initializeSoftPOS(config);
       if (!initialized) {
         setErrorMessage('Soft POS could not be initialized. Please rebuild the APK from GitHub Actions.');
