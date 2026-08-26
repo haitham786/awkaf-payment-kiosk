@@ -231,8 +231,11 @@ export async function callApexEcr(
   config: ApexEcrConfig,
   envelope: string,
   soapAction: string,
+  timeoutMsOverride?: number,
 ): Promise<ApexEcrResult> {
-  const timeoutMs = Math.max(5, config.timeoutSeconds ?? 90) * 1000;
+  const timeoutMs = timeoutMsOverride && timeoutMsOverride > 0
+    ? timeoutMsOverride
+    : Math.max(5, config.timeoutSeconds ?? 90) * 1000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();

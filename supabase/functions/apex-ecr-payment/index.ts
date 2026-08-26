@@ -61,11 +61,18 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const { data: kiosk, error: kioskError } = await supabase
-      .from("kiosks")
-      .select("id, status, configuration")
-      .eq("id", kioskId)
-      .maybeSingle();
+    // All three lookups are independent — run them together so the terminal
+    // receives the SALE as fast as possible (this used to cost 3 round trips).
+    const [kioskRes, secretRes, otherKiosksRes] = await Promise.all([
+      supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
+      supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
+      supabase.from("kiosks").select("id, name, configuration").neq("id", kioskId),
+    ]);
+
+    const kiosk = kioskRes.data;
+    const kioskError = kioskRes.error;
+    const secretRow = secretRes.data;
+    const sameTidKiosks = otherKiosksRes.data;
 
     if (kioskError || !kiosk || kiosk.status !== "active") {
       return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
@@ -73,12 +80,6 @@ serve(async (req) => {
 
     const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
     const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
-
-    const { data: secretRow } = await supabase
-      .from("kiosk_secrets")
-      .select("apex_secure_key")
-      .eq("kiosk_id", kioskId)
-      .maybeSingle();
 
     const config: ApexEcrConfig = {
       serviceUrl: String(hardware.service_url || "").trim(),
@@ -103,10 +104,6 @@ serve(async (req) => {
 
     // Pairing guard: a terminal (TID) must belong to exactly one kiosk, otherwise a
     // sale could be pushed to a terminal standing next to a different kiosk.
-    const { data: sameTidKiosks } = await supabase
-      .from("kiosks")
-      .select("id, name, configuration")
-      .neq("id", kioskId);
 
     const conflict = (sameTidKiosks ?? []).find((row) => {
       const cfg = (row.configuration ?? {}) as Record<string, unknown>;
@@ -205,26 +202,37 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
 
+    /**
+     * Sends RequestCancellation to the terminal. Kept on a short timeout so the
+     * donor never waits: the terminal must drop back to its idle screen quickly.
+     * Retried once because a terminal that is mid-prompt can reject the first
+     * cancellation while it switches state.
+     */
+    const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
+      let lastError: string | undefined;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const result = await callApexEcr(
+            config,
+            buildCancelEnvelope(config),
+            APEX_SOAP_ACTIONS.cancel,
+            12000,
+          );
+          if (result.webResponseStatus !== "99") return { cancelled: true };
+          lastError = result.webResponseErrorDesc || "Cancellation rejected";
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "Cancellation failed";
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      return { cancelled: false, error: lastError };
+    };
+
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
-      try {
-        const result = await callApexEcr(
-          config,
-          buildCancelEnvelope(config),
-          APEX_SOAP_ACTIONS.cancel,
-        );
-        return json(
-          {
-            success: true,
-            cancelled: result.webResponseStatus !== "99",
-            error: result.webResponseStatus === "99" ? result.webResponseErrorDesc : undefined,
-          },
-          200,
-          corsHeaders,
-        );
-      } catch (_err) {
-        return json({ success: true, cancelled: false }, 200, corsHeaders);
-      }
+      const outcome = await cancelAtTerminal();
+      console.log("ApexECR cancel", { correlationId, tid: config.tid, cancelled: outcome.cancelled });
+      return json({ success: true, cancelled: outcome.cancelled, error: outcome.error }, 200, corsHeaders);
     }
 
     const invoiceNumber = invoiceNumberFor(transactionId);
@@ -253,6 +261,14 @@ serve(async (req) => {
     // ------------------------------------------------------------------ sale
     if (!Number.isInteger(amount) || amount < 100 || amount > 100000000) {
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
+    }
+
+    // A terminal that is still sitting on a previous (abandoned) prompt ignores
+    // new SALE requests. When the kiosk knows the last session was not closed
+    // cleanly, clear the terminal first so the new amount always lands.
+    if (body?.forceClear === true) {
+      const cleared = await cancelAtTerminal();
+      console.log("ApexECR pre-sale clear", { correlationId, tid: config.tid, cleared: cleared.cancelled });
     }
 
     const saleResult = await callApexEcr(

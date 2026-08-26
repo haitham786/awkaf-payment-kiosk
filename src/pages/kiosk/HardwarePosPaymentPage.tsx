@@ -9,7 +9,14 @@ import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
-type Stage = "waiting" | "processing" | "declined" | "error";
+type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
+
+/**
+ * Marks whether the terminal may still be sitting on a prompt from a previous
+ * session. When set, the next SALE asks the backend to clear the terminal first
+ * so a new amount always reaches it.
+ */
+const SESSION_FLAG = "apex_session_open";
 
 interface ApexResponse {
   success?: boolean;
@@ -40,9 +47,12 @@ const HardwarePosPaymentPage = () => {
     () => readCachedCategory(category)?.category_reference || "",
   );
 
-  const transactionId = React.useMemo(() => crypto.randomUUID(), []);
+  // Every attempt gets its own transaction id so the terminal never sees a
+  // repeated invoice number after a decline or a cancelled session.
+  const transactionIdRef = useRef<string>(crypto.randomUUID());
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
+  const cancellingRef = useRef(false);
 
   useEffect(() => {
     if (!kioskId) return;
@@ -89,15 +99,23 @@ const HardwarePosPaymentPage = () => {
       return;
     }
 
+    const transactionId = transactionIdRef.current;
+    // If the previous session was never closed cleanly the terminal may still be
+    // showing the old prompt; ask the backend to clear it before the new SALE.
+    const forceClear = localStorage.getItem(SESSION_FLAG) === kioskId;
+    localStorage.setItem(SESSION_FLAG, kioskId);
+
     try {
       const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
-        body: { action: "sale", kioskId, transactionId, amount, category },
+        body: { action: "sale", kioskId, transactionId, amount, category, forceClear },
       });
+      if (cancellingRef.current) return;
       if (error) throw error;
 
       const result = (data || {}) as ApexResponse;
 
       if (result.approved) {
+        localStorage.removeItem(SESSION_FLAG);
         const ref = result.referenceNumber || result.rrn || transactionId;
         navigate(
           `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
@@ -117,38 +135,45 @@ const HardwarePosPaymentPage = () => {
         return;
       }
 
+      // Declined by the card/issuer — the terminal has finished with this session.
+      localStorage.removeItem(SESSION_FLAG);
       const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
         .filter(Boolean)
         .join(" · ");
       setDeclineMessage(detail);
       setStage("declined");
     } catch (err) {
+      if (cancellingRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
-  }, [amount, category, categoryReference, kioskId, navigate, transactionId]);
+  }, [amount, category, categoryReference, kioskId, navigate]);
 
   useEffect(() => {
-    // Show the tap prompt for a beat, then send the SALE to the terminal.
-    setStage("waiting");
-    const t = window.setTimeout(() => {
-      setStage("processing");
-      void startSale();
-    }, 300);
-    return () => window.clearTimeout(t);
+    // Send the SALE immediately — the tap prompt renders in the same frame.
+    setStage("processing");
+    void startSale();
   }, [startSale]);
 
-  const cancelAtTerminal = useCallback(() => {
+  const cancelAtTerminal = useCallback(async () => {
     if (!kioskId) return;
-    void supabase.functions.invoke("apex-ecr-payment", {
-      body: { action: "cancel", kioskId },
-    });
+    try {
+      await supabase.functions.invoke("apex-ecr-payment", {
+        body: { action: "cancel", kioskId },
+      });
+      localStorage.removeItem(SESSION_FLAG);
+    } catch (err) {
+      console.error("Terminal cancellation failed:", err);
+    }
   }, [kioskId]);
 
-  const handleCancel = () => {
-    cancelAtTerminal();
+  const handleCancel = useCallback(async () => {
+    if (cancellingRef.current) return;
+    cancellingRef.current = true;
+    setStage("cancelling");
+    await cancelAtTerminal();
     navigate("/kiosk");
-  };
+  }, [cancelAtTerminal, navigate]);
 
   const handleTimeout = () => {
     setRetryAllowed(false);
@@ -158,13 +183,12 @@ const HardwarePosPaymentPage = () => {
 
   const handleTryAgain = () => {
     if (!retryAllowed) return;
+    transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
     setErrorMessage("");
-    setStage("waiting");
-    window.setTimeout(() => {
-      setStage("processing");
-      void startSale();
-    }, 200);
+    setDeclineMessage("");
+    setStage("processing");
+    void startSale();
   };
 
   useEffect(() => {
@@ -173,15 +197,16 @@ const HardwarePosPaymentPage = () => {
     return () => window.clearTimeout(timer);
   }, [navigate, retryAllowed, stage]);
 
-  if (stage === "waiting" || stage === "processing") {
+  if (stage === "waiting" || stage === "processing" || stage === "cancelling") {
     return (
       <TerminalTapScreen
         amount={amount}
         category={category}
-        stage={stage}
+        stage={stage === "cancelling" ? "processing" : stage}
         onCancel={handleCancel}
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
+        cancelling={stage === "cancelling"}
       />
     );
   }
