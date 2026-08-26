@@ -12,6 +12,8 @@ interface TerminalTapScreenProps {
   onCancel?: () => void;
   onTimeout?: () => void;
   timeoutSeconds?: number;
+  /** True while the cancellation is being pushed to the terminal. */
+  cancelling?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
   onCancel,
   onTimeout,
   timeoutSeconds = 90,
+  cancelling = false,
 }) => {
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(
@@ -167,7 +170,11 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             <h2 className="text-gray-900 text-xl font-bold">الرجاء تمرير البطاقة على جهاز الدفع</h2>
             <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
             <p className="text-gray-500 text-xs mt-2">
-              {stage === "processing" ? "بانتظار البطاقة… / Waiting for card…" : "جاري التحضير… / Preparing…"}
+              {cancelling
+                ? "جاري إلغاء العملية على جهاز الدفع… / Cancelling at the terminal…"
+                : stage === "processing"
+                  ? "بانتظار البطاقة… / Waiting for card…"
+                  : "جاري التحضير… / Preparing…"}
             </p>
           </div>
 
@@ -188,10 +195,11 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
       <div className="px-6 pb-5 flex justify-center">
         <button
           onClick={() => onCancel?.()}
-          className="px-8 py-3 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm shadow-sm flex flex-col items-center leading-tight"
+          disabled={cancelling}
+          className="px-8 py-3 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm shadow-sm flex flex-col items-center leading-tight disabled:opacity-60"
         >
-          <span className="text-base font-bold text-gray-900">إلغاء</span>
-          <span className="text-xs text-gray-900">Cancel</span>
+          <span className="text-base font-bold text-gray-900">{cancelling ? "جاري الإلغاء…" : "إلغاء"}</span>
+          <span className="text-xs text-gray-900">{cancelling ? "Cancelling…" : "Cancel"}</span>
         </button>
       </div>
     </div>
