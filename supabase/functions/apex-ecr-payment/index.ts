@@ -263,6 +263,14 @@ serve(async (req) => {
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
+    // A terminal that is still sitting on a previous (abandoned) prompt ignores
+    // new SALE requests. When the kiosk knows the last session was not closed
+    // cleanly, clear the terminal first so the new amount always lands.
+    if (body?.forceClear === true) {
+      const cleared = await cancelAtTerminal();
+      console.log("ApexECR pre-sale clear", { correlationId, tid: config.tid, cleared: cleared.cancelled });
+    }
+
     const saleResult = await callApexEcr(
       config,
       buildSaleEnvelope(config, {
