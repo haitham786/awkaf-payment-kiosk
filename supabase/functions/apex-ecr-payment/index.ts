@@ -61,11 +61,18 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const { data: kiosk, error: kioskError } = await supabase
-      .from("kiosks")
-      .select("id, status, configuration")
-      .eq("id", kioskId)
-      .maybeSingle();
+    // All three lookups are independent — run them together so the terminal
+    // receives the SALE as fast as possible (this used to cost 3 round trips).
+    const [kioskRes, secretRes, otherKiosksRes] = await Promise.all([
+      supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
+      supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
+      supabase.from("kiosks").select("id, name, configuration").neq("id", kioskId),
+    ]);
+
+    const kiosk = kioskRes.data;
+    const kioskError = kioskRes.error;
+    const secretRow = secretRes.data;
+    const sameTidKiosks = otherKiosksRes.data;
 
     if (kioskError || !kiosk || kiosk.status !== "active") {
       return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
@@ -73,12 +80,6 @@ serve(async (req) => {
 
     const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
     const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
-
-    const { data: secretRow } = await supabase
-      .from("kiosk_secrets")
-      .select("apex_secure_key")
-      .eq("kiosk_id", kioskId)
-      .maybeSingle();
 
     const config: ApexEcrConfig = {
       serviceUrl: String(hardware.service_url || "").trim(),
