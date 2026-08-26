@@ -9,7 +9,14 @@ import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
-type Stage = "waiting" | "processing" | "declined" | "error";
+type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
+
+/**
+ * Marks whether the terminal may still be sitting on a prompt from a previous
+ * session. When set, the next SALE asks the backend to clear the terminal first
+ * so a new amount always reaches it.
+ */
+const SESSION_FLAG = "apex_session_open";
 
 interface ApexResponse {
   success?: boolean;
