@@ -202,26 +202,37 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
 
+    /**
+     * Sends RequestCancellation to the terminal. Kept on a short timeout so the
+     * donor never waits: the terminal must drop back to its idle screen quickly.
+     * Retried once because a terminal that is mid-prompt can reject the first
+     * cancellation while it switches state.
+     */
+    const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
+      let lastError: string | undefined;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const result = await callApexEcr(
+            config,
+            buildCancelEnvelope(config),
+            APEX_SOAP_ACTIONS.cancel,
+            12000,
+          );
+          if (result.webResponseStatus !== "99") return { cancelled: true };
+          lastError = result.webResponseErrorDesc || "Cancellation rejected";
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "Cancellation failed";
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      return { cancelled: false, error: lastError };
+    };
+
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
-      try {
-        const result = await callApexEcr(
-          config,
-          buildCancelEnvelope(config),
-          APEX_SOAP_ACTIONS.cancel,
-        );
-        return json(
-          {
-            success: true,
-            cancelled: result.webResponseStatus !== "99",
-            error: result.webResponseStatus === "99" ? result.webResponseErrorDesc : undefined,
-          },
-          200,
-          corsHeaders,
-        );
-      } catch (_err) {
-        return json({ success: true, cancelled: false }, 200, corsHeaders);
-      }
+      const outcome = await cancelAtTerminal();
+      console.log("ApexECR cancel", { correlationId, tid: config.tid, cancelled: outcome.cancelled });
+      return json({ success: true, cancelled: outcome.cancelled, error: outcome.error }, 200, corsHeaders);
     }
 
     const invoiceNumber = invoiceNumberFor(transactionId);
