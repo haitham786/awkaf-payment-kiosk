@@ -31,6 +31,7 @@ const HardwarePosPaymentPage = () => {
 
   const [stage, setStage] = useState<Stage>("waiting");
   const [errorMessage, setErrorMessage] = useState("");
+  const [retryAllowed, setRetryAllowed] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
   );
@@ -96,6 +97,7 @@ const HardwarePosPaymentPage = () => {
           ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
           : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
         const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
+        setRetryAllowed(result.outcomeUnknown !== true);
         setErrorMessage(`${arabic}\n${result.error}${reference}`);
         setStage("error");
         return;
@@ -131,11 +133,13 @@ const HardwarePosPaymentPage = () => {
   };
 
   const handleTimeout = () => {
+    setRetryAllowed(false);
     setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
     setStage("error");
   };
 
   const handleTryAgain = () => {
+    if (!retryAllowed) return;
     startedRef.current = false;
     setErrorMessage("");
     setStage("waiting");
@@ -178,12 +182,14 @@ const HardwarePosPaymentPage = () => {
                 <p className="text-xs text-gray-600 mt-2 whitespace-pre-line">{errorMessage}</p>
               </div>
               <div className="flex gap-2 justify-center pt-2">
-                <KioskButton variant="confirm" size="sm" onClick={handleTryAgain}>
-                  <span className="flex flex-col items-center">
-                    <span>حاول مرة أخرى</span>
-                    <span className="text-[0.6rem] opacity-80">Try Again</span>
-                  </span>
-                </KioskButton>
+                {retryAllowed && (
+                  <KioskButton variant="confirm" size="sm" onClick={handleTryAgain}>
+                    <span className="flex flex-col items-center">
+                      <span>حاول مرة أخرى</span>
+                      <span className="text-[0.6rem] opacity-80">Try Again</span>
+                    </span>
+                  </KioskButton>
+                )}
                 <KioskButton variant="secondary" size="sm" onClick={handleCancel}>
                   <span className="flex flex-col items-center">
                     <span>إلغاء</span>
