@@ -70,6 +70,9 @@ export interface ApexEcrResult {
   raw: string;
   httpStatus?: number;
   contentType?: string;
+  faultCode?: string;
+  faultMessage?: string;
+  elapsedMs?: number;
 }
 
 export function escapeXml(value: string): string {
@@ -134,7 +137,7 @@ function printerBlock(ns: string, invoiceNumber: string, referenceNumber: string
           <${ns}EnablePrintPosReceipt>0</${ns}EnablePrintPosReceipt>
           <${ns}EnablePrintReceiptNote>0</${ns}EnablePrintReceiptNote>
           <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
-          <${ns}PrinterWidth>0</${ns}PrinterWidth>
+          <${ns}PrinterWidth>40</${ns}PrinterWidth>
           <${ns}ReceiptNote></${ns}ReceiptNote>
           <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
         </${ns}Printer>`;
@@ -167,11 +170,12 @@ export function buildEnquiryByRefEnvelope(
   origInvoiceNumber: string,
   origRrn: string,
   origAuthCode = "",
+  referenceNumber = origInvoiceNumber,
 ): string {
   const inner = `${configBlock(config, "ns:")}
         <ns:OrigAuthCode>${escapeXml(origAuthCode)}</ns:OrigAuthCode>
         <ns:OrigInvoiceNumber>${escapeXml(origInvoiceNumber)}</ns:OrigInvoiceNumber>
-        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>${printerBlock("ns:", origInvoiceNumber, origInvoiceNumber)}`;
+        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>${printerBlock("ns:", origInvoiceNumber, referenceNumber)}`;
   return envelope(config, "EnquiryByRef", inner);
 }
 
@@ -184,8 +188,10 @@ export function parseApexResponse(xml: string): ApexEcrResult {
   const posRespStatus = pickTag(xml, "PosRespStatus");
   const webResponseStatus = pickTag(xml, "WebResponseStatus");
   const status = webResponseStatus.toLowerCase();
-  const webOk = status === "" || status === "0" || status === "success" || status === "ok" ||
+  const webOk = status === "0" || status === "success" || status === "ok" ||
     status === "completed" || status === "successful";
+  const faultCode = pickTag(xml, "faultcode") || pickTag(xml, "Code");
+  const faultMessage = pickTag(xml, "faultstring") || pickTag(xml, "Reason");
 
   return {
     webResponseStatus,
@@ -210,6 +216,8 @@ export function parseApexResponse(xml: string): ApexEcrResult {
     posReceipt: pickTag(xml, "PosReceipt"),
     approved: webOk && posRespStatus === "1",
     raw: xml,
+    faultCode,
+    faultMessage,
   };
 }
 
@@ -227,6 +235,7 @@ export async function callApexEcr(
   const timeoutMs = Math.max(5, config.timeoutSeconds ?? 90) * 1000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(config.serviceUrl, {
@@ -243,20 +252,22 @@ export async function callApexEcr(
     const contentType = response.headers.get("content-type") || "";
     const looksHtml = /^\s*<(!doctype|html)/i.test(text) || contentType.includes("text/html");
 
-    if (!response.ok || looksHtml) {
+    const parsed = parseApexResponse(text);
+    if (!response.ok || looksHtml || parsed.faultCode || parsed.faultMessage) {
       return {
-        ...parseApexResponse(text),
+        ...parsed,
         webResponseStatus: "99",
-        webResponseErrorDesc: !response.ok
+        webResponseErrorDesc: parsed.faultMessage || (!response.ok
           ? `ApexECR HTTP ${response.status}${looksHtml ? " (HTML/WAF response)" : ""}`
-          : "ApexECR returned an HTML page instead of SOAP (likely a firewall/WAF block or wrong service URL)",
+          : "ApexECR returned an HTML page instead of SOAP (likely a firewall/WAF block or wrong service URL)"),
         approved: false,
         httpStatus: response.status,
         contentType,
+        elapsedMs: Date.now() - startedAt,
       };
     }
 
-    return { ...parseApexResponse(text), httpStatus: response.status, contentType };
+    return { ...parsed, httpStatus: response.status, contentType, elapsedMs: Date.now() - startedAt };
   } finally {
     clearTimeout(timer);
   }

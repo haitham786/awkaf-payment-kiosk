@@ -28,6 +28,13 @@ function json(body: unknown, status: number, corsHeaders: Record<string, string>
   });
 }
 
+function classifyFailure(result: { httpStatus?: number; contentType?: string; webResponseErrorDesc: string; faultCode?: string; faultMessage?: string }) {
+  if (result.httpStatus === 522 || /WAF|HTML page/i.test(result.webResponseErrorDesc)) return "afs_network_block";
+  if (result.faultCode || result.faultMessage) return "soap_fault";
+  if (result.httpStatus && result.httpStatus >= 400) return "afs_http_error";
+  return "apex_rejected";
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -39,6 +46,7 @@ serve(async (req) => {
     const transactionId: string = body?.transactionId || "";
     const amount: number = Number(body?.amount);
     const category: string = body?.category || "donation";
+    const correlationId = crypto.randomUUID();
 
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
@@ -138,8 +146,9 @@ serve(async (req) => {
     }
 
     // -------------------------------------------------------------- diagnose
-    // Connectivity check used by the admin panel. Never touches a card; it just
-    // proves the backend can reach the ApexECR service over HTTPS.
+    // Checks the live WSDL, then sends a non-financial enquiry with impossible
+    // original references. This validates SOAP transport and merchant routing
+    // without opening a Sale or charging a card.
     if (action === "diagnose") {
       const probes: Record<string, unknown>[] = [];
 
@@ -151,7 +160,6 @@ serve(async (req) => {
           status: wsdlRes.status,
           contentType: wsdlRes.headers.get("content-type") || "",
           isWsdl: /wsdl:definitions|<definitions/i.test(wsdlText),
-          snippet: wsdlText.slice(0, 200),
         });
       } catch (err) {
         probes.push({ probe: "wsdl", error: err instanceof Error ? err.message : "failed" });
@@ -160,22 +168,41 @@ serve(async (req) => {
       try {
         const soap = await callApexEcr(
           config,
-          buildCancelEnvelope(config),
-          APEX_SOAP_ACTIONS.cancel,
+          buildEnquiryByRefEnvelope(config, "000000", "000000000000", "", `VERIFY-${correlationId.slice(0, 8)}`),
+          APEX_SOAP_ACTIONS.enquiryByRef,
         );
         probes.push({
           probe: "soap",
+          ok: soap.httpStatus === 200 && soap.webResponseStatus !== "99" && !soap.faultCode,
           status: soap.httpStatus ?? null,
           contentType: soap.contentType ?? null,
           webResponseStatus: soap.webResponseStatus,
           webResponseErrorDesc: soap.webResponseErrorDesc,
-          snippet: soap.raw.slice(0, 300),
+          posRespStatus: soap.posRespStatus,
+          responseCode: soap.posRespCode,
+          responseText: soap.posRespText,
+          faultCode: soap.faultCode || null,
+          faultMessage: soap.faultMessage || null,
+          elapsedMs: soap.elapsedMs ?? null,
+          failureType: soap.webResponseStatus === "99" ? classifyFailure(soap) : null,
         });
       } catch (err) {
         probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
       }
 
-      return json({ success: true, tid: config.tid, mid: config.mid, serviceUrl: config.serviceUrl, probes }, 200, corsHeaders);
+      const wsdlOk = probes.some((probe) => probe.probe === "wsdl" && probe.status === 200 && probe.isWsdl === true);
+      const soapOk = probes.some((probe) => probe.probe === "soap" && probe.ok === true);
+      return json({
+        success: wsdlOk && soapOk,
+        correlationId,
+        checks: { serviceReachable: wsdlOk, soapAccepted: soapOk, terminalAvailable: null },
+        error: !wsdlOk
+          ? "The AFS service contract is unreachable."
+          : !soapOk
+            ? "The AFS service is reachable, but SOAP requests are blocked or rejected."
+            : undefined,
+        probes,
+      }, 200, corsHeaders);
     }
 
     // ---------------------------------------------------------------- cancel
@@ -206,7 +233,7 @@ serve(async (req) => {
     if (action === "enquiry") {
       const result = await callApexEcr(
         config,
-        buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
+        buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || ""), transactionId),
         APEX_SOAP_ACTIONS.enquiryByRef,
       );
       return json(
@@ -239,13 +266,35 @@ serve(async (req) => {
     );
 
     if (saleResult.webResponseStatus === "99") {
-      console.error("ApexECR web failure:", saleResult.webResponseErrorDesc);
+      const failureType = classifyFailure(saleResult);
+      console.error("ApexECR request failed", {
+        correlationId,
+        operation: "Sale",
+        failureType,
+        httpStatus: saleResult.httpStatus,
+        contentType: saleResult.contentType,
+        elapsedMs: saleResult.elapsedMs,
+        webResponseStatus: saleResult.webResponseStatus,
+        error: saleResult.webResponseErrorDesc,
+      });
       return json(
         {
           success: false,
           approved: false,
           invoiceNumber,
-          error: saleResult.webResponseErrorDesc || "Terminal service error",
+          correlationId,
+          failureType,
+          outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
+          error: failureType === "afs_network_block"
+            ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
+            : saleResult.webResponseErrorDesc || "Terminal service error",
+          diagnostics: {
+            httpStatus: saleResult.httpStatus ?? null,
+            contentType: saleResult.contentType ?? null,
+            faultCode: saleResult.faultCode || null,
+            faultMessage: saleResult.faultMessage || null,
+            elapsedMs: saleResult.elapsedMs ?? null,
+          },
         },
         200,
         corsHeaders,
