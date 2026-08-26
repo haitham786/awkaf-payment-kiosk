@@ -8,6 +8,7 @@ import {
   buildEnquiryByRefEnvelope,
   buildSaleEnvelope,
   callApexEcr,
+  APEX_SOAP_ACTIONS,
   panLastFour,
 } from "../_shared/apexEcr.ts";
 
@@ -160,7 +161,7 @@ serve(async (req) => {
         const soap = await callApexEcr(
           config,
           buildCancelEnvelope(config),
-          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+          APEX_SOAP_ACTIONS.cancel,
         );
         probes.push({
           probe: "soap",
@@ -183,7 +184,7 @@ serve(async (req) => {
         const result = await callApexEcr(
           config,
           buildCancelEnvelope(config),
-          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+          APEX_SOAP_ACTIONS.cancel,
         );
         return json(
           {
@@ -206,7 +207,7 @@ serve(async (req) => {
       const result = await callApexEcr(
         config,
         buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
-        `${config.temNamespace || "http://tempuri.org/"}IApexEcr/EnquiryByRef`,
+        APEX_SOAP_ACTIONS.enquiryByRef,
       );
       return json(
         {
@@ -234,7 +235,7 @@ serve(async (req) => {
         invoiceNumber,
         referenceNumber: transactionId,
       }),
-      `${config.temNamespace || "http://tempuri.org/"}IApexEcr/PerformFinancialTransaction`,
+      APEX_SOAP_ACTIONS.sale,
     );
 
     if (saleResult.webResponseStatus === "99") {
