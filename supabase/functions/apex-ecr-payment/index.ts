@@ -13,7 +13,7 @@ import {
 } from "../_shared/apexEcr.ts";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CONFIG_CACHE_TTL_MS = 60_000;
+const CONFIG_CACHE_TTL_MS = 600_000;
 const terminalConfigCache = new Map<string, { config: ApexEcrConfig; status: string; cachedAt: number }>();
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
@@ -54,7 +54,10 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (action !== "cancel" && action !== "diagnose" && action !== "wsdl" && !UUID_REGEX.test(transactionId)) {
+    if (
+      action !== "cancel" && action !== "diagnose" && action !== "wsdl" && action !== "warm" &&
+      !UUID_REGEX.test(transactionId)
+    ) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
@@ -116,6 +119,26 @@ serve(async (req) => {
 
     if (!/^https:\/\//i.test(config.serviceUrl)) {
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
+    }
+
+    // ------------------------------------------------------------------ warm
+    // Called while the donor is still selecting a category or typing an amount.
+    // Boots this isolate, primes the terminal configuration cache above and
+    // opens the TLS session to the AFS host so the SALE goes out instantly.
+    if (action === "warm") {
+      let hostReachable = false;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET", signal: controller.signal });
+        clearTimeout(timer);
+        await res.arrayBuffer();
+        hostReachable = res.status < 500;
+      } catch {
+        hostReachable = false;
+      }
+      console.log("ApexECR warm", { correlationId, tid: config.tid, hostReachable, ms: Date.now() - requestStartedAt });
+      return json({ success: true, warmed: true, hostReachable }, 200, corsHeaders);
     }
 
 
