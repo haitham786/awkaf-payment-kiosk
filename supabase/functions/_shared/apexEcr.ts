@@ -58,6 +58,8 @@ export interface ApexEcrResult {
   posReceipt: string;
   approved: boolean;
   raw: string;
+  httpStatus?: number;
+  contentType?: string;
 }
 
 export function escapeXml(value: string): string {
@@ -238,17 +240,23 @@ export async function callApexEcr(
     });
 
     const text = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+    const looksHtml = /^\s*<(!doctype|html)/i.test(text) || contentType.includes("text/html");
 
-    if (!response.ok) {
+    if (!response.ok || looksHtml) {
       return {
         ...parseApexResponse(text),
         webResponseStatus: "99",
-        webResponseErrorDesc: `ApexECR HTTP ${response.status}`,
+        webResponseErrorDesc: !response.ok
+          ? `ApexECR HTTP ${response.status}${looksHtml ? " (HTML/WAF response)" : ""}`
+          : "ApexECR returned an HTML page instead of SOAP (likely a firewall/WAF block or wrong service URL)",
         approved: false,
+        httpStatus: response.status,
+        contentType,
       };
     }
 
-    return parseApexResponse(text);
+    return { ...parseApexResponse(text), httpStatus: response.status, contentType };
   } finally {
     clearTimeout(timer);
   }
