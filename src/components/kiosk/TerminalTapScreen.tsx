@@ -106,78 +106,81 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         backgroundColor: "#f5f5f5",
       }}
     >
-      <div className="w-full flex justify-center items-center pt-2 pb-2 min-h-[64px]">
+      {/* Logo — identical position/size to KioskLayout */}
+      <div className="relative z-10 w-full flex justify-center items-center pt-2 pb-2 min-h-[64px] shrink-0">
         {logoImage && (
           <img src={logoImage} alt="Organization Logo" className="h-12 w-auto object-contain max-w-[220px]" />
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
-        <div className="mb-4 text-center min-h-[100px] flex flex-col items-center justify-center">
-          <div className="w-14 h-14 mb-2 flex items-center justify-center">
-            {categoryData?.icon_url && (
-              <img src={categoryData.icon_url} alt={categoryData.title} className="w-full h-full object-contain" />
+      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
+        <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-5 flex flex-col items-center">
+          {/* Category */}
+          <div className="text-center flex flex-col items-center">
+            <div className="w-12 h-12 mb-1 flex items-center justify-center">
+              {categoryData?.icon_url && (
+                <img src={categoryData.icon_url} alt={categoryData.title} className="w-full h-full object-contain" />
+              )}
+            </div>
+            <p className="text-base font-bold text-gray-900 leading-tight">{categoryData?.title || ""}</p>
+            {categoryData?.title_en && <p className="text-xs text-gray-600">{categoryData.title_en}</p>}
+          </div>
+
+          {/* Amount */}
+          <div className="mt-3 flex items-baseline justify-center gap-2">
+            <CurrencyLogo className="h-6" />
+            <span className="text-gray-900 text-3xl font-bold tracking-tight">{formatAmount(amount)}</span>
+          </div>
+
+          {/* Tap animation */}
+          <div className="relative w-36 h-36 my-3">
+            {stage === "waiting" && (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="w-32 h-32 rounded-full border-2 border-emerald-400/40 animate-ping"
+                    style={{ animationDuration: "2s" }}
+                  />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="w-24 h-24 rounded-full border-2 border-emerald-400/50 animate-ping"
+                    style={{ animationDuration: "2s", animationDelay: "0.5s" }}
+                  />
+                </div>
+              </>
             )}
-          </div>
-          <p className="text-lg font-bold text-gray-900 min-h-[28px]">{categoryData?.title || ""}</p>
-          {categoryData?.title_en && <p className="text-sm text-gray-600">{categoryData.title_en}</p>}
-        </div>
-
-        <div className="mb-6 text-center">
-          <div className="flex items-baseline justify-center gap-2">
-            <CurrencyLogo className="h-7" />
-            <span className="text-gray-900 text-4xl font-bold tracking-tight">{formatAmount(amount)}</span>
-          </div>
-        </div>
-
-        <div className="relative w-48 h-48 mb-6">
-          {stage === "waiting" && (
-            <>
+            {stage === "processing" && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className="w-40 h-40 rounded-full border-2 border-emerald-400/40 animate-ping"
-                  style={{ animationDuration: "2s" }}
-                />
+                <div className="w-32 h-32 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
               </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className="w-32 h-32 rounded-full border-2 border-emerald-400/50 animate-ping"
-                  style={{ animationDuration: "2s", animationDelay: "0.4s" }}
-                />
-              </div>
-            </>
-          )}
-          {stage === "processing" && (
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-40 h-40 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
-            </div>
-          )}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
-              <CreditCard className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
+                <CreditCard className="w-10 h-10 text-white" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="text-center space-y-1 mb-6">
-          <h2 className="text-gray-900 text-xl font-bold">استخدم جهاز الدفع المجاور</h2>
-          <p className="text-gray-600 text-sm">Use the payment terminal next to the kiosk</p>
-          <p className="text-gray-500 text-xs pt-1">
-            {stage === "processing" ? "بانتظار البطاقة… / Waiting for card…" : "جاري التحضير… / Preparing…"}
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex justify-center items-center gap-3">
-            <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5" />
-            <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5" />
-            <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-5" />
-            <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-5" />
+          {/* Instruction */}
+          <div className="text-center leading-tight">
+            <h2 className="text-gray-900 text-xl font-bold">الرجاء تمرير البطاقة على جهاز الدفع</h2>
+            <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
+            <p className="text-gray-500 text-xs mt-2">
+              {stage === "processing" ? "بانتظار البطاقة… / Waiting for card…" : "جاري التحضير… / Preparing…"}
+            </p>
           </div>
-          <div className="flex justify-center items-center gap-4">
-            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-7" />
-            <img src="/images/payment-logos/gccnet.svg" alt="GCC Net" className="h-7" />
-            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-7" />
+
+          {/* Accepted payment methods */}
+          <div className="mt-4 pt-4 w-full border-t border-white/70">
+            <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-3">
+              <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-6 w-auto object-contain" />
+              <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-7 w-auto object-contain" />
+              <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-8 w-auto object-contain" />
+              <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-6 w-auto object-contain" />
+              <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-6 w-auto object-contain" />
+              <img src="/images/payment-logos/googlepay.svg" alt="Google Pay" className="h-7 w-auto object-contain" />
+            </div>
           </div>
         </div>
       </div>
