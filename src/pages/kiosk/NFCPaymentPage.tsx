@@ -139,7 +139,7 @@ const NFCPaymentPage = () => {
       setStage('error');
       setIsPaymentReady(false);
     }
-  }, [amount, kioskId]);
+  }, [amount, kioskId, category, navigate]);
 
   useEffect(() => { initializePayment(); return () => { cancelTransaction(); }; }, [initializePayment]);
 
