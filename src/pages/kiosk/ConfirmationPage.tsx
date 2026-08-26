@@ -58,6 +58,9 @@ const ConfirmationPage = () => {
         return;
       }
       if (mode === 'hardware_pos') {
+        // Refresh the heartbeat at the donor's final tap without waiting for it.
+        // This also repairs a connection that dropped while the donor was idle.
+        void warmHardwarePos(true);
         navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
         return;
       }
