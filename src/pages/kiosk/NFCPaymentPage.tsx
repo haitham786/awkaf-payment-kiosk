@@ -14,6 +14,7 @@ import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
@@ -72,6 +73,13 @@ const NFCPaymentPage = () => {
     if (!Number.isFinite(amount) || amount <= 0) { setErrorMessage('Invalid donation amount. Please select or enter an amount again.'); setStage('error'); return; }
     if (!kioskId) { setErrorMessage('Kiosk is not registered. Please set up the kiosk first.'); setStage('error'); return; }
 
+    // Safety net: this kiosk may have been switched to the hardware POS terminal.
+    // Never show a Soft POS error in that case — route to the terminal screen.
+    if (getCachedPaymentMode(kioskId) === 'hardware_pos') {
+      navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`, { replace: true });
+      return;
+    }
+
     // FAST PATH: if the SDK is already initialized in this session, skip the
     // edge-function round-trip and the NFC re-check so the next donation launches
     // Thawani Lamsa instantly.
@@ -93,7 +101,18 @@ const NFCPaymentPage = () => {
         loadKioskSoftPosConfig(kioskId),
         checkNFCAvailability(),
       ]);
-      if (!config) { setErrorMessage('Soft POS is not configured for this kiosk.'); setStage('error'); return; }
+      if (!config) {
+        // Confirm the live mode before blaming Soft POS — the kiosk may now be
+        // paired with an ApexECR hardware terminal.
+        const live = await loadKioskRuntimeConfig(kioskId, { forceRefresh: true }).catch(() => null);
+        if (live?.payment_mode === 'hardware_pos') {
+          navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`, { replace: true });
+          return;
+        }
+        setErrorMessage('Soft POS is not configured for this kiosk.');
+        setStage('error');
+        return;
+      }
       const initialized = await initializeSoftPOS(config);
       if (!initialized) {
         setErrorMessage('Soft POS could not be initialized. Please rebuild the APK from GitHub Actions.');
@@ -120,7 +139,7 @@ const NFCPaymentPage = () => {
       setStage('error');
       setIsPaymentReady(false);
     }
-  }, [amount, kioskId]);
+  }, [amount, kioskId, category, navigate]);
 
   useEffect(() => { initializePayment(); return () => { cancelTransaction(); }; }, [initializePayment]);
 

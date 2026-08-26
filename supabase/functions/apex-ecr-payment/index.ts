@@ -8,6 +8,7 @@ import {
   buildEnquiryByRefEnvelope,
   buildSaleEnvelope,
   callApexEcr,
+  APEX_SOAP_ACTIONS,
   panLastFour,
 } from "../_shared/apexEcr.ts";
 
@@ -42,7 +43,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (action !== "cancel" && !UUID_REGEX.test(transactionId)) {
+    if (action !== "cancel" && action !== "diagnose" && action !== "wsdl" && !UUID_REGEX.test(transactionId)) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
@@ -123,15 +124,77 @@ serve(async (req) => {
     }
 
 
+    // ------------------------------------------------------------------ wsdl
+    // Fetches the service contract (or an imported schema) so the exact SOAP
+    // operations and namespaces can be verified against the live service.
+    if (action === "wsdl") {
+      const target = String(body?.url || `${config.serviceUrl}?wsdl`);
+      if (!target.startsWith(config.serviceUrl.split("/").slice(0, 3).join("/"))) {
+        return json({ success: false, error: "URL outside the ApexECR host" }, 400, corsHeaders);
+      }
+      const res = await fetch(target, { method: "GET" });
+      const text = await res.text();
+      return json({ success: true, status: res.status, length: text.length, body: text.slice(0, 90000) }, 200, corsHeaders);
+    }
+
+    // -------------------------------------------------------------- diagnose
+    // Connectivity check used by the admin panel. Never touches a card; it just
+    // proves the backend can reach the ApexECR service over HTTPS.
+    if (action === "diagnose") {
+      const probes: Record<string, unknown>[] = [];
+
+      try {
+        const wsdlRes = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET" });
+        const wsdlText = await wsdlRes.text();
+        probes.push({
+          probe: "wsdl",
+          status: wsdlRes.status,
+          contentType: wsdlRes.headers.get("content-type") || "",
+          isWsdl: /wsdl:definitions|<definitions/i.test(wsdlText),
+          snippet: wsdlText.slice(0, 200),
+        });
+      } catch (err) {
+        probes.push({ probe: "wsdl", error: err instanceof Error ? err.message : "failed" });
+      }
+
+      try {
+        const soap = await callApexEcr(
+          config,
+          buildCancelEnvelope(config),
+          APEX_SOAP_ACTIONS.cancel,
+        );
+        probes.push({
+          probe: "soap",
+          status: soap.httpStatus ?? null,
+          contentType: soap.contentType ?? null,
+          webResponseStatus: soap.webResponseStatus,
+          webResponseErrorDesc: soap.webResponseErrorDesc,
+          snippet: soap.raw.slice(0, 300),
+        });
+      } catch (err) {
+        probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
+      }
+
+      return json({ success: true, tid: config.tid, mid: config.mid, serviceUrl: config.serviceUrl, probes }, 200, corsHeaders);
+    }
+
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
       try {
         const result = await callApexEcr(
           config,
           buildCancelEnvelope(config),
-          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+          APEX_SOAP_ACTIONS.cancel,
         );
-        return json({ success: true, cancelled: result.webResponseStatus !== "99" }, 200, corsHeaders);
+        return json(
+          {
+            success: true,
+            cancelled: result.webResponseStatus !== "99",
+            error: result.webResponseStatus === "99" ? result.webResponseErrorDesc : undefined,
+          },
+          200,
+          corsHeaders,
+        );
       } catch (_err) {
         return json({ success: true, cancelled: false }, 200, corsHeaders);
       }
@@ -144,7 +207,7 @@ serve(async (req) => {
       const result = await callApexEcr(
         config,
         buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || "")),
-        `${config.temNamespace || "http://tempuri.org/"}IApexEcr/EnquiryByRef`,
+        APEX_SOAP_ACTIONS.enquiryByRef,
       );
       return json(
         {
@@ -172,7 +235,7 @@ serve(async (req) => {
         invoiceNumber,
         referenceNumber: transactionId,
       }),
-      `${config.temNamespace || "http://tempuri.org/"}IApexEcr/PerformFinancialTransaction`,
+      APEX_SOAP_ACTIONS.sale,
     );
 
     if (saleResult.webResponseStatus === "99") {

@@ -34,7 +34,7 @@ const KioskSetupPanel = () => {
     isAvailable: boolean; isEnabled: boolean; checking: boolean; tested: boolean;
   }>({ isAvailable: false, isEnabled: false, checking: false, tested: false });
   
-  const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment'>('soft_pos');
+  const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos'>('soft_pos');
 
   useEffect(() => { checkAuth(); }, []);
 
@@ -50,7 +50,7 @@ const KioskSetupPanel = () => {
   const applyKioskConfig = (configRaw: unknown) => {
     const config = configRaw as Record<string, unknown> | null | undefined;
     if (!config) return;
-    setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment') || 'soft_pos');
+    setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos') || 'soft_pos');
     if (config.soft_pos && typeof config.soft_pos === 'object') {
       const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
       setSoftPosConfig(prev => ({ authKey: sp.auth_key ?? prev.authKey, isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' }));
@@ -263,6 +263,8 @@ const KioskSetupPanel = () => {
                     <><Smartphone className="w-4 h-4 text-emerald-600" /><span className="text-sm font-medium text-emerald-700">Soft POS Active - Thawani Lamsa NFC</span></>
                   ) : kioskPaymentMode === 'test_payment' ? (
                     <><Info className="w-4 h-4 text-amber-600" /><span className="text-sm font-medium text-amber-700">Testing Mode Active - Simulated Successful Payments</span></>
+                  ) : kioskPaymentMode === 'hardware_pos' ? (
+                    <><Smartphone className="w-4 h-4 text-gray-700" /><span className="text-sm font-medium text-gray-700">Hardware POS Terminal Active - ApexECR (Ahli Bank / AFS)</span></>
                   ) : (
                     <><Globe className="w-4 h-4 text-blue-600" /><span className="text-sm font-medium text-blue-700">Payment Gateway Active - Thawani Checkout</span></>
                   )}

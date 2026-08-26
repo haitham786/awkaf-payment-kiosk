@@ -47,7 +47,7 @@ function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
 export function getCachedPaymentMode(kioskId: string): KioskPaymentMode | null {
   try {
     const v = localStorage.getItem(PAYMENT_MODE_LS_KEY(kioskId));
-    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment") return v;
+    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment" || v === "hardware_pos") return v;
     return null;
   } catch {
     return null;

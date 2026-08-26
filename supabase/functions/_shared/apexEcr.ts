@@ -15,6 +15,14 @@
 export const APEX_DEFAULT_TEM_NS = "http://tempuri.org/";
 export const APEX_DEFAULT_DATA_NS = "http://schemas.datacontract.org/2004/07/";
 
+/** SOAPAction values taken from the live WSDL (portType IEcrComInterface). */
+export const APEX_SOAP_ACTIONS = {
+  sale: "http://tempuri.org/IEcrComInterface/Sale",
+  cancel: "http://tempuri.org/IEcrComInterface/RequestCancellation",
+  enquiryByRef: "http://tempuri.org/IEcrComInterface/EnquiryByRef",
+  enquiry: "http://tempuri.org/IEcrComInterface/Enquiry",
+} as const;
+
 export interface ApexEcrConfig {
   serviceUrl: string;
   tid: string;
@@ -25,6 +33,8 @@ export interface ApexEcrConfig {
   tellerFullName?: string;
   temNamespace?: string;
   dataNamespace?: string;
+  integratorName?: string;
+  tenant?: string;
   /** Seconds to wait for the donor to tap the card at the terminal. */
   timeoutSeconds?: number;
 }
@@ -58,6 +68,8 @@ export interface ApexEcrResult {
   posReceipt: string;
   approved: boolean;
   raw: string;
+  httpStatus?: number;
+  contentType?: string;
 }
 
 export function escapeXml(value: string): string {
@@ -98,15 +110,18 @@ export function baisasToDecimalString(baisas: number): string {
 }
 
 function configBlock(config: ApexEcrConfig, ns: string): string {
+  // Element order must match the WCF data contract (alphabetical within EcrConfig).
   return `
-      <${ns}Config>
-        <${ns}EcrCurrencyCode>${escapeXml(config.currencyCode)}</${ns}EcrCurrencyCode>
-        <${ns}EcrTillerFullName>${escapeXml(config.tellerFullName || "KIOSK")}</${ns}EcrTillerFullName>
-        <${ns}EcrTillerUserName>${escapeXml(config.tellerUserName || "KIOSK")}</${ns}EcrTillerUserName>
-        <${ns}MerchantSecureKey>${escapeXml(config.secureKey)}</${ns}MerchantSecureKey>
-        <${ns}Mid>${escapeXml(config.mid)}</${ns}Mid>
-        <${ns}Tid>${escapeXml(config.tid)}</${ns}Tid>
-      </${ns}Config>`;
+        <${ns}Config>
+          <${ns}EcrCurrencyCode>${escapeXml(config.currencyCode)}</${ns}EcrCurrencyCode>
+          <${ns}EcrTillerFullName>${escapeXml(config.tellerFullName || "KIOSK")}</${ns}EcrTillerFullName>
+          <${ns}EcrTillerUserName>${escapeXml(config.tellerUserName || "KIOSK")}</${ns}EcrTillerUserName>
+          <${ns}IntegratorName>${escapeXml(config.integratorName || "AWKAF-KIOSK")}</${ns}IntegratorName>
+          <${ns}MerchantSecureKey>${escapeXml(config.secureKey)}</${ns}MerchantSecureKey>
+          <${ns}Mid>${escapeXml(config.mid)}</${ns}Mid>
+          <${ns}Tenant>${escapeXml(config.tenant || "")}</${ns}Tenant>
+          <${ns}Tid>${escapeXml(config.tid)}</${ns}Tid>
+        </${ns}Config>`;
 }
 
 /**
@@ -115,75 +130,62 @@ function configBlock(config: ApexEcrConfig, ns: string): string {
  */
 function printerBlock(ns: string, invoiceNumber: string, referenceNumber: string): string {
   return `
-      <${ns}Printer>
-        <${ns}EnablePrintPosReceipt>0</${ns}EnablePrintPosReceipt>
-        <${ns}EnablePrintReceiptNote>0</${ns}EnablePrintReceiptNote>
-        <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
-        <${ns}PrinterWidth>0</${ns}PrinterWidth>
-        <${ns}ReceiptNote></${ns}ReceiptNote>
-        <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
-      </${ns}Printer>`;
+        <${ns}Printer>
+          <${ns}EnablePrintPosReceipt>0</${ns}EnablePrintPosReceipt>
+          <${ns}EnablePrintReceiptNote>0</${ns}EnablePrintReceiptNote>
+          <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
+          <${ns}PrinterWidth>0</${ns}PrinterWidth>
+          <${ns}ReceiptNote></${ns}ReceiptNote>
+          <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
+        </${ns}Printer>`;
 }
 
-export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
+function envelope(config: ApexEcrConfig, operation: string, inner: string): string {
   const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
   const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
   return `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
   <soapenv:Body>
-    <tem:PerformFinancialTransaction>
-      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", request.invoiceNumber, request.referenceNumber)}
-        <ns:TransactionType>SALE</ns:TransactionType>
-        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>
-        <ns:InvoiceNumber>${escapeXml(request.invoiceNumber)}</ns:InvoiceNumber>
+    <tem:${operation}>
+      <tem:webReq>${inner}
       </tem:webReq>
-    </tem:PerformFinancialTransaction>
+    </tem:${operation}>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
 
+/** Sale: SaleRequest = { Config, EcrAmount, Printer } in that exact order. */
+export function buildSaleEnvelope(config: ApexEcrConfig, request: ApexSaleRequest): string {
+  const inner = `${configBlock(config, "ns:")}
+        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>${printerBlock("ns:", request.invoiceNumber, request.referenceNumber)}`;
+  return envelope(config, "Sale", inner);
+}
+
+/** EnquiryByRef: EnquiryRequest = { Config, OrigAuthCode, OrigInvoiceNumber, OrigRrn, Printer }. */
 export function buildEnquiryByRefEnvelope(
   config: ApexEcrConfig,
   origInvoiceNumber: string,
   origRrn: string,
   origAuthCode = "",
 ): string {
-  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
-  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
-  <soapenv:Body>
-    <tem:EnquiryByRef>
-      <tem:webReq>${configBlock(config, "ns:")}${printerBlock("ns:", origInvoiceNumber, origInvoiceNumber)}
+  const inner = `${configBlock(config, "ns:")}
         <ns:OrigAuthCode>${escapeXml(origAuthCode)}</ns:OrigAuthCode>
         <ns:OrigInvoiceNumber>${escapeXml(origInvoiceNumber)}</ns:OrigInvoiceNumber>
-        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>
-      </tem:webReq>
-    </tem:EnquiryByRef>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>${printerBlock("ns:", origInvoiceNumber, origInvoiceNumber)}`;
+  return envelope(config, "EnquiryByRef", inner);
 }
 
+/** RequestCancellation: CancelRequest = { Config }. */
 export function buildCancelEnvelope(config: ApexEcrConfig): string {
-  const tem = config.temNamespace || APEX_DEFAULT_TEM_NS;
-  const data = config.dataNamespace || APEX_DEFAULT_DATA_NS;
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${tem}" xmlns:ns="${data}">
-  <soapenv:Body>
-    <tem:CancelLastRequest>
-      <tem:webReq>${configBlock(config, "ns:")}
-      </tem:webReq>
-    </tem:CancelLastRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+  return envelope(config, "RequestCancellation", configBlock(config, "ns:"));
 }
 
 export function parseApexResponse(xml: string): ApexEcrResult {
   const posRespStatus = pickTag(xml, "PosRespStatus");
   const webResponseStatus = pickTag(xml, "WebResponseStatus");
-  const webOk = webResponseStatus === "" ||
-    webResponseStatus === "0" ||
-    webResponseStatus.toLowerCase() === "success";
+  const status = webResponseStatus.toLowerCase();
+  const webOk = status === "" || status === "0" || status === "success" || status === "ok" ||
+    status === "completed" || status === "successful";
 
   return {
     webResponseStatus,
@@ -238,17 +240,23 @@ export async function callApexEcr(
     });
 
     const text = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+    const looksHtml = /^\s*<(!doctype|html)/i.test(text) || contentType.includes("text/html");
 
-    if (!response.ok) {
+    if (!response.ok || looksHtml) {
       return {
         ...parseApexResponse(text),
         webResponseStatus: "99",
-        webResponseErrorDesc: `ApexECR HTTP ${response.status}`,
+        webResponseErrorDesc: !response.ok
+          ? `ApexECR HTTP ${response.status}${looksHtml ? " (HTML/WAF response)" : ""}`
+          : "ApexECR returned an HTML page instead of SOAP (likely a firewall/WAF block or wrong service URL)",
         approved: false,
+        httpStatus: response.status,
+        contentType,
       };
     }
 
-    return parseApexResponse(text);
+    return { ...parseApexResponse(text), httpStatus: response.status, contentType };
   } finally {
     clearTimeout(timer);
   }

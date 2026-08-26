@@ -52,6 +52,10 @@ const ConfirmationPage = () => {
           navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
           return;
         }
+        if (config?.payment_mode === 'hardware_pos') {
+          navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
+          return;
+        }
         if (config?.payment_mode === 'soft_pos') {
           navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
           return;
