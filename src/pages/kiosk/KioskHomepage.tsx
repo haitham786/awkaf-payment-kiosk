@@ -8,6 +8,7 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
+import { persistPaymentMode } from "@/lib/kioskConfig";
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
@@ -82,6 +83,7 @@ const KioskHomepage = () => {
         setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
         return;
       }
+      persistPaymentMode(kioskId, data.kiosk.configuration?.payment_mode);
       setKioskStatus(data.kiosk.status);
       if (data.kiosk.status === 'pending_approval') setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
       else if (data.kiosk.status === 'inactive') setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');

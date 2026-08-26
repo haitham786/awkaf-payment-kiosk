@@ -54,7 +54,7 @@ export function getCachedPaymentMode(kioskId: string): KioskPaymentMode | null {
   }
 }
 
-function persistPaymentMode(kioskId: string, mode: KioskPaymentMode | undefined) {
+export function persistPaymentMode(kioskId: string, mode: KioskPaymentMode | undefined) {
   try {
     if (mode) localStorage.setItem(PAYMENT_MODE_LS_KEY(kioskId), mode);
   } catch {
