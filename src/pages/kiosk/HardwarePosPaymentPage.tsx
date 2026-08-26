@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 type Stage = "waiting" | "processing" | "declined" | "error";
 
@@ -17,6 +18,7 @@ interface ApexResponse {
   referenceNumber?: string | null;
   rrn?: string | null;
   responseText?: string | null;
+  responseCode?: string | null;
   timedOut?: boolean;
   correlationId?: string;
   failureType?: string;
@@ -32,6 +34,8 @@ const HardwarePosPaymentPage = () => {
   const [stage, setStage] = useState<Stage>("waiting");
   const [errorMessage, setErrorMessage] = useState("");
   const [retryAllowed, setRetryAllowed] = useState(true);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(90);
+  const [declineMessage, setDeclineMessage] = useState("");
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
   );
@@ -39,6 +43,16 @@ const HardwarePosPaymentPage = () => {
   const transactionId = React.useMemo(() => crypto.randomUUID(), []);
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!kioskId) return;
+    void loadKioskRuntimeConfig(kioskId).then((config) => {
+      const configuredTimeout = config?.hardware_pos?.timeout_seconds;
+      if (typeof configuredTimeout === "number" && configuredTimeout >= 5) {
+        setTimeoutSeconds(configuredTimeout + 5);
+      }
+    }).catch((error) => console.error("Unable to load terminal timeout:", error));
+  }, [kioskId]);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -103,6 +117,10 @@ const HardwarePosPaymentPage = () => {
         return;
       }
 
+      const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
+        .filter(Boolean)
+        .join(" · ");
+      setDeclineMessage(detail);
       setStage("declined");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
@@ -150,10 +168,10 @@ const HardwarePosPaymentPage = () => {
   };
 
   useEffect(() => {
-    if (stage !== "declined" && stage !== "error") return;
+    if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
     const timer = window.setTimeout(() => navigate("/kiosk"), 10000);
     return () => window.clearTimeout(timer);
-  }, [navigate, stage]);
+  }, [navigate, retryAllowed, stage]);
 
   if (stage === "waiting" || stage === "processing") {
     return (
@@ -163,6 +181,7 @@ const HardwarePosPaymentPage = () => {
         stage={stage}
         onCancel={handleCancel}
         onTimeout={handleTimeout}
+        timeoutSeconds={timeoutSeconds}
       />
     );
   }
@@ -215,6 +234,7 @@ const HardwarePosPaymentPage = () => {
             <div className="leading-tight flex flex-col items-center">
               <h2 className="text-2xl font-bold text-destructive tracking-normal">تم رفض العملية</h2>
               <p className="text-sm text-destructive/70 mt-1">Transaction Declined</p>
+              {declineMessage && <p className="text-xs text-muted-foreground mt-2">{declineMessage}</p>}
             </div>
           </div>
         </Card>
