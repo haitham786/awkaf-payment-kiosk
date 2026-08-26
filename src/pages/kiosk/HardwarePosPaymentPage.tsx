@@ -100,14 +100,13 @@ const HardwarePosPaymentPage = () => {
     }
 
     const transactionId = transactionIdRef.current;
-    // If the previous session was never closed cleanly the terminal may still be
-    // showing the old prompt; ask the backend to clear it before the new SALE.
-    const forceClear = localStorage.getItem(SESSION_FLAG) === kioskId;
+    // Mark the session locally for lifecycle tracking, but never block a new SALE
+    // behind a cancellation request. The amount must be dispatched immediately.
     localStorage.setItem(SESSION_FLAG, kioskId);
 
     try {
       const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
-        body: { action: "sale", kioskId, transactionId, amount, category, forceClear },
+        body: { action: "sale", kioskId, transactionId, amount, category },
       });
       if (cancellingRef.current) return;
       if (error) throw error;
@@ -156,14 +155,18 @@ const HardwarePosPaymentPage = () => {
   }, [startSale]);
 
   const cancelAtTerminal = useCallback(async () => {
-    if (!kioskId) return;
+    if (!kioskId) return false;
     try {
-      await supabase.functions.invoke("apex-ecr-payment", {
+      const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
         body: { action: "cancel", kioskId },
       });
-      localStorage.removeItem(SESSION_FLAG);
+      if (error) throw error;
+      const cancelled = data?.cancelled === true;
+      if (cancelled) localStorage.removeItem(SESSION_FLAG);
+      return cancelled;
     } catch (err) {
       console.error("Terminal cancellation failed:", err);
+      return false;
     }
   }, [kioskId]);
 

@@ -40,6 +40,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const requestStartedAt = Date.now();
     const body = await req.json();
     const action: string = body?.action || "sale";
     const kioskId: string = body?.kioskId || "";
@@ -61,18 +62,17 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    // All three lookups are independent — run them together so the terminal
-    // receives the SALE as fast as possible (this used to cost 3 round trips).
-    const [kioskRes, secretRes, otherKiosksRes] = await Promise.all([
+    // Only load data for this kiosk on the payment hot path. Terminal pairing is
+    // enforced when configuration is saved and by the database uniqueness guard.
+    const configLookupStartedAt = Date.now();
+    const [kioskRes, secretRes] = await Promise.all([
       supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
       supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
-      supabase.from("kiosks").select("id, name, configuration").neq("id", kioskId),
     ]);
 
     const kiosk = kioskRes.data;
     const kioskError = kioskRes.error;
     const secretRow = secretRes.data;
-    const sameTidKiosks = otherKiosksRes.data;
 
     if (kioskError || !kiosk || kiosk.status !== "active") {
       return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
@@ -97,28 +97,6 @@ serve(async (req) => {
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
       return json(
         { success: false, error: "Hardware POS is not fully configured for this kiosk." },
-        400,
-        corsHeaders,
-      );
-    }
-
-    // Pairing guard: a terminal (TID) must belong to exactly one kiosk, otherwise a
-    // sale could be pushed to a terminal standing next to a different kiosk.
-
-    const conflict = (sameTidKiosks ?? []).find((row) => {
-      const cfg = (row.configuration ?? {}) as Record<string, unknown>;
-      if (cfg.payment_mode !== "hardware_pos") return false;
-      const hw = (cfg.hardware_pos ?? {}) as Record<string, unknown>;
-      return String(hw.tid || "").trim() === config.tid;
-    });
-
-    if (conflict) {
-      console.error("Terminal pairing conflict for TID", config.tid, "kiosks:", kioskId, conflict.id);
-      return json(
-        {
-          success: false,
-          error: `Terminal ${config.tid} is paired with more than one kiosk. Fix the kiosk configuration before taking payments.`,
-        },
         400,
         corsHeaders,
       );
@@ -263,14 +241,13 @@ serve(async (req) => {
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
-    // A terminal that is still sitting on a previous (abandoned) prompt ignores
-    // new SALE requests. When the kiosk knows the last session was not closed
-    // cleanly, clear the terminal first so the new amount always lands.
-    if (body?.forceClear === true) {
-      const cleared = await cancelAtTerminal();
-      console.log("ApexECR pre-sale clear", { correlationId, tid: config.tid, cleared: cleared.cancelled });
-    }
-
+    const saleDispatchStartedAt = Date.now();
+    console.log("ApexECR sale dispatch", {
+      correlationId,
+      tid: config.tid,
+      configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
+      requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
+    });
     const saleResult = await callApexEcr(
       config,
       buildSaleEnvelope(config, {
@@ -280,6 +257,14 @@ serve(async (req) => {
       }),
       APEX_SOAP_ACTIONS.sale,
     );
+    console.log("ApexECR sale response", {
+      correlationId,
+      tid: config.tid,
+      dispatchToResponseMs: Date.now() - saleDispatchStartedAt,
+      approved: saleResult.approved,
+      webResponseStatus: saleResult.webResponseStatus,
+      posRespStatus: saleResult.posRespStatus,
+    });
 
     if (saleResult.webResponseStatus === "99") {
       const failureType = classifyFailure(saleResult);
