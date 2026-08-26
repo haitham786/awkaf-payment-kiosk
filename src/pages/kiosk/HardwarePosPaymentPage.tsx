@@ -8,6 +8,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
 
@@ -49,7 +50,7 @@ const HardwarePosPaymentPage = () => {
 
   // Every attempt gets its own transaction id so the terminal never sees a
   // repeated invoice number after a decline or a cancelled session.
-  const transactionIdRef = useRef<string>(crypto.randomUUID());
+  const transactionIdRef = useRef<string>(searchParams.get("transactionId") || crypto.randomUUID());
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
@@ -105,9 +106,7 @@ const HardwarePosPaymentPage = () => {
     localStorage.setItem(SESSION_FLAG, kioskId);
 
     try {
-      const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
-        body: { action: "sale", kioskId, transactionId, amount, category },
-      });
+      const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current) return;
       if (error) throw error;
 
