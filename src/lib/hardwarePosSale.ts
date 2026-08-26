@@ -25,9 +25,10 @@ export function beginHardwarePosSale(request: HardwarePosSaleRequest): SaleInvoc
   });
   pendingSales.set(request.transactionId, invocation);
 
-  void invocation.finally(() => {
+  const release = () => {
     window.setTimeout(() => pendingSales.delete(request.transactionId), 30_000);
-  });
+  };
+  void invocation.then(release, release);
 
   return invocation;
 }
