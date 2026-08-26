@@ -72,6 +72,13 @@ const NFCPaymentPage = () => {
     if (!Number.isFinite(amount) || amount <= 0) { setErrorMessage('Invalid donation amount. Please select or enter an amount again.'); setStage('error'); return; }
     if (!kioskId) { setErrorMessage('Kiosk is not registered. Please set up the kiosk first.'); setStage('error'); return; }
 
+    // Safety net: this kiosk may have been switched to the hardware POS terminal.
+    // Never show a Soft POS error in that case — route to the terminal screen.
+    if (getCachedPaymentMode(kioskId) === 'hardware_pos') {
+      navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`, { replace: true });
+      return;
+    }
+
     // FAST PATH: if the SDK is already initialized in this session, skip the
     // edge-function round-trip and the NFC re-check so the next donation launches
     // Thawani Lamsa instantly.
