@@ -14,6 +14,7 @@ import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { ThawaniTapCardScreen } from "@/components/kiosk/ThawaniTapCardScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 type PaymentStage = 'waiting' | 'processing' | 'success' | 'declined' | 'error';
 
