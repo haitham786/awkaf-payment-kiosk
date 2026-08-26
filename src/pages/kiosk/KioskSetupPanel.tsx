@@ -263,6 +263,8 @@ const KioskSetupPanel = () => {
                     <><Smartphone className="w-4 h-4 text-emerald-600" /><span className="text-sm font-medium text-emerald-700">Soft POS Active - Thawani Lamsa NFC</span></>
                   ) : kioskPaymentMode === 'test_payment' ? (
                     <><Info className="w-4 h-4 text-amber-600" /><span className="text-sm font-medium text-amber-700">Testing Mode Active - Simulated Successful Payments</span></>
+                  ) : kioskPaymentMode === 'hardware_pos' ? (
+                    <><Smartphone className="w-4 h-4 text-gray-700" /><span className="text-sm font-medium text-gray-700">Hardware POS Terminal Active - ApexECR (Ahli Bank / AFS)</span></>
                   ) : (
                     <><Globe className="w-4 h-4 text-blue-600" /><span className="text-sm font-medium text-blue-700">Payment Gateway Active - Thawani Checkout</span></>
                   )}
