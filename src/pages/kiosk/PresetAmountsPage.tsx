@@ -6,6 +6,7 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { warmHardwarePos } from "@/lib/hardwarePosWarm";
 
 const PresetAmountsPage = () => {
   const navigate = useNavigate();
@@ -14,6 +15,11 @@ const PresetAmountsPage = () => {
   const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(() => readCachedCategory(categoryId));
 
   const presetAmounts = [1, 3, 5, 10, 20, 30, 50, 100, 200];
+
+  // Wake the payment backend while the donor picks a preset amount.
+  useEffect(() => {
+    warmHardwarePos();
+  }, []);
 
   useEffect(() => {
     const loadCategoryData = async () => {
