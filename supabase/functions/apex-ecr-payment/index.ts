@@ -104,10 +104,6 @@ serve(async (req) => {
 
     // Pairing guard: a terminal (TID) must belong to exactly one kiosk, otherwise a
     // sale could be pushed to a terminal standing next to a different kiosk.
-    const { data: sameTidKiosks } = await supabase
-      .from("kiosks")
-      .select("id, name, configuration")
-      .neq("id", kioskId);
 
     const conflict = (sameTidKiosks ?? []).find((row) => {
       const cfg = (row.configuration ?? {}) as Record<string, unknown>;
