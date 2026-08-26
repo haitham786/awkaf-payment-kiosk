@@ -174,9 +174,18 @@ const HardwarePosPaymentPage = () => {
     if (cancellingRef.current) return;
     cancellingRef.current = true;
     setStage("cancelling");
-    await cancelAtTerminal();
+
+    // Always push the cancellation to the terminal so the amount clears from
+    // its screen. The request keeps running in the background if it is slow —
+    // the donor is never held on the kiosk for more than a few seconds.
+    const cancelRequest = cancelAtTerminal();
+    await Promise.race([
+      cancelRequest,
+      new Promise((resolve) => window.setTimeout(resolve, 6000)),
+    ]);
     navigate("/kiosk");
   }, [cancelAtTerminal, navigate]);
+
 
   const handleTimeout = () => {
     setRetryAllowed(false);

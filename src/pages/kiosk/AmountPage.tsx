@@ -6,6 +6,7 @@ import { Delete, Eraser } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import { warmHardwarePos } from "@/lib/hardwarePosWarm";
 
 const AmountPage = () => {
   const [rialAmount, setRialAmount] = useState("");
@@ -15,6 +16,11 @@ const AmountPage = () => {
   const navigate = useNavigate();
   const categoryId = searchParams.get("category");
   const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null; category_id: string } | null>(() => readCachedCategory(categoryId));
+
+  // Wake the payment backend and the terminal route while the donor types.
+  useEffect(() => {
+    warmHardwarePos();
+  }, []);
 
   useEffect(() => {
     const loadCategoryData = async () => {

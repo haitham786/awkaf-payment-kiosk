@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { warmHardwarePos } from "@/lib/hardwarePosWarm";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
@@ -15,6 +16,11 @@ const ConfirmationPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
+
+  // Final wake-up so the SALE dispatches the instant the donor confirms.
+  useEffect(() => {
+    warmHardwarePos();
+  }, []);
 
   useEffect(() => {
     const loadCategory = async () => {
