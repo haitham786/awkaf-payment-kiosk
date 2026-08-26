@@ -123,6 +123,47 @@ serve(async (req) => {
     }
 
 
+    // -------------------------------------------------------------- diagnose
+    // Connectivity check used by the admin panel. Never touches a card; it just
+    // proves the backend can reach the ApexECR service over HTTPS.
+    if (action === "diagnose") {
+      const probes: Record<string, unknown>[] = [];
+
+      try {
+        const wsdlRes = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET" });
+        const wsdlText = await wsdlRes.text();
+        probes.push({
+          probe: "wsdl",
+          status: wsdlRes.status,
+          contentType: wsdlRes.headers.get("content-type") || "",
+          isWsdl: /wsdl:definitions|<definitions/i.test(wsdlText),
+          snippet: wsdlText.slice(0, 200),
+        });
+      } catch (err) {
+        probes.push({ probe: "wsdl", error: err instanceof Error ? err.message : "failed" });
+      }
+
+      try {
+        const soap = await callApexEcr(
+          config,
+          buildCancelEnvelope(config),
+          `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
+        );
+        probes.push({
+          probe: "soap",
+          status: soap.httpStatus ?? null,
+          contentType: soap.contentType ?? null,
+          webResponseStatus: soap.webResponseStatus,
+          webResponseErrorDesc: soap.webResponseErrorDesc,
+          snippet: soap.raw.slice(0, 300),
+        });
+      } catch (err) {
+        probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
+      }
+
+      return json({ success: true, tid: config.tid, mid: config.mid, serviceUrl: config.serviceUrl, probes }, 200, corsHeaders);
+    }
+
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
       try {
@@ -131,7 +172,15 @@ serve(async (req) => {
           buildCancelEnvelope(config),
           `${config.temNamespace || "http://tempuri.org/"}IApexEcr/CancelLastRequest`,
         );
-        return json({ success: true, cancelled: result.webResponseStatus !== "99" }, 200, corsHeaders);
+        return json(
+          {
+            success: true,
+            cancelled: result.webResponseStatus !== "99",
+            error: result.webResponseStatus === "99" ? result.webResponseErrorDesc : undefined,
+          },
+          200,
+          corsHeaders,
+        );
       } catch (_err) {
         return json({ success: true, cancelled: false }, 200, corsHeaders);
       }
