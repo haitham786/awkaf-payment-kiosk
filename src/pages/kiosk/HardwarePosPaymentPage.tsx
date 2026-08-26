@@ -47,9 +47,12 @@ const HardwarePosPaymentPage = () => {
     () => readCachedCategory(category)?.category_reference || "",
   );
 
-  const transactionId = React.useMemo(() => crypto.randomUUID(), []);
+  // Every attempt gets its own transaction id so the terminal never sees a
+  // repeated invoice number after a decline or a cancelled session.
+  const transactionIdRef = useRef<string>(crypto.randomUUID());
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
+  const cancellingRef = useRef(false);
 
   useEffect(() => {
     if (!kioskId) return;
