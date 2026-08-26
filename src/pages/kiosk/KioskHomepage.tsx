@@ -8,6 +8,7 @@ import { Settings, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
@@ -75,17 +76,16 @@ const KioskHomepage = () => {
         setKioskMessage('يرجى تسجيل هذا الكشك من خلال لوحة الإعدادات للبدء.');
         return;
       }
-      const { data, error } = await supabase.functions.invoke('get-kiosk-config', { body: { kioskId } });
-      if (error) throw error;
-      if (!data?.kiosk) {
+      const config = await loadKioskRuntimeConfig(kioskId, { forceRefresh: true });
+      if (!config) {
         setKioskStatus('disconnected');
         setKioskMessage('تم فصل هذا الكشك من النظام. يرجى التواصل مع الإدارة.');
         return;
       }
-      setKioskStatus(data.kiosk.status);
-      if (data.kiosk.status === 'pending_approval') setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
-      else if (data.kiosk.status === 'inactive') setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
-      else if (data.kiosk.status === 'maintenance') setKioskMessage('الكشك قيد الصيانة. نعتذر عن الإزعاج.');
+      // The homepage already has a locally known active state. This refresh is
+      // primarily to persist payment_mode before the donor reaches confirmation.
+      setKioskStatus('active');
+      setKioskMessage('');
     } catch (error) {
       console.error('Error checking kiosk status:', error);
     }

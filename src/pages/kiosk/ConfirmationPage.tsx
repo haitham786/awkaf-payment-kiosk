@@ -7,7 +7,7 @@ import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
@@ -39,28 +39,32 @@ const ConfirmationPage = () => {
     return `${rials}.${baisas.toString().padStart(3, '0')}`;
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     const kioskId = localStorage.getItem('kiosk_id');
     if (kioskId) {
-      try {
-        const config = await loadKioskRuntimeConfig(kioskId);
-        if (config?.payment_mode === 'test_payment') {
-          navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
-          return;
-        }
-        if (config?.payment_mode === 'payment_gateway') {
-          navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
-          return;
-        }
-        if (config?.payment_mode === 'hardware_pos') {
-          navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
-          return;
-        }
-        if (config?.payment_mode === 'soft_pos') {
-          navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
-          return;
-        }
-      } catch (error) { console.error('Error checking kiosk config:', error); }
+      const mode = getCachedPaymentMode(kioskId);
+      if (mode === 'test_payment') {
+        navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
+        return;
+      }
+      if (mode === 'payment_gateway') {
+        navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
+        return;
+      }
+      if (mode === 'hardware_pos') {
+        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
+        return;
+      }
+      if (mode === 'soft_pos') {
+        navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
+        return;
+      }
+
+      // First run only: resolve the mode on the lightweight routing screen.
+      // Never hold the donor on confirmation while waiting for the network.
+      void loadKioskRuntimeConfig(kioskId).catch((error) => {
+        console.warn('Unable to refresh kiosk payment mode:', error);
+      });
     }
     navigate(`/kiosk/payment-request?category=${category}&amount=${amount}`);
   };

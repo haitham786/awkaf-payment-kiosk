@@ -13,6 +13,8 @@ import {
 } from "../_shared/apexEcr.ts";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CONFIG_CACHE_TTL_MS = 60_000;
+const terminalConfigCache = new Map<string, { config: ApexEcrConfig; status: string; cachedAt: number }>();
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
 function invoiceNumberFor(transactionId: string): string {
@@ -62,37 +64,47 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    // Only load data for this kiosk on the payment hot path. Terminal pairing is
-    // enforced when configuration is saved and by the database uniqueness guard.
     const configLookupStartedAt = Date.now();
-    const [kioskRes, secretRes] = await Promise.all([
-      supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
-      supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
-    ]);
+    const cached = terminalConfigCache.get(kioskId);
+    let config: ApexEcrConfig;
+    let kioskStatus: string;
 
-    const kiosk = kioskRes.data;
-    const kioskError = kioskRes.error;
-    const secretRow = secretRes.data;
+    if (cached && Date.now() - cached.cachedAt < CONFIG_CACHE_TTL_MS) {
+      config = cached.config;
+      kioskStatus = cached.status;
+    } else {
+      // Only load this kiosk. MID/TID uniqueness is enforced when configuration
+      // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
+      const [kioskRes, secretRes] = await Promise.all([
+        supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
+        supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
+      ]);
+      const kiosk = kioskRes.data;
+      if (kioskRes.error || !kiosk) {
+        return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
+      }
 
-    if (kioskError || !kiosk || kiosk.status !== "active") {
-      return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
+      const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
+      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
+      config = {
+        serviceUrl: String(hardware.service_url || "").trim(),
+        tid: String(hardware.tid || "").trim(),
+        mid: String(hardware.mid || "").trim(),
+        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
+        currencyCode: String(hardware.currency_code || "512"),
+        tellerUserName: "KIOSK",
+        tellerFullName: "KIOSK",
+        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
+        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
+      };
+      kioskStatus = kiosk.status;
+      terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
     }
 
-    const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
-    const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
-
-    const config: ApexEcrConfig = {
-      serviceUrl: String(hardware.service_url || "").trim(),
-      tid: String(hardware.tid || "").trim(),
-      mid: String(hardware.mid || "").trim(),
-      secureKey: String(secretRow?.apex_secure_key || "").trim(),
-      currencyCode: String(hardware.currency_code || "512"),
-      tellerUserName: "KIOSK",
-      tellerFullName: "KIOSK",
-      temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
-      dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
-      timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
-    };
+    if (kioskStatus !== "active") {
+      return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
+    }
 
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
       return json(
@@ -196,7 +208,10 @@ serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
-          if (result.webResponseStatus !== "99") return { cancelled: true };
+           const cancellationStatus = result.webResponseStatus.trim().toLowerCase();
+           if (["0", "success", "ok", "completed", "successful"].includes(cancellationStatus)) {
+             return { cancelled: true };
+           }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
         } catch (err) {
           lastError = err instanceof Error ? err.message : "Cancellation failed";
