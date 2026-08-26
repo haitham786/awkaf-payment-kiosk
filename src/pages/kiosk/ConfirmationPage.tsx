@@ -9,6 +9,7 @@ import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import { warmHardwarePos } from "@/lib/hardwarePosWarm";
+import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
@@ -58,7 +59,11 @@ const ConfirmationPage = () => {
         return;
       }
       if (mode === 'hardware_pos') {
-        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
+        const transactionId = crypto.randomUUID();
+        // Dispatch before navigation so rendering the payment screen adds zero
+        // latency between the donor's tap and the terminal command.
+        void beginHardwarePosSale({ kioskId, transactionId, amount, category });
+        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}&transactionId=${transactionId}`);
         return;
       }
       if (mode === 'soft_pos') {
