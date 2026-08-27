@@ -175,6 +175,13 @@ const HardwarePosPaymentPage = () => {
 
 
   const handleTimeout = () => {
+    // Apex cancellation always targets the last request. Clear the terminal
+    // prompt before exposing the timeout state so the next donor is never met
+    // by an orphaned session or "Another transaction under processing".
+    cancellingRef.current = true;
+    void cancelAtTerminal().finally(() => {
+      cancellingRef.current = false;
+    });
     setRetryAllowed(false);
     setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
     setStage("error");

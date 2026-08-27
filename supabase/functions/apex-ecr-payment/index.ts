@@ -9,6 +9,7 @@ import {
   buildSaleEnvelope,
   callApexEcr,
   APEX_SOAP_ACTIONS,
+  isAnotherTransactionInProgress,
   isSuccessfulWebResponse,
   panLastFour,
 } from "../_shared/apexEcr.ts";
@@ -313,7 +314,7 @@ serve(async (req) => {
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
-    const saleResult = await callApexEcr(
+    let saleResult = await callApexEcr(
       config,
       buildSaleEnvelope(config, {
         amount: baisasToDecimalString(amount),
@@ -322,6 +323,40 @@ serve(async (req) => {
       }),
       APEX_SOAP_ACTIONS.sale,
     );
+
+    // Apex accepts only one terminal request at a time. If a previous donor's
+    // prompt survived a browser close, timeout, or interrupted network request,
+    // the new SALE is explicitly rejected and was never queued. Cancel that
+    // stale request and retry this SALE exactly once after cancellation succeeds.
+    const initialError = safeApexError(saleResult);
+    if (
+      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
+      isAnotherTransactionInProgress(initialError)
+    ) {
+      console.warn("ApexECR stale session detected", { correlationId, tid: config.tid });
+      const cancellation = await cancelAtTerminal();
+      console.log("ApexECR stale session cancellation", {
+        correlationId,
+        tid: config.tid,
+        cancelled: cancellation.cancelled,
+        error: cancellation.error,
+      });
+
+      if (cancellation.cancelled) {
+        // Give the terminal a short state-transition window; this is only paid
+        // on stale-session recovery and never slows the normal SALE path.
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        saleResult = await callApexEcr(
+          config,
+          buildSaleEnvelope(config, {
+            amount: baisasToDecimalString(amount),
+            invoiceNumber,
+            referenceNumber: transactionId,
+          }),
+          APEX_SOAP_ACTIONS.sale,
+        );
+      }
+    }
     console.log("ApexECR sale response", {
       correlationId,
       tid: config.tid,
