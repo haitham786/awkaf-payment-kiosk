@@ -68,6 +68,8 @@ serve(async (req) => {
     );
 
     const configLookupStartedAt = Date.now();
+    const refreshConfig = body?.refreshConfig === true;
+    if (refreshConfig) terminalConfigCache.delete(kioskId);
     const cached = terminalConfigCache.get(kioskId);
     let config: ApexEcrConfig;
     let kioskStatus: string;
@@ -102,7 +104,14 @@ serve(async (req) => {
         timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
       };
       kioskStatus = kiosk.status;
-      terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
+      // Never cache an unusable configuration: a wiped or half-saved terminal
+      // setup must be re-read on the next attempt instead of being pinned for
+      // ten minutes inside a warm isolate.
+      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
+        terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
+      } else {
+        terminalConfigCache.delete(kioskId);
+      }
     }
 
     if (kioskStatus !== "active") {
@@ -110,12 +119,25 @@ serve(async (req) => {
     }
 
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
+      const missing = [
+        config.serviceUrl ? null : "Service URL",
+        config.mid ? null : "MID",
+        config.tid ? null : "TID",
+        config.secureKey ? null : "Merchant Secure Key",
+      ].filter(Boolean).join(", ");
+      console.error("ApexECR configuration incomplete", { correlationId, kioskId, missing });
       return json(
-        { success: false, error: "Hardware POS is not fully configured for this kiosk." },
+        {
+          success: false,
+          error: `Hardware POS is not fully configured for this kiosk. Missing: ${missing}. Open Manage Kiosks → Edit kiosk → Hardware POS and re-enter these values.`,
+          missing,
+          failureType: "not_configured",
+        },
         400,
         corsHeaders,
       );
     }
+
 
     if (!/^https:\/\//i.test(config.serviceUrl)) {
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
