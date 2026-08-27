@@ -55,6 +55,65 @@ function safeApexError(result: { webResponseErrorDesc: string; posRespText: stri
   return message || (result.posRespCode ? `AFS response code ${result.posRespCode}` : "AFS did not route the request to the terminal.");
 }
 
+/**
+ * Stores an approved/declined terminal result through the existing
+ * process-payment pipeline so reporting, reference numbers and receipts behave
+ * identically no matter which code path discovered the outcome.
+ */
+async function recordApexTransaction(params: {
+  transactionId: string;
+  kioskId: string;
+  amount: number;
+  category: string;
+  config: ApexEcrConfig;
+  result: ApexEcrResult;
+  invoiceNumber: string;
+}): Promise<string | null> {
+  const { transactionId, kioskId, amount, category, config, result, invoiceNumber } = params;
+  try {
+    const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        "x-internal-token": Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "",
+      },
+      body: JSON.stringify({
+        transactionId,
+        kioskId,
+        amount,
+        category,
+        mobileNumber: null,
+        paymentType: "hardware_pos",
+        provider: "apex_ecr",
+        posResponse: {
+          success: result.approved,
+          responseCode: result.posRespCode || (result.approved ? "00" : "05"),
+          rrn: result.posRRN || null,
+          authCode: result.posAuthCode || null,
+          tid: config.tid,
+          mid: config.mid,
+          cardType: result.posIssuerName || null,
+          cardLastFour: panLastFour(result.posPan),
+          invoiceNumber: result.posInvoiceNumber || invoiceNumber,
+          batchNumber: result.posBatchNumber || null,
+          stan: result.posStan || null,
+          posDate: result.posDate || null,
+          posTime: result.posTime || null,
+          respText: result.posRespText || null,
+          cvmId: result.posCVMId || null,
+        },
+      }),
+    });
+    const processBody = await processRes.json().catch(() => ({}));
+    return processBody?.transaction?.reference_number ?? null;
+  } catch (recordError) {
+    console.error("Failed to record hardware POS transaction:", recordError);
+    return null;
+  }
+}
+
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
