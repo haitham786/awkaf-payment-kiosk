@@ -914,18 +914,60 @@ const KiosksManagement = () => {
                         </p>
                       ) : null;
                     })()}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleVerifyTerminal}
-                      disabled={verifyingTerminal}
-                    >
-                      {verifyingTerminal ? 'Checking AFS connection…' : 'Test AFS Connection'}
-                    </Button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="apex_test_rials">Test Amount — Rials</Label>
+                        <Input
+                          id="apex_test_rials"
+                          type="number"
+                          min={0}
+                          value={testRials}
+                          onChange={(e) => setTestRials(e.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="apex_test_baisas">Test Amount — Baisas</Label>
+                        <Input
+                          id="apex_test_baisas"
+                          type="number"
+                          min={0}
+                          max={999}
+                          value={testBaisas}
+                          onChange={(e) => setTestBaisas(e.target.value)}
+                          placeholder="100"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      "Test Connection" pushes this exact amount to the paired terminal through the same
+                      route a donor uses. It is never recorded as a donation. Use "Cancel" to clear the
+                      amount from the terminal screen.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleTestConnection}
+                        disabled={verifyingTerminal || cancellingTerminal}
+                      >
+                        {verifyingTerminal ? 'Sending to terminal…' : 'Test Connection'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleCancelTerminal}
+                        disabled={cancellingTerminal}
+                      >
+                        {cancellingTerminal ? 'Cancelling…' : 'Cancel'}
+                      </Button>
+                    </div>
                     {terminalDiagnostic && (
                       <p className="text-xs text-muted-foreground break-words">{terminalDiagnostic}</p>
                     )}
+
                   </div>
                 </div>
               )}
