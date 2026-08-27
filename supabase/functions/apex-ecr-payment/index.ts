@@ -844,52 +844,18 @@ serve(async (req) => {
     // Admin connection tests take the identical terminal path but are never
     // stored as donations.
     const testMode = body?.testMode === true;
-    const internalToken = Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "";
-    let referenceNumber: string | null = null;
-
-    try {
-      if (testMode) throw new Error("skip-recording");
-
-      const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "x-internal-token": internalToken,
-        },
-        body: JSON.stringify({
-          transactionId,
-          kioskId,
-          amount,
-          category,
-          mobileNumber: null,
-          paymentType: "hardware_pos",
-          provider: "apex_ecr",
-          posResponse: {
-            success: saleResult.approved,
-            responseCode: saleResult.posRespCode || (saleResult.approved ? "00" : "05"),
-            rrn: saleResult.posRRN || null,
-            authCode: saleResult.posAuthCode || null,
-            tid: config.tid,
-            mid: config.mid,
-            cardType: saleResult.posIssuerName || null,
-            cardLastFour: panLastFour(saleResult.posPan),
-            invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
-            batchNumber: saleResult.posBatchNumber || null,
-            stan: saleResult.posStan || null,
-            posDate: saleResult.posDate || null,
-            posTime: saleResult.posTime || null,
-            respText: saleResult.posRespText || null,
-            cvmId: saleResult.posCVMId || null,
-          },
-        }),
+    const referenceNumber = testMode
+      ? null
+      : await recordApexTransaction({
+        transactionId,
+        kioskId,
+        amount,
+        category,
+        config,
+        result: saleResult,
+        invoiceNumber,
       });
 
-      const processBody = await processRes.json().catch(() => ({}));
-      referenceNumber = processBody?.transaction?.reference_number ?? null;
-    } catch (recordError) {
-      if (!testMode) console.error("Failed to record hardware POS transaction:", recordError);
-    }
 
 
     const responseBody = {
