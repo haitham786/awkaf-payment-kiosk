@@ -337,6 +337,27 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
 
+    // --------------------------------------------------------------- outcome
+    // Read-only recovery path. If the kiosk lost the SALE response, it polls
+    // here for the outcome the backend already stored for this transaction.
+    if (action === "outcome") {
+      const { data: sessionRow } = await supabase
+        .from("apex_terminal_sessions")
+        .select("transaction_id, state, result")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+
+      const finishedStates = ["approved", "declined", "failed", "cancelled", "unknown"];
+      const matches = sessionRow?.transaction_id === transactionId;
+      const finished = matches && finishedStates.includes(String(sessionRow?.state || ""));
+      return json({
+        success: true,
+        finished,
+        state: matches ? sessionRow?.state ?? "missing" : "missing",
+        result: finished ? sessionRow?.result ?? null : null,
+      }, 200, corsHeaders);
+    }
+
 
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
