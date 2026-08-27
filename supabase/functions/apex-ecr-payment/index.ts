@@ -263,6 +263,78 @@ serve(async (req) => {
       return { cancelled: false, error: lastError };
     };
 
+    // ------------------------------------------------------------------ warm
+    // Idle readiness probe. Keeps this isolate hot, primes the terminal
+    // configuration cache above and re-opens the TLS session to the AFS host so
+    // the SALE goes out instantly. It also reports the coordinator state so the
+    // kiosk can show live readiness, and — only when nothing is paying — clears
+    // a terminal session whose lease has already expired.
+    if (action === "warm") {
+      let hostReachable = false;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET", signal: controller.signal });
+        clearTimeout(timer);
+        await res.arrayBuffer();
+        hostReachable = res.status < 500;
+      } catch {
+        hostReachable = false;
+      }
+
+      const { data: sessionRow } = await supabase
+        .from("apex_terminal_sessions")
+        .select("transaction_id, state, lease_expires_at")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+
+      const activeStates = ["active", "cancelling", "recovering"];
+      const sessionState = String(sessionRow?.state || "idle");
+      const leaseExpired = sessionRow
+        ? new Date(sessionRow.lease_expires_at).getTime() <= Date.now()
+        : true;
+      let busy = activeStates.includes(sessionState) && !leaseExpired;
+      let staleCleared: boolean | null = null;
+
+      // Idle-only recovery: an expired lease means no live donor owns the
+      // terminal, so the orphaned prompt is cleared before the next donor.
+      if (body?.releaseStale === true && activeStates.includes(sessionState) && leaseExpired) {
+        const recovered = await cancelAtTerminal();
+        staleCleared = recovered.cancelled;
+        if (recovered.cancelled) {
+          await supabase.rpc("finish_apex_terminal_session", {
+            _kiosk_id: kioskId,
+            _transaction_id: sessionRow!.transaction_id,
+            _state: "cancelled",
+            _result: { success: true, cancelled: true, reason: "idle_stale_release" },
+          });
+          busy = false;
+        } else {
+          busy = true;
+        }
+        console.warn("ApexECR idle stale release", { correlationId, tid: config.tid, cleared: recovered.cancelled, error: recovered.error });
+      }
+
+      console.log("ApexECR warm", {
+        correlationId,
+        tid: config.tid,
+        hostReachable,
+        sessionState,
+        busy,
+        ms: Date.now() - requestStartedAt,
+      });
+      return json({
+        success: true,
+        warmed: true,
+        hostReachable,
+        sessionState,
+        leaseExpired,
+        busy,
+        staleCleared,
+      }, 200, corsHeaders);
+    }
+
+
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
       const { data: ownershipRows, error: ownershipError } = await supabase.rpc(
