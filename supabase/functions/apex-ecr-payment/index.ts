@@ -423,21 +423,32 @@ serve(async (req) => {
 
       // Idle-only recovery: an expired lease means no live donor owns the
       // terminal, so the orphaned prompt is cleared before the next donor.
+      // The claim below is atomic: if a SALE has taken the terminal in the
+      // meantime, the claim fails and no cancellation is ever sent — a probe
+      // can therefore never cancel a live payment.
       if (body?.releaseStale === true && activeStates.includes(sessionState) && leaseExpired) {
-        const recovered = await cancelAtTerminal();
-        staleCleared = recovered.cancelled;
-        if (recovered.cancelled) {
-          await supabase.rpc("finish_apex_terminal_session", {
-            _kiosk_id: kioskId,
-            _transaction_id: sessionRow!.transaction_id,
-            _state: "cancelled",
-            _result: { success: true, cancelled: true, reason: "idle_stale_release" },
-          });
-          busy = false;
+        const { data: claimed } = await supabase.rpc("claim_stale_apex_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: sessionRow!.transaction_id,
+        });
+        if (claimed === true) {
+          const recovered = await cancelAtTerminal();
+          staleCleared = recovered.cancelled;
+          if (recovered.cancelled) {
+            await supabase.rpc("finish_apex_terminal_session", {
+              _kiosk_id: kioskId,
+              _transaction_id: sessionRow!.transaction_id,
+              _state: "cancelled",
+              _result: { success: true, cancelled: true, reason: "idle_stale_release" },
+            });
+            busy = false;
+          } else {
+            busy = true;
+          }
+          console.warn("ApexECR idle stale release", { correlationId, tid: config.tid, cleared: recovered.cancelled, error: recovered.error });
         } else {
           busy = true;
         }
-        console.warn("ApexECR idle stale release", { correlationId, tid: config.tid, cleared: recovered.cancelled, error: recovered.error });
       }
 
       console.log("ApexECR warm", {
