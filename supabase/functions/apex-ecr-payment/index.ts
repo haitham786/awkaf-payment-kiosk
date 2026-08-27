@@ -600,6 +600,77 @@ serve(async (req) => {
       return json(responseBody, 200, corsHeaders);
     }
 
+    // Ambiguous approval: AFS accepted the request but the terminal-level
+    // fields do not clearly say approved. Ask the terminal's own record
+    // (EnquiryByRef) before telling the donor the payment failed.
+    if (!saleResult.approved) {
+      console.warn("ApexECR non-approved sale reply", {
+        correlationId,
+        tid: config.tid,
+        posRespStatus: saleResult.posRespStatus || null,
+        posRespCode: saleResult.posRespCode || null,
+        posRespText: saleResult.posRespText || null,
+        posRRN: saleResult.posRRN || null,
+        posAuthCode: saleResult.posAuthCode || null,
+        raw: redactApexRaw(saleResult.raw),
+      });
+
+      const clearlyDeclined = ["0", "-1", "false", "declined", "decline"]
+        .includes(String(saleResult.posRespStatus || "").trim().toLowerCase())
+        && !saleResult.posAuthCode && !saleResult.posRRN;
+
+      if (!clearlyDeclined) {
+        try {
+          const enquiry = await callApexEcr(
+            config,
+            buildEnquiryByRefEnvelope(
+              config,
+              invoiceNumber,
+              saleResult.posRRN || "",
+              saleResult.posAuthCode || "",
+              transactionId,
+            ),
+            APEX_SOAP_ACTIONS.enquiryByRef,
+            15000,
+          );
+          const enquiryApproved = isSuccessfulWebResponse(enquiry.webResponseStatus) && isApprovedPosResponse(
+            enquiry.posRespStatus,
+            enquiry.posRespCode,
+            enquiry.posAuthCode,
+            enquiry.posRRN,
+            enquiry.posRespText,
+          );
+          console.log("ApexECR outcome enquiry", {
+            correlationId,
+            tid: config.tid,
+            enquiryApproved,
+            posRespStatus: enquiry.posRespStatus || null,
+            posRespCode: enquiry.posRespCode || null,
+          });
+          if (enquiryApproved) {
+            saleResult = {
+              ...saleResult,
+              approved: true,
+              posRespStatus: enquiry.posRespStatus || saleResult.posRespStatus,
+              posRespCode: enquiry.posRespCode || saleResult.posRespCode,
+              posRespText: enquiry.posRespText || saleResult.posRespText,
+              posRRN: enquiry.posRRN || saleResult.posRRN,
+              posAuthCode: enquiry.posAuthCode || saleResult.posAuthCode,
+              posPan: enquiry.posPan || saleResult.posPan,
+              posIssuerName: enquiry.posIssuerName || saleResult.posIssuerName,
+            };
+          }
+        } catch (enquiryError) {
+          console.warn("ApexECR outcome enquiry failed", {
+            correlationId,
+            error: enquiryError instanceof Error ? enquiryError.message : "unknown",
+          });
+        }
+      }
+    }
+
+
+
     // Record the transaction through the existing pipeline so reporting,
     // reference numbers and receipts behave exactly as they do today.
     // Admin connection tests take the identical terminal path but are never
