@@ -232,7 +232,24 @@ serve(async (req) => {
       cacheConfig();
     }
 
+    /**
+     * The SALE fast path reserves the terminal while it loads the config. If we
+     * bail out before dispatching, the reservation must be handed straight back
+     * so the next donor is never blocked by a lease that never sent a command.
+     */
+    const releasePreAcquisitionIfHeld = async () => {
+      if (preAcquisition?.acquisition !== "acquired") return;
+      preAcquisition = null;
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _state: "failed",
+        _result: { success: false, approved: false, reason: "sale_not_dispatched" },
+      }).catch(() => undefined);
+    };
+
     if (kioskStatus !== "active") {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
     }
 
