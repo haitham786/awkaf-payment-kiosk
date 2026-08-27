@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
   ApexEcrConfig,
+  ApexEcrResult,
   baisasToDecimalString,
   buildCancelEnvelope,
   buildEnquiryByRefEnvelope,
@@ -17,6 +18,13 @@ import {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONFIG_CACHE_TTL_MS = 600_000;
 const terminalConfigCache = new Map<string, { config: ApexEcrConfig; status: string; cachedAt: number }>();
+
+interface TerminalAcquisition {
+  acquisition: "acquired" | "completed" | "duplicate_active" | "stale_recovery" | "busy";
+  owner_transaction_id: string;
+  session_state: string;
+  stored_result: Record<string, unknown> | null;
+}
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
 function invoiceNumberFor(transactionId: string): string {
@@ -61,10 +69,7 @@ serve(async (req) => {
     if (!UUID_REGEX.test(kioskId)) {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
-    if (
-      action !== "cancel" && action !== "diagnose" && action !== "wsdl" && action !== "warm" &&
-      !UUID_REGEX.test(transactionId)
-    ) {
+    if (action !== "diagnose" && action !== "wsdl" && action !== "warm" && !UUID_REGEX.test(transactionId)) {
       return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
@@ -260,9 +265,12 @@ serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
-           if (isSuccessfulWebResponse(result.webResponseStatus)) {
-             return { cancelled: true };
-           }
+          if (
+            isSuccessfulWebResponse(result.webResponseStatus) ||
+            /transaction\s+not\s+found|no\s+(?:active|pending)\s+transaction/i.test(result.webResponseErrorDesc)
+          ) {
+            return { cancelled: true };
+          }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
         } catch (err) {
           lastError = err instanceof Error ? err.message : "Cancellation failed";
@@ -274,9 +282,33 @@ serve(async (req) => {
 
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
+      const { data: ownershipRows, error: ownershipError } = await supabase.rpc(
+        "request_apex_terminal_cancellation",
+        { _kiosk_id: kioskId, _transaction_id: transactionId },
+      );
+      if (ownershipError) throw ownershipError;
+      const ownership = Array.isArray(ownershipRows) ? ownershipRows[0] : null;
+      if (ownership?.allowed !== true) {
+        const alreadyFinished = ["approved", "declined", "failed", "cancelled"].includes(String(ownership?.session_state || ""));
+        return json({
+          success: alreadyFinished,
+          cancelled: ownership?.session_state === "cancelled",
+          state: ownership?.session_state || "missing",
+          error: alreadyFinished
+            ? "This payment session has already finished."
+            : "This cancellation does not own the active terminal session.",
+        }, 200, corsHeaders);
+      }
+
       const outcome = await cancelAtTerminal();
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _state: outcome.cancelled ? "cancelled" : "unknown",
+        _result: { success: outcome.cancelled, cancelled: outcome.cancelled, error: outcome.error || null },
+      });
       console.log("ApexECR cancel", { correlationId, tid: config.tid, cancelled: outcome.cancelled });
-      return json({ success: true, cancelled: outcome.cancelled, error: outcome.error }, 200, corsHeaders);
+      return json({ success: outcome.cancelled, cancelled: outcome.cancelled, error: outcome.error }, 200, corsHeaders);
     }
 
     const invoiceNumber = invoiceNumberFor(transactionId);
@@ -307,6 +339,63 @@ serve(async (req) => {
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
+    const leaseSeconds = Math.min(300, Math.max(30, Number(config.timeoutSeconds || 90) + 30));
+    const { data: acquisitionRows, error: acquisitionError } = await supabase.rpc(
+      "acquire_apex_terminal_session",
+      {
+        _kiosk_id: kioskId,
+        _terminal_id: config.tid,
+        _transaction_id: transactionId,
+        _lease_seconds: leaseSeconds,
+      },
+    );
+    if (acquisitionError) throw acquisitionError;
+    const acquisition = (Array.isArray(acquisitionRows) ? acquisitionRows[0] : null) as TerminalAcquisition | null;
+    if (!acquisition) throw new Error("Unable to coordinate the terminal session.");
+
+    if (acquisition.acquisition === "completed" && acquisition.stored_result) {
+      return json(acquisition.stored_result, 200, corsHeaders);
+    }
+    if (acquisition.acquisition === "duplicate_active") {
+      return json({
+        success: false,
+        approved: false,
+        failureType: "session_in_progress",
+        outcomeUnknown: true,
+        error: "This payment request is already being processed by the terminal.",
+      }, 200, corsHeaders);
+    }
+    if (acquisition.acquisition === "busy") {
+      return json({
+        success: false,
+        approved: false,
+        failureType: "terminal_busy",
+        outcomeUnknown: true,
+        error: "The terminal is completing the previous payment. Please wait for it to return to the idle screen.",
+      }, 200, corsHeaders);
+    }
+    if (acquisition.acquisition === "stale_recovery") {
+      console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid });
+      const recovered = await cancelAtTerminal();
+      if (!recovered.cancelled) {
+        await supabase.rpc("finish_apex_terminal_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: acquisition.owner_transaction_id,
+          _state: "unknown",
+          _result: { success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." },
+        });
+        return json({ success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." }, 200, corsHeaders);
+      }
+      const { data: activated, error: activationError } = await supabase.rpc(
+        "activate_recovered_apex_session",
+        { _kiosk_id: kioskId, _transaction_id: transactionId, _lease_seconds: leaseSeconds },
+      );
+      if (activationError || activated !== true) {
+        return json({ success: false, approved: false, failureType: "terminal_busy", outcomeUnknown: true, error: "The terminal session changed during recovery. Please wait before trying again." }, 200, corsHeaders);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+
     const saleDispatchStartedAt = Date.now();
     console.log("ApexECR sale dispatch", {
       correlationId,
@@ -314,20 +403,27 @@ serve(async (req) => {
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
-    let saleResult = await callApexEcr(
-      config,
-      buildSaleEnvelope(config, {
-        amount: baisasToDecimalString(amount),
-        invoiceNumber,
-        referenceNumber: transactionId,
-      }),
-      APEX_SOAP_ACTIONS.sale,
-    );
+    let saleResult: ApexEcrResult;
+    try {
+      saleResult = await callApexEcr(
+        config,
+        buildSaleEnvelope(config, {
+          amount: baisasToDecimalString(amount),
+          invoiceNumber,
+          referenceNumber: transactionId,
+        }),
+        APEX_SOAP_ACTIONS.sale,
+      );
+    } catch (saleError) {
+      const message = saleError instanceof Error ? saleError.message : "Terminal request failed.";
+      const responseBody = { success: false, approved: false, timedOut: /abort/i.test(message), outcomeUnknown: true, failureType: "terminal_timeout", error: /abort/i.test(message) ? "The terminal did not respond in time." : message };
+      await supabase.rpc("finish_apex_terminal_session", { _kiosk_id: kioskId, _transaction_id: transactionId, _state: "unknown", _result: responseBody });
+      return json(responseBody, 200, corsHeaders);
+    }
 
-    // Apex accepts only one terminal request at a time. If a previous donor's
-    // prompt survived a browser close, timeout, or interrupted network request,
-    // the new SALE is explicitly rejected and was never queued. Cancel that
-    // stale request and retry this SALE exactly once after cancellation succeeds.
+    // The database lease proves no current app request owns this TID. A busy
+    // response here can therefore only be an Apex-side orphan predating the
+    // lease; clear that orphan and retry this SALE exactly once.
     const initialError = safeApexError(saleResult);
     if (
       !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
@@ -382,8 +478,7 @@ serve(async (req) => {
         webResponseStatus: saleResult.webResponseStatus,
         error: apexError,
       });
-      return json(
-        {
+      const responseBody = {
           success: false,
           approved: false,
           invoiceNumber,
@@ -405,10 +500,14 @@ serve(async (req) => {
             posRespCode: saleResult.posRespCode || null,
             posRespText: saleResult.posRespText || null,
           },
-        },
-        200,
-        corsHeaders,
-      );
+        };
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _state: responseBody.outcomeUnknown ? "unknown" : "failed",
+        _result: responseBody,
+      });
+      return json(responseBody, 200, corsHeaders);
     }
 
     // Record the transaction through the existing pipeline so reporting,
@@ -464,8 +563,7 @@ serve(async (req) => {
     }
 
 
-    return json(
-      {
+    const responseBody = {
         success: true,
         approved: saleResult.approved,
         invoiceNumber,
@@ -476,10 +574,14 @@ serve(async (req) => {
         responseText: saleResult.posRespText,
         cardType: saleResult.posIssuerName,
         cardLastFour: panLastFour(saleResult.posPan),
-      },
-      200,
-      corsHeaders,
-    );
+      };
+    await supabase.rpc("finish_apex_terminal_session", {
+      _kiosk_id: kioskId,
+      _transaction_id: transactionId,
+      _state: saleResult.approved ? "approved" : "declined",
+      _result: responseBody,
+    });
+    return json(responseBody, 200, corsHeaders);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
     const aborted = /abort/i.test(message);

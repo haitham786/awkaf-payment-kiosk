@@ -263,11 +263,13 @@ const KiosksManagement = () => {
     setTerminalDiagnostic(null);
     try {
       const startedAt = Date.now();
+      const testTransactionId = crypto.randomUUID();
+      sessionStorage.setItem(`apex_test_transaction_${editingId}`, testTransactionId);
       const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
         body: {
           action: 'sale',
           kioskId: editingId,
-          transactionId: crypto.randomUUID(),
+          transactionId: testTransactionId,
           amount: amountBaisas,
           category: 'donation',
           testMode: true,
@@ -316,11 +318,17 @@ const KiosksManagement = () => {
     }
     setCancellingTerminal(true);
     try {
+      const transactionId = sessionStorage.getItem(`apex_test_transaction_${editingId}`);
+      if (!transactionId) {
+        toast.error('No active terminal test is available to cancel.');
+        return;
+      }
       const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'cancel', kioskId: editingId, refreshConfig: true },
+        body: { action: 'cancel', kioskId: editingId, transactionId, refreshConfig: true },
       });
       if (error) throw error;
       if (data?.cancelled) {
+        sessionStorage.removeItem(`apex_test_transaction_${editingId}`);
         setTerminalDiagnostic('Cancellation accepted — the terminal screen has been cleared.');
         toast.success('Cancellation sent to the terminal.');
       } else {
