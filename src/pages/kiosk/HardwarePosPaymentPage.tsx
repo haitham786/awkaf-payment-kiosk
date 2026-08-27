@@ -304,11 +304,14 @@ const HardwarePosPaymentPage = () => {
     startedRef.current = false;
     ignoreSaleResultRef.current = false;
     outcomeHandledRef.current = false;
+    pendingUnknownRef.current = null;
+    recoveryDeadlineRef.current = Date.now() + RECOVERY_WINDOW_MS;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
     void startSale();
   };
+
 
   useEffect(() => {
     if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
