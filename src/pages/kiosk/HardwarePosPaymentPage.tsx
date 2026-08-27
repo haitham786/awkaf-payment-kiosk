@@ -125,7 +125,9 @@ const HardwarePosPaymentPage = () => {
       if (result.success === false && result.error) {
         const arabic = result.failureType === "afs_network_block"
           ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+          : result.failureType === "apex_rejected"
+            ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
+            : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
         const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
         setRetryAllowed(result.outcomeUnknown !== true);
         setErrorMessage(`${arabic}\n${result.error}${reference}`);
