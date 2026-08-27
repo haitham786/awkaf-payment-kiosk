@@ -189,8 +189,9 @@ const HardwarePosPaymentPage = () => {
   }, [startSale]);
 
   // Outcome recovery: if the sale response is lost in transit (edge isolate
-  // recycled, flaky link), the backend still stored the terminal's outcome.
-  // Poll for it so an approved payment always reaches the Thank-You screen.
+  // recycled, flaky link) the backend still knows — or can ask the terminal —
+  // what happened. Poll so an approved payment always reaches the Thank-You
+  // screen and is always recorded for billing.
   useEffect(() => {
     if (stage !== "processing" || !kioskId) return;
     let cancelled = false;
@@ -200,22 +201,36 @@ const HardwarePosPaymentPage = () => {
       const transactionId = transactionIdRef.current;
       try {
         const { data } = await supabase.functions.invoke("apex-ecr-payment", {
-          body: { action: "outcome", kioskId, transactionId },
+          body: { action: "outcome", kioskId, transactionId, amount, category },
         });
         if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
         const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
-        if (data?.finished && stored) applyOutcome(stored, transactionId);
+        if (data?.finished && stored) {
+          applyOutcome(stored, transactionId);
+          return;
+        }
       } catch {
         // Polling is best-effort; the direct sale response remains authoritative.
       }
+
+      // The recovery window has closed without any terminal outcome — show the
+      // last known failure so the donor is never left on a dead screen.
+      if (!cancelled && !outcomeHandledRef.current && Date.now() >= recoveryDeadlineRef.current) {
+        const pending = pendingUnknownRef.current;
+        if (pending) {
+          pendingUnknownRef.current = null;
+          applyOutcome({ ...pending, outcomeUnknown: false }, transactionId);
+        }
+      }
     };
 
-    const interval = window.setInterval(poll, 5000);
+    const interval = window.setInterval(poll, 3000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [applyOutcome, kioskId, stage]);
+  }, [amount, applyOutcome, category, kioskId, stage]);
+
 
 
 
