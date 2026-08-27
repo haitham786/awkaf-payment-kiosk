@@ -47,6 +47,7 @@ const HardwarePosPaymentPage = () => {
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
+  const ignoreSaleResultRef = useRef(false);
 
   useEffect(() => {
     if (!kioskId) return;
@@ -96,7 +97,7 @@ const HardwarePosPaymentPage = () => {
     const transactionId = transactionIdRef.current;
     try {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
-      if (cancellingRef.current) return;
+      if (cancellingRef.current || ignoreSaleResultRef.current) return;
       if (error) throw error;
 
       const result = (data || {}) as ApexResponse;
@@ -130,7 +131,7 @@ const HardwarePosPaymentPage = () => {
       setDeclineMessage(detail);
       setStage("declined");
     } catch (err) {
-      if (cancellingRef.current) return;
+      if (cancellingRef.current || ignoreSaleResultRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
@@ -175,6 +176,11 @@ const HardwarePosPaymentPage = () => {
 
 
   const handleTimeout = () => {
+    // Apex cancellation always targets the last request. Clear the terminal
+    // prompt before exposing the timeout state so the next donor is never met
+    // by an orphaned session or "Another transaction under processing".
+    ignoreSaleResultRef.current = true;
+    void cancelAtTerminal();
     setRetryAllowed(false);
     setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
     setStage("error");
@@ -184,6 +190,7 @@ const HardwarePosPaymentPage = () => {
     if (!retryAllowed) return;
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
+    ignoreSaleResultRef.current = false;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");

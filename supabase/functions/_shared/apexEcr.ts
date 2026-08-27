@@ -225,6 +225,16 @@ export function isSuccessfulWebResponse(status: string): boolean {
     .includes(String(status || "").trim().toLowerCase());
 }
 
+/**
+ * Apex rejects a new SALE while the terminal is still waiting for feedback
+ * from the previous request. This response is safe to recover from because the
+ * new SALE was not accepted by Apex; cancel the last request, then submit once.
+ */
+export function isAnotherTransactionInProgress(message: string): boolean {
+  return /another\s+transaction\s+(?:is\s+)?(?:under|in)\s+process(?:ing)?|waiting\s+for\s+pos\s+feedback/i
+    .test(String(message || ""));
+}
+
 /** Last four digits of a masked PAN such as "470468******4250". */
 export function panLastFour(pan: string): string | null {
   const digits = String(pan || "").replace(/[^0-9]/g, "");
