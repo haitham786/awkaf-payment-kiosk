@@ -211,7 +211,7 @@ serve(async (req) => {
         );
         probes.push({
           probe: "soap",
-          ok: soap.httpStatus === 200 && soap.webResponseStatus !== "99" && !soap.faultCode,
+          ok: soap.httpStatus === 200 && isSuccessfulWebResponse(soap.webResponseStatus) && !soap.faultCode,
           status: soap.httpStatus ?? null,
           contentType: soap.contentType ?? null,
           webResponseStatus: soap.webResponseStatus,
@@ -222,7 +222,7 @@ serve(async (req) => {
           faultCode: soap.faultCode || null,
           faultMessage: soap.faultMessage || null,
           elapsedMs: soap.elapsedMs ?? null,
-          failureType: soap.webResponseStatus === "99" ? classifyFailure(soap) : null,
+          failureType: !isSuccessfulWebResponse(soap.webResponseStatus) ? classifyFailure(soap) : null,
         });
       } catch (err) {
         probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
@@ -237,7 +237,7 @@ serve(async (req) => {
         error: !wsdlOk
           ? "The AFS service contract is unreachable."
           : !soapOk
-            ? "The AFS service is reachable, but SOAP requests are blocked or rejected."
+            ? "The AFS service is reachable, but it rejected the terminal request. Check the returned AFS error and ask AFS/Ahli Bank to confirm this TID is online and paired to the supplied MID and merchant key."
             : undefined,
         probes,
       }, 200, corsHeaders);
