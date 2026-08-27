@@ -9,6 +9,8 @@ import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
+import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
+
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
 
