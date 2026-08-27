@@ -14,6 +14,8 @@ interface TerminalTapScreenProps {
   timeoutSeconds?: number;
   /** True while the cancellation is being pushed to the terminal. */
   cancelling?: boolean;
+  /** True when the terminal has not acknowledged the amount within a few seconds. */
+  slowDispatch?: boolean;
 }
 
 /**
@@ -28,7 +30,9 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
   onTimeout,
   timeoutSeconds = 90,
   cancelling = false,
+  slowDispatch = false,
 }) => {
+
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(
     () => localStorage.getItem("kiosk_background_url") || "",
@@ -176,7 +180,16 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
                   ? "بانتظار البطاقة… / Waiting for card…"
                   : "جاري التحضير… / Preparing…"}
             </p>
+            {slowDispatch && !cancelling && (
+              <p className="text-amber-700 text-[0.7rem] mt-2 leading-snug">
+                شبكة جهاز الدفع بطيئة حالياً، المبلغ في طريقه إلى الجهاز
+                <span className="block text-amber-600/80">
+                  The terminal network is slow right now — the amount is still on its way.
+                </span>
+              </p>
+            )}
           </div>
+
 
           {/* Accepted payment methods */}
           <div className="mt-4 pt-4 w-full border-t border-white/70">

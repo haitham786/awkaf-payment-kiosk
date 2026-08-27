@@ -10,6 +10,8 @@ import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
 import { persistPaymentMode } from "@/lib/kioskConfig";
 import { warmHardwarePos } from "@/lib/hardwarePosWarm";
+import { TerminalReadinessBadge } from "@/components/kiosk/TerminalReadinessBadge";
+
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
@@ -210,7 +212,11 @@ const KioskHomepage = () => {
           <p className="text-sm text-gray-600 font-bold">
             Choose the category of donation
           </p>
+          <div className="mt-1 flex justify-center">
+            <TerminalReadinessBadge />
+          </div>
         </div>
+
 
         <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0 content-start">
           {loading ? (
