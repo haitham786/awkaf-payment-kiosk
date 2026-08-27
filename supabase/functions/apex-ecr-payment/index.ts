@@ -476,6 +476,17 @@ serve(async (req) => {
       return json(responseBody, 200, corsHeaders);
     }
 
+    console.log("ApexECR sale response", {
+      correlationId,
+      tid: config.tid,
+      afsRoundTripMs: Date.now() - saleDispatchStartedAt,
+      totalMs: Date.now() - requestStartedAt,
+      webResponseStatus: saleResult.webResponseStatus,
+      posRespStatus: saleResult.posRespStatus,
+    });
+
+
+
     // The database lease proves no current app request owns this TID. A busy
     // response here can therefore only be an Apex-side orphan predating the
     // lease; clear that orphan and retry this SALE exactly once.
