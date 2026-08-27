@@ -212,9 +212,6 @@ const KioskHomepage = () => {
           <p className="text-sm text-gray-600 font-bold">
             Choose the category of donation
           </p>
-          <div className="mt-1 flex justify-center">
-            <TerminalReadinessBadge />
-          </div>
         </div>
 
 
