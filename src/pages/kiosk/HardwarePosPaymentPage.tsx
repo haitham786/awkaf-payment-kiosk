@@ -12,13 +12,6 @@ import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
 
-/**
- * Marks whether the terminal may still be sitting on a prompt from a previous
- * session. When set, the next SALE asks the backend to clear the terminal first
- * so a new amount always reaches it.
- */
-const SESSION_FLAG = "apex_session_open";
-
 interface ApexResponse {
   success?: boolean;
   approved?: boolean;
@@ -101,10 +94,6 @@ const HardwarePosPaymentPage = () => {
     }
 
     const transactionId = transactionIdRef.current;
-    // Mark the session locally for lifecycle tracking, but never block a new SALE
-    // behind a cancellation request. The amount must be dispatched immediately.
-    localStorage.setItem(SESSION_FLAG, kioskId);
-
     try {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current) return;
@@ -113,7 +102,6 @@ const HardwarePosPaymentPage = () => {
       const result = (data || {}) as ApexResponse;
 
       if (result.approved) {
-        localStorage.removeItem(SESSION_FLAG);
         const ref = result.referenceNumber || result.rrn || transactionId;
         navigate(
           `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
@@ -136,7 +124,6 @@ const HardwarePosPaymentPage = () => {
       }
 
       // Declined by the card/issuer — the terminal has finished with this session.
-      localStorage.removeItem(SESSION_FLAG);
       const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
         .filter(Boolean)
         .join(" · ");
@@ -163,7 +150,6 @@ const HardwarePosPaymentPage = () => {
       });
       if (error) throw error;
       const cancelled = data?.cancelled === true;
-      if (cancelled) localStorage.removeItem(SESSION_FLAG);
       return cancelled;
     } catch (err) {
       console.error("Terminal cancellation failed:", err);
@@ -226,7 +212,7 @@ const HardwarePosPaymentPage = () => {
 
   if (stage === "error") {
     return (
-      <KioskLayout>
+      <KioskLayout showHomeButton={false}>
         <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
@@ -262,7 +248,7 @@ const HardwarePosPaymentPage = () => {
   }
 
   return (
-    <KioskLayout>
+    <KioskLayout showHomeButton={false}>
       <div className="w-full max-w-md mx-auto flex flex-col justify-center gap-3 pb-24">
         <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm text-center rounded-xl">
           <div className="space-y-5">
