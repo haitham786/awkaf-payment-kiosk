@@ -611,6 +611,7 @@ serve(async (req) => {
 
     // ------------------------------------------------------------------ sale
     if (!Number.isInteger(amount) || amount < 100 || amount > 100000000) {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
