@@ -120,6 +120,8 @@ export async function loadKioskRuntimeConfig(
 
     // Persist the (non-secret) payment mode so the next donation can route instantly.
     if (config?.payment_mode) persistPaymentMode(kioskId, config.payment_mode);
+    persistTerminalTimeout(kioskId, config?.hardware_pos?.timeout_seconds);
+
 
     // Only cache if we didn't request secrets (to keep cache clean/safe)
     if (config && !options.includeSoftPosSecret) {
