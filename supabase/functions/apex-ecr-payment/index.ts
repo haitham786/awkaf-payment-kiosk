@@ -411,8 +411,9 @@ serve(async (req) => {
       const processBody = await processRes.json().catch(() => ({}));
       referenceNumber = processBody?.transaction?.reference_number ?? null;
     } catch (recordError) {
-      console.error("Failed to record hardware POS transaction:", recordError);
+      if (!testMode) console.error("Failed to record hardware POS transaction:", recordError);
     }
+
 
     return json(
       {
