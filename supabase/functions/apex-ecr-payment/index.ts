@@ -347,7 +347,10 @@ serve(async (req) => {
         .eq("kiosk_id", kioskId)
         .maybeSingle();
 
-      const finishedStates = ["approved", "declined", "failed", "cancelled", "unknown"];
+      // Cancelled / unknown sessions are owned by the cancellation path, so
+      // only real terminal outcomes are handed back to a polling kiosk.
+      const finishedStates = ["approved", "declined", "failed"];
+
       const matches = sessionRow?.transaction_id === transactionId;
       const finished = matches && finishedStates.includes(String(sessionRow?.state || ""));
       return json({
