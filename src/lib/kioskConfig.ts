@@ -62,6 +62,33 @@ export function persistPaymentMode(kioskId: string, mode: KioskPaymentMode | und
   }
 }
 
+const POS_TIMEOUT_LS_KEY = (kioskId: string) => `kiosk:pos_timeout:${kioskId}`;
+
+/**
+ * Terminal wait time, read synchronously from the device. The payment screen
+ * must never spend a network round trip on a value that only controls a
+ * countdown — the donor's SALE has to leave the device first.
+ */
+export function getCachedTerminalTimeout(kioskId: string): number | null {
+  try {
+    const value = Number(localStorage.getItem(POS_TIMEOUT_LS_KEY(kioskId)));
+    return Number.isFinite(value) && value >= 5 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistTerminalTimeout(kioskId: string, seconds: number | undefined) {
+  try {
+    if (typeof seconds === "number" && seconds >= 5) {
+      localStorage.setItem(POS_TIMEOUT_LS_KEY(kioskId), String(seconds));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+
 export async function loadKioskRuntimeConfig(
   kioskId: string,
   options: { includeSoftPosSecret?: boolean; forceRefresh?: boolean } = {},
