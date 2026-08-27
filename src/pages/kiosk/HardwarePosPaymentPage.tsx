@@ -149,10 +149,29 @@ const HardwarePosPaymentPage = () => {
   }, [amount, category, categoryReference, kioskId, navigate]);
 
   useEffect(() => {
+    // The idle readiness loop must never probe while a donor is paying.
+    setHardwarePosSessionBusy(true);
+    return () => setHardwarePosSessionBusy(false);
+  }, []);
+
+  useEffect(() => {
     // Send the SALE immediately — the tap prompt renders in the same frame.
     setStage("processing");
     void startSale();
   }, [startSale]);
+
+  useEffect(() => {
+    // Backend dispatch is normally ~150-250 ms. Anything past this threshold is
+    // terminal/bank-network transit, so it is surfaced instead of a silent wait.
+    if (stage !== "processing") {
+      setSlowDispatch(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlowDispatch(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [stage]);
+
+
 
   const cancelAtTerminal = useCallback(async () => {
     if (!kioskId) return false;
