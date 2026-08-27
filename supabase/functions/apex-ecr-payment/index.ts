@@ -12,7 +12,10 @@ import {
   APEX_SOAP_ACTIONS,
   isAnotherTransactionInProgress,
   isSuccessfulWebResponse,
+  isApprovedPosResponse,
+  redactApexRaw,
   panLastFour,
+
 } from "../_shared/apexEcr.ts";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -334,6 +337,30 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
 
+    // --------------------------------------------------------------- outcome
+    // Read-only recovery path. If the kiosk lost the SALE response, it polls
+    // here for the outcome the backend already stored for this transaction.
+    if (action === "outcome") {
+      const { data: sessionRow } = await supabase
+        .from("apex_terminal_sessions")
+        .select("transaction_id, state, result")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+
+      // Cancelled / unknown sessions are owned by the cancellation path, so
+      // only real terminal outcomes are handed back to a polling kiosk.
+      const finishedStates = ["approved", "declined", "failed"];
+
+      const matches = sessionRow?.transaction_id === transactionId;
+      const finished = matches && finishedStates.includes(String(sessionRow?.state || ""));
+      return json({
+        success: true,
+        finished,
+        state: matches ? sessionRow?.state ?? "missing" : "missing",
+        result: finished ? sessionRow?.result ?? null : null,
+      }, 200, corsHeaders);
+    }
+
 
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
@@ -575,6 +602,77 @@ serve(async (req) => {
       });
       return json(responseBody, 200, corsHeaders);
     }
+
+    // Ambiguous approval: AFS accepted the request but the terminal-level
+    // fields do not clearly say approved. Ask the terminal's own record
+    // (EnquiryByRef) before telling the donor the payment failed.
+    if (!saleResult.approved) {
+      console.warn("ApexECR non-approved sale reply", {
+        correlationId,
+        tid: config.tid,
+        posRespStatus: saleResult.posRespStatus || null,
+        posRespCode: saleResult.posRespCode || null,
+        posRespText: saleResult.posRespText || null,
+        posRRN: saleResult.posRRN || null,
+        posAuthCode: saleResult.posAuthCode || null,
+        raw: redactApexRaw(saleResult.raw),
+      });
+
+      const clearlyDeclined = ["0", "-1", "false", "declined", "decline"]
+        .includes(String(saleResult.posRespStatus || "").trim().toLowerCase())
+        && !saleResult.posAuthCode && !saleResult.posRRN;
+
+      if (!clearlyDeclined) {
+        try {
+          const enquiry = await callApexEcr(
+            config,
+            buildEnquiryByRefEnvelope(
+              config,
+              invoiceNumber,
+              saleResult.posRRN || "",
+              saleResult.posAuthCode || "",
+              transactionId,
+            ),
+            APEX_SOAP_ACTIONS.enquiryByRef,
+            15000,
+          );
+          const enquiryApproved = isSuccessfulWebResponse(enquiry.webResponseStatus) && isApprovedPosResponse(
+            enquiry.posRespStatus,
+            enquiry.posRespCode,
+            enquiry.posAuthCode,
+            enquiry.posRRN,
+            enquiry.posRespText,
+          );
+          console.log("ApexECR outcome enquiry", {
+            correlationId,
+            tid: config.tid,
+            enquiryApproved,
+            posRespStatus: enquiry.posRespStatus || null,
+            posRespCode: enquiry.posRespCode || null,
+          });
+          if (enquiryApproved) {
+            saleResult = {
+              ...saleResult,
+              approved: true,
+              posRespStatus: enquiry.posRespStatus || saleResult.posRespStatus,
+              posRespCode: enquiry.posRespCode || saleResult.posRespCode,
+              posRespText: enquiry.posRespText || saleResult.posRespText,
+              posRRN: enquiry.posRRN || saleResult.posRRN,
+              posAuthCode: enquiry.posAuthCode || saleResult.posAuthCode,
+              posPan: enquiry.posPan || saleResult.posPan,
+              posIssuerName: enquiry.posIssuerName || saleResult.posIssuerName,
+            };
+          }
+        } catch (enquiryError) {
+          console.warn("ApexECR outcome enquiry failed", {
+            correlationId,
+            error: enquiryError instanceof Error ? enquiryError.message : "unknown",
+          });
+        }
+      }
+    }
+
+
 
     // Record the transaction through the existing pipeline so reporting,
     // reference numbers and receipts behave exactly as they do today.

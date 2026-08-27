@@ -45,7 +45,7 @@ const HardwarePosPaymentPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [retryAllowed, setRetryAllowed] = useState(true);
   const [timeoutSeconds, setTimeoutSeconds] = useState(90);
-  const [slowDispatch, setSlowDispatch] = useState(false);
+
 
   const [declineMessage, setDeclineMessage] = useState("");
   const [categoryReference, setCategoryReference] = useState<string>(
@@ -59,6 +59,45 @@ const HardwarePosPaymentPage = () => {
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
   const ignoreSaleResultRef = useRef(false);
+  const outcomeHandledRef = useRef(false);
+  const categoryReferenceRef = useRef(categoryReference);
+  categoryReferenceRef.current = categoryReference;
+
+  /** Single place where a terminal outcome moves the donor forward. */
+  const applyOutcome = useCallback((result: ApexResponse, transactionId: string) => {
+    if (outcomeHandledRef.current || cancellingRef.current || ignoreSaleResultRef.current) return;
+    outcomeHandledRef.current = true;
+
+    if (result.approved) {
+      const ref = result.referenceNumber || result.rrn || transactionId;
+      navigate(
+        `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
+          `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReferenceRef.current}`,
+      );
+      return;
+    }
+
+    if (result.success === false && result.error) {
+      const arabic = result.failureType === "afs_network_block"
+        ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
+        : result.failureType === "apex_rejected"
+          ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
+          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+      const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
+      setRetryAllowed(result.outcomeUnknown !== true);
+      setErrorMessage(`${arabic}\n${result.error}${reference}`);
+      setStage("error");
+      return;
+    }
+
+    // Declined by the card/issuer — the terminal has finished with this session.
+    const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
+      .filter(Boolean)
+      .join(" · ");
+    setDeclineMessage(detail);
+    setStage("declined");
+  }, [amount, category, navigate]);
+
 
   useEffect(() => {
     if (!kioskId) return;
@@ -110,43 +149,13 @@ const HardwarePosPaymentPage = () => {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current || ignoreSaleResultRef.current) return;
       if (error) throw error;
-
-      const result = (data || {}) as ApexResponse;
-
-      if (result.approved) {
-        const ref = result.referenceNumber || result.rrn || transactionId;
-        navigate(
-          `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
-            `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReference}`,
-        );
-        return;
-      }
-
-      if (result.success === false && result.error) {
-        const arabic = result.failureType === "afs_network_block"
-          ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-          : result.failureType === "apex_rejected"
-            ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
-            : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
-        const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-        setRetryAllowed(result.outcomeUnknown !== true);
-        setErrorMessage(`${arabic}\n${result.error}${reference}`);
-        setStage("error");
-        return;
-      }
-
-      // Declined by the card/issuer — the terminal has finished with this session.
-      const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
-        .filter(Boolean)
-        .join(" · ");
-      setDeclineMessage(detail);
-      setStage("declined");
+      applyOutcome((data || {}) as ApexResponse, transactionId);
     } catch (err) {
-      if (cancellingRef.current || ignoreSaleResultRef.current) return;
+      if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
-  }, [amount, category, categoryReference, kioskId, navigate]);
+  }, [amount, applyOutcome, category, kioskId]);
 
   useEffect(() => {
     // The idle readiness loop must never probe while a donor is paying.
@@ -160,16 +169,35 @@ const HardwarePosPaymentPage = () => {
     void startSale();
   }, [startSale]);
 
+  // Outcome recovery: if the sale response is lost in transit (edge isolate
+  // recycled, flaky link), the backend still stored the terminal's outcome.
+  // Poll for it so an approved payment always reaches the Thank-You screen.
   useEffect(() => {
-    // Backend dispatch is normally ~150-250 ms. Anything past this threshold is
-    // terminal/bank-network transit, so it is surfaced instead of a silent wait.
-    if (stage !== "processing") {
-      setSlowDispatch(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setSlowDispatch(true), 6000);
-    return () => window.clearTimeout(timer);
-  }, [stage]);
+    if (stage !== "processing" || !kioskId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
+      const transactionId = transactionIdRef.current;
+      try {
+        const { data } = await supabase.functions.invoke("apex-ecr-payment", {
+          body: { action: "outcome", kioskId, transactionId },
+        });
+        if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
+        const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
+        if (data?.finished && stored) applyOutcome(stored, transactionId);
+      } catch {
+        // Polling is best-effort; the direct sale response remains authoritative.
+      }
+    };
+
+    const interval = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [applyOutcome, kioskId, stage]);
+
 
 
 
@@ -192,44 +220,40 @@ const HardwarePosPaymentPage = () => {
     }
   }, [kioskId]);
 
-  const handleCancel = useCallback(async () => {
-    if (cancellingRef.current) return;
+  /**
+   * Cancel leaves the payment screen as soon as the terminal acknowledges, or
+   * after a short grace period if Apex is slow — the cancel request keeps
+   * running in the background so the terminal prompt is always cleared.
+   */
+  const leaveAfterCancel = useCallback((graceMs = 4000) => {
+    ignoreSaleResultRef.current = true;
+    outcomeHandledRef.current = true;
     cancellingRef.current = true;
     setStage("cancelling");
 
-    // Always push the cancellation to the terminal so the amount clears from
-    // its screen. The request keeps running in the background if it is slow —
-    // the donor is never held on the kiosk for more than a few seconds.
-    const cancelled = await cancelAtTerminal();
-    if (cancelled) {
-      ignoreSaleResultRef.current = true;
+    let left = false;
+    const leave = () => {
+      if (left) return;
+      left = true;
       navigate("/kiosk");
-      return;
-    }
-    cancellingRef.current = false;
-    setRetryAllowed(false);
-    setErrorMessage("لم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe terminal did not confirm cancellation. Please wait until it returns to the idle screen.");
-    setStage("error");
+    };
+    const grace = window.setTimeout(leave, graceMs);
+    void cancelAtTerminal().then(() => {
+      window.clearTimeout(grace);
+      leave();
+    });
   }, [cancelAtTerminal, navigate]);
 
+  const handleCancel = useCallback(() => {
+    if (cancellingRef.current) return;
+    leaveAfterCancel();
+  }, [leaveAfterCancel]);
 
   const handleTimeout = () => {
     // Apex cancellation always targets the last request. Clear the terminal
-    // prompt before exposing the timeout state so the next donor is never met
-    // by an orphaned session or "Another transaction under processing".
-    ignoreSaleResultRef.current = true;
-    cancellingRef.current = true;
-    setStage("cancelling");
-    void cancelAtTerminal().then((cancelled) => {
-      if (cancelled) {
-        navigate("/kiosk");
-        return;
-      }
-      cancellingRef.current = false;
-      setRetryAllowed(false);
-      setErrorMessage("انتهت المهلة ولم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe session timed out and the terminal did not confirm cancellation. Please wait until it returns to idle.");
-      setStage("error");
-    });
+    // prompt so the next donor is never met by an orphaned session.
+    if (cancellingRef.current) return;
+    leaveAfterCancel();
   };
 
   const handleTryAgain = () => {
@@ -237,6 +261,7 @@ const HardwarePosPaymentPage = () => {
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
     ignoreSaleResultRef.current = false;
+    outcomeHandledRef.current = false;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
@@ -259,11 +284,10 @@ const HardwarePosPaymentPage = () => {
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
         cancelling={stage === "cancelling"}
-        slowDispatch={slowDispatch}
-
       />
     );
   }
+
 
   if (stage === "error") {
     return (
