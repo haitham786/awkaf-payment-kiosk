@@ -63,12 +63,20 @@ const HardwarePosPaymentPage = () => {
   const categoryReferenceRef = useRef(categoryReference);
   categoryReferenceRef.current = categoryReference;
 
+  // While an outcome is "unknown" the card may still have been charged, so we
+  // keep the tap screen up and let the backend interrogate the terminal
+  // instead of telling the donor it failed. Only after this window do we
+  // surface the error.
+  const RECOVERY_WINDOW_MS = 45000;
+  const recoveryDeadlineRef = useRef<number>(Date.now() + RECOVERY_WINDOW_MS);
+  const pendingUnknownRef = useRef<ApexResponse | null>(null);
+
   /** Single place where a terminal outcome moves the donor forward. */
   const applyOutcome = useCallback((result: ApexResponse, transactionId: string) => {
     if (outcomeHandledRef.current || cancellingRef.current || ignoreSaleResultRef.current) return;
-    outcomeHandledRef.current = true;
 
     if (result.approved) {
+      outcomeHandledRef.current = true;
       const ref = result.referenceNumber || result.rrn || transactionId;
       navigate(
         `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
@@ -78,25 +86,36 @@ const HardwarePosPaymentPage = () => {
     }
 
     if (result.success === false && result.error) {
+      // Unknown outcome (timeout, lost response, terminal still busy): keep
+      // waiting so the recovery poll can find the real result at the terminal.
+      if (result.outcomeUnknown && Date.now() < recoveryDeadlineRef.current) {
+        pendingUnknownRef.current = result;
+        setStage("processing");
+        return;
+      }
+
+      outcomeHandledRef.current = true;
       const arabic = result.failureType === "afs_network_block"
         ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
         : result.failureType === "apex_rejected"
           ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
           : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
       const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-      setRetryAllowed(result.outcomeUnknown !== true);
+      setRetryAllowed(true);
       setErrorMessage(`${arabic}\n${result.error}${reference}`);
       setStage("error");
       return;
     }
 
     // Declined by the card/issuer — the terminal has finished with this session.
+    outcomeHandledRef.current = true;
     const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
       .filter(Boolean)
       .join(" · ");
     setDeclineMessage(detail);
     setStage("declined");
   }, [amount, category, navigate]);
+
 
 
   useEffect(() => {
