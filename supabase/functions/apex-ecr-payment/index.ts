@@ -578,14 +578,49 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
     if (acquisition.acquisition === "busy") {
-      return json({
-        success: false,
-        approved: false,
-        failureType: "terminal_busy",
-        outcomeUnknown: true,
-        error: "The terminal is completing the previous payment. Please wait for it to return to the idle screen.",
-      }, 200, corsHeaders);
+      // A kiosk owns exactly one terminal and serves one donor at a time, so a
+      // brand-new SALE from this kiosk means the previous session was
+      // abandoned (donor walked away, app relaunched, screen killed). Clear the
+      // terminal prompt, release the lease and take the session over instead of
+      // making the donor in front of the kiosk wait for a lease to expire.
+      console.warn("ApexECR taking over an abandoned session", {
+        correlationId,
+        tid: config.tid,
+        previousState: acquisition.session_state,
+      });
+      const takeover = await cancelAtTerminal();
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: acquisition.owner_transaction_id,
+        _state: "cancelled",
+        _result: {
+          success: takeover.cancelled,
+          cancelled: takeover.cancelled,
+          reason: "superseded_by_new_sale",
+          error: takeover.error || null,
+        },
+      });
+
+      const { data: retryRows, error: retryError } = await supabase.rpc("acquire_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _terminal_id: config.tid,
+        _transaction_id: transactionId,
+        _lease_seconds: leaseSeconds,
+      });
+      const retryAcquisition = (Array.isArray(retryRows) ? retryRows[0] : null) as TerminalAcquisition | null;
+      if (retryError || retryAcquisition?.acquisition !== "acquired") {
+        return json({
+          success: false,
+          approved: false,
+          failureType: "terminal_busy",
+          outcomeUnknown: true,
+          error: "The terminal is still finishing the previous payment. Please try again in a moment.",
+        }, 200, corsHeaders);
+      }
+      // Short state-transition window after clearing the previous prompt.
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
+
     if (acquisition.acquisition === "stale_recovery") {
       console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid });
       const recovered = await cancelAtTerminal();
