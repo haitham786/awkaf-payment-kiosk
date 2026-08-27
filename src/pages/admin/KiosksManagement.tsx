@@ -231,40 +231,110 @@ const KiosksManagement = () => {
     );
   };
 
-  const handleVerifyTerminal = async () => {
+  /**
+   * Sends a real SALE to the paired terminal using exactly the same backend path
+   * the kiosk uses, so the amount entered here appears on the POS screen just as
+   * it does for a donor. Nothing is recorded as a donation (testMode).
+   */
+  const handleTestConnection = async () => {
     const hardware = formData.configuration.hardware_pos;
     if (!editingId) {
-      toast.error('Save the kiosk first, then verify its terminal.');
+      toast.error('Save the kiosk first, then test its terminal.');
       return;
     }
-    if (!hardware?.tid?.trim() || !hardware?.mid?.trim()) {
-      toast.error('Enter both MID and TID before verifying.');
+    if (!hardware?.tid?.trim() || !hardware?.mid?.trim() || !hardware?.service_url?.trim()) {
+      toast.error('Enter the Service URL, MID and TID before testing.');
       return;
     }
+
+    const rials = Number(testRials || 0);
+    const baisas = Number(testBaisas || 0);
+    if (!Number.isFinite(rials) || !Number.isFinite(baisas) || rials < 0 || baisas < 0 || baisas > 999) {
+      toast.error('Enter a valid amount. Baisas must be between 0 and 999.');
+      return;
+    }
+    const amountBaisas = Math.round(rials * 1000 + baisas);
+    if (amountBaisas < 100) {
+      toast.error('The minimum test amount is 100 baisas.');
+      return;
+    }
+
     setVerifyingTerminal(true);
     setTerminalDiagnostic(null);
     try {
+      const startedAt = Date.now();
       const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'diagnose', kioskId: editingId },
+        body: {
+          action: 'sale',
+          kioskId: editingId,
+          transactionId: crypto.randomUUID(),
+          amount: amountBaisas,
+          category: 'donation',
+          testMode: true,
+          refreshConfig: true,
+        },
       });
       if (error) throw error;
-      if (data?.success) {
-        const message = `AFS service and SOAP routing responded. Reference: ${data.correlationId}`;
-        setTerminalDiagnostic(message);
-        toast.success(message);
-      } else {
-        const soapProbe = Array.isArray(data?.probes) ? data.probes.find((probe: any) => probe?.probe === 'soap') : null;
-        const detail = soapProbe?.webResponseErrorDesc || soapProbe?.faultMessage || data?.error;
-        const message = `${detail || 'AFS did not accept the SOAP request.'}${data?.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
+
+      const elapsed = `${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
+      const amountLabel = `${rials}.${String(baisas).padStart(3, '0')} OMR`;
+
+      if (data?.success === false) {
+        const message = `${data.error || 'The terminal did not accept the request.'}${data.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
         setTerminalDiagnostic(message);
         toast.error(message);
+        return;
       }
+
+      if (data?.approved) {
+        const message = `Approved at the terminal — ${amountLabel} in ${elapsed}. RRN ${data.rrn || '—'}.`;
+        setTerminalDiagnostic(message);
+        toast.success(message);
+        return;
+      }
+
+      const detail = [data?.responseText, data?.responseCode ? `Code ${data.responseCode}` : null]
+        .filter(Boolean)
+        .join(' · ');
+      const message = `Terminal reached in ${elapsed} and showed ${amountLabel}, but the card was not approved. ${detail}`;
+      setTerminalDiagnostic(message);
+      toast.warning(message);
     } catch (error: any) {
-      toast.error(`Terminal verification failed: ${error.message}`);
+      const message = `Terminal test failed: ${error.message}`;
+      setTerminalDiagnostic(message);
+      toast.error(message);
     } finally {
       setVerifyingTerminal(false);
     }
   };
+
+  /** Clears the amount currently displayed on the paired terminal. */
+  const handleCancelTerminal = async () => {
+    if (!editingId) {
+      toast.error('Save the kiosk first, then cancel at its terminal.');
+      return;
+    }
+    setCancellingTerminal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
+        body: { action: 'cancel', kioskId: editingId, refreshConfig: true },
+      });
+      if (error) throw error;
+      if (data?.cancelled) {
+        setTerminalDiagnostic('Cancellation accepted — the terminal screen has been cleared.');
+        toast.success('Cancellation sent to the terminal.');
+      } else {
+        const message = data?.error || 'The terminal did not confirm the cancellation.';
+        setTerminalDiagnostic(message);
+        toast.error(message);
+      }
+    } catch (error: any) {
+      toast.error(`Cancellation failed: ${error.message}`);
+    } finally {
+      setCancellingTerminal(false);
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
