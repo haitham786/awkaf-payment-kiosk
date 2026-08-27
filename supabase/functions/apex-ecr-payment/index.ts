@@ -397,8 +397,11 @@ serve(async (req) => {
     }
 
     // --------------------------------------------------------------- outcome
-    // Read-only recovery path. If the kiosk lost the SALE response, it polls
-    // here for the outcome the backend already stored for this transaction.
+    // Recovery path. If the kiosk lost the SALE response (edge isolate
+    // recycled, flaky link, app relaunch), it polls here. We first return the
+    // outcome the backend already stored; if the outcome is still unknown we
+    // ask the terminal itself (EnquiryByRef) and, when the card was actually
+    // charged, record the donation so billing and receipts are never lost.
     if (action === "outcome") {
       const { data: sessionRow } = await supabase
         .from("apex_terminal_sessions")
@@ -406,19 +409,87 @@ serve(async (req) => {
         .eq("kiosk_id", kioskId)
         .maybeSingle();
 
-      // Cancelled / unknown sessions are owned by the cancellation path, so
-      // only real terminal outcomes are handed back to a polling kiosk.
+      // Cancelled sessions are owned by the cancellation path.
       const finishedStates = ["approved", "declined", "failed"];
 
       const matches = sessionRow?.transaction_id === transactionId;
-      const finished = matches && finishedStates.includes(String(sessionRow?.state || ""));
-      return json({
-        success: true,
-        finished,
-        state: matches ? sessionRow?.state ?? "missing" : "missing",
-        result: finished ? sessionRow?.result ?? null : null,
-      }, 200, corsHeaders);
+      const state = matches ? String(sessionRow?.state || "missing") : "missing";
+      if (matches && finishedStates.includes(state)) {
+        return json({ success: true, finished: true, state, result: sessionRow?.result ?? null }, 200, corsHeaders);
+      }
+
+      // Unknown / missing: ask the terminal for its own record of this invoice.
+      if (state === "unknown" || state === "missing") {
+        const outcomeInvoice = invoiceNumberFor(transactionId);
+        try {
+          const enquiry = await callApexEcr(
+            config,
+            buildEnquiryByRefEnvelope(config, outcomeInvoice, "", "", transactionId),
+            APEX_SOAP_ACTIONS.enquiryByRef,
+            15000,
+          );
+          const approved = isSuccessfulWebResponse(enquiry.webResponseStatus) && isApprovedPosResponse(
+            enquiry.posRespStatus,
+            enquiry.posRespCode,
+            enquiry.posAuthCode,
+            enquiry.posRRN,
+            enquiry.posRespText,
+          );
+          console.log("ApexECR outcome recovery enquiry", {
+            correlationId,
+            tid: config.tid,
+            state,
+            approved,
+            webResponseStatus: enquiry.webResponseStatus,
+            posRespCode: enquiry.posRespCode || null,
+          });
+
+          if (approved) {
+            const recoveredResult: ApexEcrResult = { ...enquiry, approved: true };
+            const referenceNumber = Number.isInteger(amount) && amount > 0
+              ? await recordApexTransaction({
+                transactionId,
+                kioskId,
+                amount,
+                category,
+                config,
+                result: recoveredResult,
+                invoiceNumber: outcomeInvoice,
+              })
+              : null;
+            const recoveredBody = {
+              success: true,
+              approved: true,
+              recovered: true,
+              invoiceNumber: outcomeInvoice,
+              referenceNumber,
+              rrn: enquiry.posRRN,
+              authCode: enquiry.posAuthCode,
+              responseCode: enquiry.posRespCode,
+              responseText: enquiry.posRespText,
+              cardType: enquiry.posIssuerName,
+              cardLastFour: panLastFour(enquiry.posPan),
+            };
+            await supabase.rpc("finish_apex_terminal_session", {
+              _kiosk_id: kioskId,
+              _transaction_id: transactionId,
+              _state: "approved",
+              _result: recoveredBody,
+            });
+            return json({ success: true, finished: true, state: "approved", result: recoveredBody }, 200, corsHeaders);
+          }
+        } catch (enquiryError) {
+          console.warn("ApexECR outcome recovery failed", {
+            correlationId,
+            error: enquiryError instanceof Error ? enquiryError.message : "unknown",
+          });
+        }
+      }
+
+      return json({ success: true, finished: false, state, result: null }, 200, corsHeaders);
     }
+
+
 
 
     // ---------------------------------------------------------------- cancel
