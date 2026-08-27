@@ -171,9 +171,17 @@ const HardwarePosPaymentPage = () => {
       applyOutcome((data || {}) as ApexResponse, transactionId);
     } catch (err) {
       if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
-      setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
-      setStage("error");
+      // The request itself failed, so the card may still have been charged.
+      // Treat it as an unknown outcome and let the recovery poll decide.
+      applyOutcome({
+        success: false,
+        approved: false,
+        outcomeUnknown: true,
+        failureType: "transport_error",
+        error: err instanceof Error ? err.message : "Could not reach the payment terminal.",
+      }, transactionId);
     }
+
   }, [amount, applyOutcome, category, kioskId]);
 
   useEffect(() => {
