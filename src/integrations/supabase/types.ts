@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      apex_terminal_sessions: {
+        Row: {
+          cancel_requested: boolean
+          created_at: string
+          kiosk_id: string
+          lease_expires_at: string
+          pending_transaction_id: string | null
+          result: Json | null
+          state: string
+          terminal_id: string
+          transaction_id: string
+          updated_at: string
+        }
+        Insert: {
+          cancel_requested?: boolean
+          created_at?: string
+          kiosk_id: string
+          lease_expires_at: string
+          pending_transaction_id?: string | null
+          result?: Json | null
+          state: string
+          terminal_id: string
+          transaction_id: string
+          updated_at?: string
+        }
+        Update: {
+          cancel_requested?: boolean
+          created_at?: string
+          kiosk_id?: string
+          lease_expires_at?: string
+          pending_transaction_id?: string | null
+          result?: Json | null
+          state?: string
+          terminal_id?: string
+          transaction_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apex_terminal_sessions_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donation_categories: {
         Row: {
           category_id: string
@@ -445,6 +492,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_apex_terminal_session: {
+        Args: {
+          _kiosk_id: string
+          _lease_seconds?: number
+          _terminal_id: string
+          _transaction_id: string
+        }
+        Returns: {
+          acquisition: string
+          owner_transaction_id: string
+          session_state: string
+          stored_result: Json
+        }[]
+      }
+      activate_recovered_apex_session: {
+        Args: {
+          _kiosk_id: string
+          _lease_seconds?: number
+          _transaction_id: string
+        }
+        Returns: boolean
+      }
+      finish_apex_terminal_session: {
+        Args: {
+          _kiosk_id: string
+          _result?: Json
+          _state: string
+          _transaction_id: string
+        }
+        Returns: boolean
+      }
       generate_reference_number: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -452,6 +530,13 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      request_apex_terminal_cancellation: {
+        Args: { _kiosk_id: string; _transaction_id: string }
+        Returns: {
+          allowed: boolean
+          session_state: string
+        }[]
       }
     }
     Enums: {
