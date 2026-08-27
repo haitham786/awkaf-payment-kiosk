@@ -364,10 +364,15 @@ serve(async (req) => {
 
     // Record the transaction through the existing pipeline so reporting,
     // reference numbers and receipts behave exactly as they do today.
+    // Admin connection tests take the identical terminal path but are never
+    // stored as donations.
+    const testMode = body?.testMode === true;
     const internalToken = Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "";
     let referenceNumber: string | null = null;
 
     try {
+      if (testMode) throw new Error("skip-recording");
+
       const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
         method: "POST",
         headers: {
