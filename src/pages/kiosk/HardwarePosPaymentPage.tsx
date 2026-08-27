@@ -259,6 +259,8 @@ const HardwarePosPaymentPage = () => {
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
         cancelling={stage === "cancelling"}
+        slowDispatch={slowDispatch}
+
       />
     );
   }
