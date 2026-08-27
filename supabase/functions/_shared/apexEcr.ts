@@ -212,7 +212,14 @@ export function parseApexResponse(xml: string): ApexEcrResult {
     posIssuerName: pickTag(xml, "PosIssuerName"),
     posCardEntryModeId: pickTag(xml, "PosCardEntryModeId"),
     posReceipt: pickTag(xml, "PosReceipt"),
-    approved: webOk && posRespStatus === "1",
+    approved: webOk && isApprovedPosResponse(
+      posRespStatus,
+      pickTag(xml, "PosRespCode"),
+      pickTag(xml, "PosAuthCode"),
+      pickTag(xml, "PosRRN"),
+      pickTag(xml, "PosRespText"),
+    ),
+
     raw: xml,
     faultCode,
     faultMessage,
