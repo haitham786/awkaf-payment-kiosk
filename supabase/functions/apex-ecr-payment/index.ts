@@ -155,25 +155,8 @@ serve(async (req) => {
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
 
-    // ------------------------------------------------------------------ warm
-    // Called while the donor is still selecting a category or typing an amount.
-    // Boots this isolate, primes the terminal configuration cache above and
-    // opens the TLS session to the AFS host so the SALE goes out instantly.
-    if (action === "warm") {
-      let hostReachable = false;
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET", signal: controller.signal });
-        clearTimeout(timer);
-        await res.arrayBuffer();
-        hostReachable = res.status < 500;
-      } catch {
-        hostReachable = false;
-      }
-      console.log("ApexECR warm", { correlationId, tid: config.tid, hostReachable, ms: Date.now() - requestStartedAt });
-      return json({ success: true, warmed: true, hostReachable }, 200, corsHeaders);
-    }
+
+
 
 
     // ------------------------------------------------------------------ wsdl
