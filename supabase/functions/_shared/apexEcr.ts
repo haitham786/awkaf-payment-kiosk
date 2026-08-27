@@ -233,6 +233,40 @@ export function isSuccessfulWebResponse(status: string): boolean {
 }
 
 /**
+ * Terminal-level approval. Apex documents PosRespStatus = 1 for approved, but
+ * live responses also use `true` / `Approved`, and occasionally omit the field
+ * entirely while returning an approval response code with an auth code / RRN.
+ */
+export function isApprovedPosResponse(
+  posRespStatus: string,
+  posRespCode: string,
+  posAuthCode: string,
+  posRRN: string,
+  posRespText: string,
+): boolean {
+  const status = String(posRespStatus || "").trim().toLowerCase();
+  if (["1", "true", "approved", "approve", "success"].includes(status)) return true;
+  if (["0", "-1", "false", "declined", "decline"].includes(status)) return false;
+
+  // Status missing/unknown: fall back to the issuer response.
+  const code = String(posRespCode || "").trim();
+  const approvedCode = code === "00" || code === "000";
+  const hasProof = !!String(posAuthCode || "").trim() || !!String(posRRN || "").trim();
+  const approvedText = /approved|accepted/i.test(String(posRespText || ""));
+  return (approvedCode && hasProof) || (approvedCode && approvedText);
+}
+
+/** Masks a PAN inside a raw SOAP body so replies can be logged safely. */
+export function redactApexRaw(xml: string): string {
+  return String(xml || "")
+    .replace(/(<(?:[A-Za-z0-9_.-]+:)?PosPan\b[^>]*>)([\s\S]*?)(<\/)/gi, "$1***$3")
+    .replace(/(<(?:[A-Za-z0-9_.-]+:)?MerchantSecureKey\b[^>]*>)([\s\S]*?)(<\/)/gi, "$1***$3")
+    .replace(/(<(?:[A-Za-z0-9_.-]+:)?PosReceipt\b[^>]*>)([\s\S]*?)(<\/)/gi, "$1***$3")
+    .slice(0, 4000);
+}
+
+
+/**
  * Apex rejects a new SALE while the terminal is still waiting for feedback
  * from the previous request. This response is safe to recover from because the
  * new SALE was not accepted by Apex; cancel the last request, then submit once.
