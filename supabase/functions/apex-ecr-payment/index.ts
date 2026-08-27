@@ -261,6 +261,7 @@ serve(async (req) => {
         config.secureKey ? null : "Merchant Secure Key",
       ].filter(Boolean).join(", ");
       console.error("ApexECR configuration incomplete", { correlationId, kioskId, missing });
+      await releasePreAcquisitionIfHeld();
       return json(
         {
           success: false,
@@ -275,6 +276,7 @@ serve(async (req) => {
 
 
     if (!/^https:\/\//i.test(config.serviceUrl)) {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
 
