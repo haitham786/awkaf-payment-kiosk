@@ -750,13 +750,16 @@ serve(async (req) => {
 
     // The database lease proves no current app request owns this TID. A busy
     // response here can therefore only be an Apex-side orphan predating the
-    // lease; clear that orphan and retry this SALE exactly once.
-    const initialError = safeApexError(saleResult);
-    if (
-      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
-      isAnotherTransactionInProgress(initialError)
-    ) {
-      console.warn("ApexECR stale session detected", { correlationId, tid: config.tid });
+    // lease (terminal rebooted, battery died mid-prompt, previous request lost
+    // in transit). Clear that orphan and re-send this SALE; retried twice
+    // because a terminal that is switching state can reject the first attempt.
+    for (let recovery = 0; recovery < 2; recovery++) {
+      if (
+        isSuccessfulWebResponse(saleResult.webResponseStatus) ||
+        !isAnotherTransactionInProgress(safeApexError(saleResult))
+      ) break;
+
+      console.warn("ApexECR stale session detected", { correlationId, tid: config.tid, attempt: recovery + 1 });
       const cancellation = await cancelAtTerminal();
       console.log("ApexECR stale session cancellation", {
         correlationId,
@@ -765,10 +768,11 @@ serve(async (req) => {
         error: cancellation.error,
       });
 
-      if (cancellation.cancelled) {
-        // Give the terminal a short state-transition window; this is only paid
-        // on stale-session recovery and never slows the normal SALE path.
-        await new Promise((resolve) => setTimeout(resolve, 350));
+      // Re-send even when the cancellation reply is unclear: Apex frequently
+      // clears the orphan without acknowledging it, and a SALE that Apex never
+      // accepted cannot double-charge.
+      await new Promise((resolve) => setTimeout(resolve, cancellation.cancelled ? 350 : 700));
+      try {
         saleResult = await callApexEcr(
           config,
           buildSaleEnvelope(config, {
@@ -778,6 +782,12 @@ serve(async (req) => {
           }),
           APEX_SOAP_ACTIONS.sale,
         );
+      } catch (retryError) {
+        console.warn("ApexECR stale-session retry failed", {
+          correlationId,
+          error: retryError instanceof Error ? retryError.message : "unknown",
+        });
+        break;
       }
     }
     console.log("ApexECR sale response", {
