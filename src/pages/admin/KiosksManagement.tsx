@@ -111,15 +111,22 @@ const KiosksManagement = () => {
     };
   };
 
+  /**
+   * Credentials are only ever overwritten with a real value. A blank field means
+   * "leave the stored key untouched", so saving the kiosk for an unrelated reason
+   * can never wipe the ApexECR secure key or the Soft POS auth key.
+   */
   const saveKioskSecret = async (kioskId: string, authKey: string, apexSecureKey = '') => {
+    const payload: Record<string, any> = { kiosk_id: kioskId };
+    if (authKey) payload.soft_pos_auth_key = authKey;
+    if (apexSecureKey) payload.apex_secure_key = apexSecureKey;
+
     const { error } = await supabase
       .from('kiosk_secrets')
-      .upsert(
-        { kiosk_id: kioskId, soft_pos_auth_key: authKey, apex_secure_key: apexSecureKey },
-        { onConflict: 'kiosk_id' },
-      );
+      .upsert(payload, { onConflict: 'kiosk_id' });
     if (error) throw error;
   };
+
 
   useEffect(() => {
     checkAuth();
