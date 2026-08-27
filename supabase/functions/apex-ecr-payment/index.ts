@@ -55,6 +55,65 @@ function safeApexError(result: { webResponseErrorDesc: string; posRespText: stri
   return message || (result.posRespCode ? `AFS response code ${result.posRespCode}` : "AFS did not route the request to the terminal.");
 }
 
+/**
+ * Stores an approved/declined terminal result through the existing
+ * process-payment pipeline so reporting, reference numbers and receipts behave
+ * identically no matter which code path discovered the outcome.
+ */
+async function recordApexTransaction(params: {
+  transactionId: string;
+  kioskId: string;
+  amount: number;
+  category: string;
+  config: ApexEcrConfig;
+  result: ApexEcrResult;
+  invoiceNumber: string;
+}): Promise<string | null> {
+  const { transactionId, kioskId, amount, category, config, result, invoiceNumber } = params;
+  try {
+    const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        "x-internal-token": Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "",
+      },
+      body: JSON.stringify({
+        transactionId,
+        kioskId,
+        amount,
+        category,
+        mobileNumber: null,
+        paymentType: "hardware_pos",
+        provider: "apex_ecr",
+        posResponse: {
+          success: result.approved,
+          responseCode: result.posRespCode || (result.approved ? "00" : "05"),
+          rrn: result.posRRN || null,
+          authCode: result.posAuthCode || null,
+          tid: config.tid,
+          mid: config.mid,
+          cardType: result.posIssuerName || null,
+          cardLastFour: panLastFour(result.posPan),
+          invoiceNumber: result.posInvoiceNumber || invoiceNumber,
+          batchNumber: result.posBatchNumber || null,
+          stan: result.posStan || null,
+          posDate: result.posDate || null,
+          posTime: result.posTime || null,
+          respText: result.posRespText || null,
+          cvmId: result.posCVMId || null,
+        },
+      }),
+    });
+    const processBody = await processRes.json().catch(() => ({}));
+    return processBody?.transaction?.reference_number ?? null;
+  } catch (recordError) {
+    console.error("Failed to record hardware POS transaction:", recordError);
+    return null;
+  }
+}
+
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -338,8 +397,11 @@ serve(async (req) => {
     }
 
     // --------------------------------------------------------------- outcome
-    // Read-only recovery path. If the kiosk lost the SALE response, it polls
-    // here for the outcome the backend already stored for this transaction.
+    // Recovery path. If the kiosk lost the SALE response (edge isolate
+    // recycled, flaky link, app relaunch), it polls here. We first return the
+    // outcome the backend already stored; if the outcome is still unknown we
+    // ask the terminal itself (EnquiryByRef) and, when the card was actually
+    // charged, record the donation so billing and receipts are never lost.
     if (action === "outcome") {
       const { data: sessionRow } = await supabase
         .from("apex_terminal_sessions")
@@ -347,19 +409,87 @@ serve(async (req) => {
         .eq("kiosk_id", kioskId)
         .maybeSingle();
 
-      // Cancelled / unknown sessions are owned by the cancellation path, so
-      // only real terminal outcomes are handed back to a polling kiosk.
+      // Cancelled sessions are owned by the cancellation path.
       const finishedStates = ["approved", "declined", "failed"];
 
       const matches = sessionRow?.transaction_id === transactionId;
-      const finished = matches && finishedStates.includes(String(sessionRow?.state || ""));
-      return json({
-        success: true,
-        finished,
-        state: matches ? sessionRow?.state ?? "missing" : "missing",
-        result: finished ? sessionRow?.result ?? null : null,
-      }, 200, corsHeaders);
+      const state = matches ? String(sessionRow?.state || "missing") : "missing";
+      if (matches && finishedStates.includes(state)) {
+        return json({ success: true, finished: true, state, result: sessionRow?.result ?? null }, 200, corsHeaders);
+      }
+
+      // Unknown / missing: ask the terminal for its own record of this invoice.
+      if (state === "unknown" || state === "missing") {
+        const outcomeInvoice = invoiceNumberFor(transactionId);
+        try {
+          const enquiry = await callApexEcr(
+            config,
+            buildEnquiryByRefEnvelope(config, outcomeInvoice, "", "", transactionId),
+            APEX_SOAP_ACTIONS.enquiryByRef,
+            15000,
+          );
+          const approved = isSuccessfulWebResponse(enquiry.webResponseStatus) && isApprovedPosResponse(
+            enquiry.posRespStatus,
+            enquiry.posRespCode,
+            enquiry.posAuthCode,
+            enquiry.posRRN,
+            enquiry.posRespText,
+          );
+          console.log("ApexECR outcome recovery enquiry", {
+            correlationId,
+            tid: config.tid,
+            state,
+            approved,
+            webResponseStatus: enquiry.webResponseStatus,
+            posRespCode: enquiry.posRespCode || null,
+          });
+
+          if (approved) {
+            const recoveredResult: ApexEcrResult = { ...enquiry, approved: true };
+            const referenceNumber = Number.isInteger(amount) && amount > 0
+              ? await recordApexTransaction({
+                transactionId,
+                kioskId,
+                amount,
+                category,
+                config,
+                result: recoveredResult,
+                invoiceNumber: outcomeInvoice,
+              })
+              : null;
+            const recoveredBody = {
+              success: true,
+              approved: true,
+              recovered: true,
+              invoiceNumber: outcomeInvoice,
+              referenceNumber,
+              rrn: enquiry.posRRN,
+              authCode: enquiry.posAuthCode,
+              responseCode: enquiry.posRespCode,
+              responseText: enquiry.posRespText,
+              cardType: enquiry.posIssuerName,
+              cardLastFour: panLastFour(enquiry.posPan),
+            };
+            await supabase.rpc("finish_apex_terminal_session", {
+              _kiosk_id: kioskId,
+              _transaction_id: transactionId,
+              _state: "approved",
+              _result: recoveredBody,
+            });
+            return json({ success: true, finished: true, state: "approved", result: recoveredBody }, 200, corsHeaders);
+          }
+        } catch (enquiryError) {
+          console.warn("ApexECR outcome recovery failed", {
+            correlationId,
+            error: enquiryError instanceof Error ? enquiryError.message : "unknown",
+          });
+        }
+      }
+
+      return json({ success: true, finished: false, state, result: null }, 200, corsHeaders);
     }
+
+
 
 
     // ---------------------------------------------------------------- cancel
@@ -448,14 +578,49 @@ serve(async (req) => {
       }, 200, corsHeaders);
     }
     if (acquisition.acquisition === "busy") {
-      return json({
-        success: false,
-        approved: false,
-        failureType: "terminal_busy",
-        outcomeUnknown: true,
-        error: "The terminal is completing the previous payment. Please wait for it to return to the idle screen.",
-      }, 200, corsHeaders);
+      // A kiosk owns exactly one terminal and serves one donor at a time, so a
+      // brand-new SALE from this kiosk means the previous session was
+      // abandoned (donor walked away, app relaunched, screen killed). Clear the
+      // terminal prompt, release the lease and take the session over instead of
+      // making the donor in front of the kiosk wait for a lease to expire.
+      console.warn("ApexECR taking over an abandoned session", {
+        correlationId,
+        tid: config.tid,
+        previousState: acquisition.session_state,
+      });
+      const takeover = await cancelAtTerminal();
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: acquisition.owner_transaction_id,
+        _state: "cancelled",
+        _result: {
+          success: takeover.cancelled,
+          cancelled: takeover.cancelled,
+          reason: "superseded_by_new_sale",
+          error: takeover.error || null,
+        },
+      });
+
+      const { data: retryRows, error: retryError } = await supabase.rpc("acquire_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _terminal_id: config.tid,
+        _transaction_id: transactionId,
+        _lease_seconds: leaseSeconds,
+      });
+      const retryAcquisition = (Array.isArray(retryRows) ? retryRows[0] : null) as TerminalAcquisition | null;
+      if (retryError || retryAcquisition?.acquisition !== "acquired") {
+        return json({
+          success: false,
+          approved: false,
+          failureType: "terminal_busy",
+          outcomeUnknown: true,
+          error: "The terminal is still finishing the previous payment. Please try again in a moment.",
+        }, 200, corsHeaders);
+      }
+      // Short state-transition window after clearing the previous prompt.
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
+
     if (acquisition.acquisition === "stale_recovery") {
       console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid });
       const recovered = await cancelAtTerminal();
@@ -679,52 +844,18 @@ serve(async (req) => {
     // Admin connection tests take the identical terminal path but are never
     // stored as donations.
     const testMode = body?.testMode === true;
-    const internalToken = Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "";
-    let referenceNumber: string | null = null;
-
-    try {
-      if (testMode) throw new Error("skip-recording");
-
-      const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "x-internal-token": internalToken,
-        },
-        body: JSON.stringify({
-          transactionId,
-          kioskId,
-          amount,
-          category,
-          mobileNumber: null,
-          paymentType: "hardware_pos",
-          provider: "apex_ecr",
-          posResponse: {
-            success: saleResult.approved,
-            responseCode: saleResult.posRespCode || (saleResult.approved ? "00" : "05"),
-            rrn: saleResult.posRRN || null,
-            authCode: saleResult.posAuthCode || null,
-            tid: config.tid,
-            mid: config.mid,
-            cardType: saleResult.posIssuerName || null,
-            cardLastFour: panLastFour(saleResult.posPan),
-            invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
-            batchNumber: saleResult.posBatchNumber || null,
-            stan: saleResult.posStan || null,
-            posDate: saleResult.posDate || null,
-            posTime: saleResult.posTime || null,
-            respText: saleResult.posRespText || null,
-            cvmId: saleResult.posCVMId || null,
-          },
-        }),
+    const referenceNumber = testMode
+      ? null
+      : await recordApexTransaction({
+        transactionId,
+        kioskId,
+        amount,
+        category,
+        config,
+        result: saleResult,
+        invoiceNumber,
       });
 
-      const processBody = await processRes.json().catch(() => ({}));
-      referenceNumber = processBody?.transaction?.reference_number ?? null;
-    } catch (recordError) {
-      if (!testMode) console.error("Failed to record hardware POS transaction:", recordError);
-    }
 
 
     const responseBody = {

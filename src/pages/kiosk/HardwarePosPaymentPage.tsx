@@ -63,12 +63,20 @@ const HardwarePosPaymentPage = () => {
   const categoryReferenceRef = useRef(categoryReference);
   categoryReferenceRef.current = categoryReference;
 
+  // While an outcome is "unknown" the card may still have been charged, so we
+  // keep the tap screen up and let the backend interrogate the terminal
+  // instead of telling the donor it failed. Only after this window do we
+  // surface the error.
+  const RECOVERY_WINDOW_MS = 45000;
+  const recoveryDeadlineRef = useRef<number>(Date.now() + RECOVERY_WINDOW_MS);
+  const pendingUnknownRef = useRef<ApexResponse | null>(null);
+
   /** Single place where a terminal outcome moves the donor forward. */
   const applyOutcome = useCallback((result: ApexResponse, transactionId: string) => {
     if (outcomeHandledRef.current || cancellingRef.current || ignoreSaleResultRef.current) return;
-    outcomeHandledRef.current = true;
 
     if (result.approved) {
+      outcomeHandledRef.current = true;
       const ref = result.referenceNumber || result.rrn || transactionId;
       navigate(
         `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
@@ -78,25 +86,36 @@ const HardwarePosPaymentPage = () => {
     }
 
     if (result.success === false && result.error) {
+      // Unknown outcome (timeout, lost response, terminal still busy): keep
+      // waiting so the recovery poll can find the real result at the terminal.
+      if (result.outcomeUnknown && Date.now() < recoveryDeadlineRef.current) {
+        pendingUnknownRef.current = result;
+        setStage("processing");
+        return;
+      }
+
+      outcomeHandledRef.current = true;
       const arabic = result.failureType === "afs_network_block"
         ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
         : result.failureType === "apex_rejected"
           ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
           : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
       const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-      setRetryAllowed(result.outcomeUnknown !== true);
+      setRetryAllowed(true);
       setErrorMessage(`${arabic}\n${result.error}${reference}`);
       setStage("error");
       return;
     }
 
     // Declined by the card/issuer — the terminal has finished with this session.
+    outcomeHandledRef.current = true;
     const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
       .filter(Boolean)
       .join(" · ");
     setDeclineMessage(detail);
     setStage("declined");
   }, [amount, category, navigate]);
+
 
 
   useEffect(() => {
@@ -152,9 +171,17 @@ const HardwarePosPaymentPage = () => {
       applyOutcome((data || {}) as ApexResponse, transactionId);
     } catch (err) {
       if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
-      setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
-      setStage("error");
+      // The request itself failed, so the card may still have been charged.
+      // Treat it as an unknown outcome and let the recovery poll decide.
+      applyOutcome({
+        success: false,
+        approved: false,
+        outcomeUnknown: true,
+        failureType: "transport_error",
+        error: err instanceof Error ? err.message : "Could not reach the payment terminal.",
+      }, transactionId);
     }
+
   }, [amount, applyOutcome, category, kioskId]);
 
   useEffect(() => {
@@ -170,8 +197,9 @@ const HardwarePosPaymentPage = () => {
   }, [startSale]);
 
   // Outcome recovery: if the sale response is lost in transit (edge isolate
-  // recycled, flaky link), the backend still stored the terminal's outcome.
-  // Poll for it so an approved payment always reaches the Thank-You screen.
+  // recycled, flaky link) the backend still knows — or can ask the terminal —
+  // what happened. Poll so an approved payment always reaches the Thank-You
+  // screen and is always recorded for billing.
   useEffect(() => {
     if (stage !== "processing" || !kioskId) return;
     let cancelled = false;
@@ -181,22 +209,36 @@ const HardwarePosPaymentPage = () => {
       const transactionId = transactionIdRef.current;
       try {
         const { data } = await supabase.functions.invoke("apex-ecr-payment", {
-          body: { action: "outcome", kioskId, transactionId },
+          body: { action: "outcome", kioskId, transactionId, amount, category },
         });
         if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
         const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
-        if (data?.finished && stored) applyOutcome(stored, transactionId);
+        if (data?.finished && stored) {
+          applyOutcome(stored, transactionId);
+          return;
+        }
       } catch {
         // Polling is best-effort; the direct sale response remains authoritative.
       }
+
+      // The recovery window has closed without any terminal outcome — show the
+      // last known failure so the donor is never left on a dead screen.
+      if (!cancelled && !outcomeHandledRef.current && Date.now() >= recoveryDeadlineRef.current) {
+        const pending = pendingUnknownRef.current;
+        if (pending) {
+          pendingUnknownRef.current = null;
+          applyOutcome({ ...pending, outcomeUnknown: false }, transactionId);
+        }
+      }
     };
 
-    const interval = window.setInterval(poll, 5000);
+    const interval = window.setInterval(poll, 3000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [applyOutcome, kioskId, stage]);
+  }, [amount, applyOutcome, category, kioskId, stage]);
+
 
 
 
@@ -262,11 +304,14 @@ const HardwarePosPaymentPage = () => {
     startedRef.current = false;
     ignoreSaleResultRef.current = false;
     outcomeHandledRef.current = false;
+    pendingUnknownRef.current = null;
+    recoveryDeadlineRef.current = Date.now() + RECOVERY_WINDOW_MS;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
     void startSale();
   };
+
 
   useEffect(() => {
     if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
