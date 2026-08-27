@@ -30,6 +30,7 @@ interface CancellationResponse {
   success?: boolean;
   cancelled?: boolean;
   error?: string;
+  state?: string;
 }
 
 const HardwarePosPaymentPage = () => {
@@ -157,9 +158,11 @@ const HardwarePosPaymentPage = () => {
       });
       if (error) throw error;
       const result = (data || {}) as CancellationResponse;
-      const cancelled = result.cancelled === true;
-      if (!cancelled && result.error) console.error("Terminal rejected cancellation:", result.error);
-      return cancelled;
+      const safeToLeave = result.cancelled === true || (
+        result.success === true && ["approved", "declined", "failed", "cancelled"].includes(result.state || "")
+      );
+      if (!safeToLeave && result.error) console.error("Terminal rejected cancellation:", result.error);
+      return safeToLeave;
     } catch (err) {
       console.error("Terminal cancellation failed:", err);
       return false;

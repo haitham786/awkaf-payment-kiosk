@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
   ApexEcrConfig,
+  ApexEcrResult,
   baisasToDecimalString,
   buildCancelEnvelope,
   buildEnquiryByRefEnvelope,
@@ -402,7 +403,7 @@ serve(async (req) => {
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
-    let saleResult;
+    let saleResult: ApexEcrResult;
     try {
       saleResult = await callApexEcr(
         config,
