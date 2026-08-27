@@ -147,10 +147,71 @@ serve(async (req) => {
     const cached = terminalConfigCache.get(kioskId);
     let config: ApexEcrConfig;
     let kioskStatus: string;
+    // Set when the SALE fast path already reserved the terminal in the same
+    // database round trip that loaded the configuration.
+    let preAcquisition: TerminalAcquisition | null = null;
+    const saleLeaseSeconds = 120;
+
+    const buildConfig = (configuration: Record<string, unknown>, secureKey: string): ApexEcrConfig => {
+      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
+      return {
+        serviceUrl: String(hardware.service_url || "").trim(),
+        tid: String(hardware.tid || "").trim(),
+        mid: String(hardware.mid || "").trim(),
+        secureKey: String(secureKey || "").trim(),
+        currencyCode: String(hardware.currency_code || "512"),
+        tellerUserName: "KIOSK",
+        tellerFullName: "KIOSK",
+        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
+        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
+      };
+    };
+    const cacheConfig = () => {
+      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
+        terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
+      } else {
+        terminalConfigCache.delete(kioskId);
+      }
+    };
 
     if (cached && Date.now() - cached.cachedAt < CONFIG_CACHE_TTL_MS) {
       config = cached.config;
       kioskStatus = cached.status;
+    } else if (action === "sale") {
+      // Cold isolate on the hot path: one round trip loads the kiosk, its
+      // merchant key and reserves the terminal lease, instead of three.
+      const { data: beginRows, error: beginError } = await supabase.rpc("begin_apex_sale", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _lease_seconds: saleLeaseSeconds,
+      });
+      if (beginError) throw beginError;
+      const begun = (Array.isArray(beginRows) ? beginRows[0] : null) as
+        | {
+          kiosk_status: string;
+          configuration: Record<string, unknown> | null;
+          secure_key: string | null;
+          acquisition: string;
+          owner_transaction_id: string | null;
+          session_state: string | null;
+          stored_result: Record<string, unknown> | null;
+        }
+        | null;
+      if (!begun || begun.kiosk_status === "missing") {
+        return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
+      }
+      config = buildConfig(begun.configuration ?? {}, begun.secure_key ?? "");
+      kioskStatus = begun.kiosk_status;
+      cacheConfig();
+      if (begun.acquisition !== "skipped") {
+        preAcquisition = {
+          acquisition: begun.acquisition as TerminalAcquisition["acquisition"],
+          owner_transaction_id: begun.owner_transaction_id ?? "",
+          session_state: begun.session_state ?? "",
+          stored_result: begun.stored_result,
+        };
+      }
     } else {
       // Only load this kiosk. MID/TID uniqueness is enforced when configuration
       // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
@@ -163,29 +224,12 @@ serve(async (req) => {
         return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
       }
 
-      const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
-      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
-      config = {
-        serviceUrl: String(hardware.service_url || "").trim(),
-        tid: String(hardware.tid || "").trim(),
-        mid: String(hardware.mid || "").trim(),
-        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
-        currencyCode: String(hardware.currency_code || "512"),
-        tellerUserName: "KIOSK",
-        tellerFullName: "KIOSK",
-        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
-        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
-        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
-      };
+      config = buildConfig((kiosk.configuration ?? {}) as Record<string, unknown>, secretRes.data?.apex_secure_key || "");
       kioskStatus = kiosk.status;
       // Never cache an unusable configuration: a wiped or half-saved terminal
       // setup must be re-read on the next attempt instead of being pinned for
       // ten minutes inside a warm isolate.
-      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
-        terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
-      } else {
-        terminalConfigCache.delete(kioskId);
-      }
+      cacheConfig();
     }
 
     if (kioskStatus !== "active") {
