@@ -79,6 +79,11 @@ const KiosksManagement = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [verifyingTerminal, setVerifyingTerminal] = useState(false);
   const [terminalDiagnostic, setTerminalDiagnostic] = useState<string | null>(null);
+  const [testRials, setTestRials] = useState('0');
+  const [testBaisas, setTestBaisas] = useState('100');
+  const [cancellingTerminal, setCancellingTerminal] = useState(false);
+
+
 
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
