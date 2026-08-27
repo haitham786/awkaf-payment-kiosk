@@ -220,44 +220,40 @@ const HardwarePosPaymentPage = () => {
     }
   }, [kioskId]);
 
-  const handleCancel = useCallback(async () => {
-    if (cancellingRef.current) return;
+  /**
+   * Cancel leaves the payment screen as soon as the terminal acknowledges, or
+   * after a short grace period if Apex is slow — the cancel request keeps
+   * running in the background so the terminal prompt is always cleared.
+   */
+  const leaveAfterCancel = useCallback((graceMs = 4000) => {
+    ignoreSaleResultRef.current = true;
+    outcomeHandledRef.current = true;
     cancellingRef.current = true;
     setStage("cancelling");
 
-    // Always push the cancellation to the terminal so the amount clears from
-    // its screen. The request keeps running in the background if it is slow —
-    // the donor is never held on the kiosk for more than a few seconds.
-    const cancelled = await cancelAtTerminal();
-    if (cancelled) {
-      ignoreSaleResultRef.current = true;
+    let left = false;
+    const leave = () => {
+      if (left) return;
+      left = true;
       navigate("/kiosk");
-      return;
-    }
-    cancellingRef.current = false;
-    setRetryAllowed(false);
-    setErrorMessage("لم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe terminal did not confirm cancellation. Please wait until it returns to the idle screen.");
-    setStage("error");
+    };
+    const grace = window.setTimeout(leave, graceMs);
+    void cancelAtTerminal().then(() => {
+      window.clearTimeout(grace);
+      leave();
+    });
   }, [cancelAtTerminal, navigate]);
 
+  const handleCancel = useCallback(() => {
+    if (cancellingRef.current) return;
+    leaveAfterCancel();
+  }, [leaveAfterCancel]);
 
   const handleTimeout = () => {
     // Apex cancellation always targets the last request. Clear the terminal
-    // prompt before exposing the timeout state so the next donor is never met
-    // by an orphaned session or "Another transaction under processing".
-    ignoreSaleResultRef.current = true;
-    cancellingRef.current = true;
-    setStage("cancelling");
-    void cancelAtTerminal().then((cancelled) => {
-      if (cancelled) {
-        navigate("/kiosk");
-        return;
-      }
-      cancellingRef.current = false;
-      setRetryAllowed(false);
-      setErrorMessage("انتهت المهلة ولم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe session timed out and the terminal did not confirm cancellation. Please wait until it returns to idle.");
-      setStage("error");
-    });
+    // prompt so the next donor is never met by an orphaned session.
+    if (cancellingRef.current) return;
+    leaveAfterCancel();
   };
 
   const handleTryAgain = () => {
@@ -265,6 +261,7 @@ const HardwarePosPaymentPage = () => {
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
     ignoreSaleResultRef.current = false;
+    outcomeHandledRef.current = false;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
@@ -287,11 +284,10 @@ const HardwarePosPaymentPage = () => {
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
         cancelling={stage === "cancelling"}
-        slowDispatch={slowDispatch}
-
       />
     );
   }
+
 
   if (stage === "error") {
     return (
