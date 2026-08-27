@@ -5,7 +5,7 @@ import {
   isSuccessfulWebResponse,
   parseApexResponse,
   type ApexEcrConfig,
-} from "./apexEcr.ts";
+} from "../_shared/apexEcr.ts";
 
 const config: ApexEcrConfig = {
   serviceUrl: "https://example.test/EcrComInterface.svc",
