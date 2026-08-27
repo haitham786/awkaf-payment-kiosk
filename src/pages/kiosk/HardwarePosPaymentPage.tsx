@@ -26,6 +26,12 @@ interface ApexResponse {
   outcomeUnknown?: boolean;
 }
 
+interface CancellationResponse {
+  success?: boolean;
+  cancelled?: boolean;
+  error?: string;
+}
+
 const HardwarePosPaymentPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -147,10 +153,12 @@ const HardwarePosPaymentPage = () => {
     if (!kioskId) return false;
     try {
       const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
-        body: { action: "cancel", kioskId },
+        body: { action: "cancel", kioskId, transactionId: transactionIdRef.current },
       });
       if (error) throw error;
-      const cancelled = data?.cancelled === true;
+      const result = (data || {}) as CancellationResponse;
+      const cancelled = result.cancelled === true;
+      if (!cancelled && result.error) console.error("Terminal rejected cancellation:", result.error);
       return cancelled;
     } catch (err) {
       console.error("Terminal cancellation failed:", err);
@@ -166,12 +174,16 @@ const HardwarePosPaymentPage = () => {
     // Always push the cancellation to the terminal so the amount clears from
     // its screen. The request keeps running in the background if it is slow —
     // the donor is never held on the kiosk for more than a few seconds.
-    const cancelRequest = cancelAtTerminal();
-    await Promise.race([
-      cancelRequest,
-      new Promise((resolve) => window.setTimeout(resolve, 6000)),
-    ]);
-    navigate("/kiosk");
+    const cancelled = await cancelAtTerminal();
+    if (cancelled) {
+      ignoreSaleResultRef.current = true;
+      navigate("/kiosk");
+      return;
+    }
+    cancellingRef.current = false;
+    setRetryAllowed(false);
+    setErrorMessage("لم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe terminal did not confirm cancellation. Please wait until it returns to the idle screen.");
+    setStage("error");
   }, [cancelAtTerminal, navigate]);
 
 
@@ -180,10 +192,18 @@ const HardwarePosPaymentPage = () => {
     // prompt before exposing the timeout state so the next donor is never met
     // by an orphaned session or "Another transaction under processing".
     ignoreSaleResultRef.current = true;
-    void cancelAtTerminal();
-    setRetryAllowed(false);
-    setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
-    setStage("error");
+    cancellingRef.current = true;
+    setStage("cancelling");
+    void cancelAtTerminal().then((cancelled) => {
+      if (cancelled) {
+        navigate("/kiosk");
+        return;
+      }
+      cancellingRef.current = false;
+      setRetryAllowed(false);
+      setErrorMessage("انتهت المهلة ولم يؤكد جهاز الدفع الإلغاء. يرجى الانتظار حتى يعود الجهاز إلى شاشة الاستعداد.\nThe session timed out and the terminal did not confirm cancellation. Please wait until it returns to idle.");
+      setStage("error");
+    });
   };
 
   const handleTryAgain = () => {
