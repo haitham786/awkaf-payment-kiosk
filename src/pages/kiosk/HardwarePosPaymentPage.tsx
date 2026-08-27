@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { getCachedTerminalTimeout } from "@/lib/kioskConfig";
 import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
 
