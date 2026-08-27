@@ -187,9 +187,7 @@ export function buildCancelEnvelope(config: ApexEcrConfig): string {
 export function parseApexResponse(xml: string): ApexEcrResult {
   const posRespStatus = pickTag(xml, "PosRespStatus");
   const webResponseStatus = pickTag(xml, "WebResponseStatus");
-  const status = webResponseStatus.toLowerCase();
-  const webOk = status === "0" || status === "success" || status === "ok" ||
-    status === "completed" || status === "successful";
+  const webOk = isSuccessfulWebResponse(webResponseStatus);
   const faultCode = pickTag(xml, "faultcode") || pickTag(xml, "Code");
   const faultMessage = pickTag(xml, "faultstring") || pickTag(xml, "Reason");
 
@@ -219,6 +217,12 @@ export function parseApexResponse(xml: string): ApexEcrResult {
     faultCode,
     faultMessage,
   };
+}
+
+/** AFS uses a string enum and misspells its failure value as `Faild`. */
+export function isSuccessfulWebResponse(status: string): boolean {
+  return ["0", "success", "ok", "completed", "successful"]
+    .includes(String(status || "").trim().toLowerCase());
 }
 
 /** Last four digits of a masked PAN such as "470468******4250". */

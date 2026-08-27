@@ -9,6 +9,7 @@ import {
   buildSaleEnvelope,
   callApexEcr,
   APEX_SOAP_ACTIONS,
+  isSuccessfulWebResponse,
   panLastFour,
 } from "../_shared/apexEcr.ts";
 
@@ -35,6 +36,11 @@ function classifyFailure(result: { httpStatus?: number; contentType?: string; we
   if (result.faultCode || result.faultMessage) return "soap_fault";
   if (result.httpStatus && result.httpStatus >= 400) return "afs_http_error";
   return "apex_rejected";
+}
+
+function safeApexError(result: { webResponseErrorDesc: string; posRespText: string; posRespCode: string }): string {
+  const message = result.webResponseErrorDesc || result.posRespText;
+  return message || (result.posRespCode ? `AFS response code ${result.posRespCode}` : "AFS did not route the request to the terminal.");
 }
 
 serve(async (req) => {
@@ -205,7 +211,7 @@ serve(async (req) => {
         );
         probes.push({
           probe: "soap",
-          ok: soap.httpStatus === 200 && soap.webResponseStatus !== "99" && !soap.faultCode,
+          ok: soap.httpStatus === 200 && isSuccessfulWebResponse(soap.webResponseStatus) && !soap.faultCode,
           status: soap.httpStatus ?? null,
           contentType: soap.contentType ?? null,
           webResponseStatus: soap.webResponseStatus,
@@ -216,7 +222,7 @@ serve(async (req) => {
           faultCode: soap.faultCode || null,
           faultMessage: soap.faultMessage || null,
           elapsedMs: soap.elapsedMs ?? null,
-          failureType: soap.webResponseStatus === "99" ? classifyFailure(soap) : null,
+          failureType: !isSuccessfulWebResponse(soap.webResponseStatus) ? classifyFailure(soap) : null,
         });
       } catch (err) {
         probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
@@ -231,7 +237,7 @@ serve(async (req) => {
         error: !wsdlOk
           ? "The AFS service contract is unreachable."
           : !soapOk
-            ? "The AFS service is reachable, but SOAP requests are blocked or rejected."
+            ? "The AFS service is reachable, but it rejected the terminal request. Check the returned AFS error and ask AFS/Ahli Bank to confirm this TID is online and paired to the supplied MID and merchant key."
             : undefined,
         probes,
       }, 200, corsHeaders);
@@ -253,8 +259,7 @@ serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
-           const cancellationStatus = result.webResponseStatus.trim().toLowerCase();
-           if (["0", "success", "ok", "completed", "successful"].includes(cancellationStatus)) {
+           if (isSuccessfulWebResponse(result.webResponseStatus)) {
              return { cancelled: true };
            }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
@@ -323,11 +328,15 @@ serve(async (req) => {
       dispatchToResponseMs: Date.now() - saleDispatchStartedAt,
       approved: saleResult.approved,
       webResponseStatus: saleResult.webResponseStatus,
+      webResponseErrorDesc: saleResult.webResponseErrorDesc,
       posRespStatus: saleResult.posRespStatus,
+      posRespCode: saleResult.posRespCode,
+      posRespText: saleResult.posRespText,
     });
 
-    if (saleResult.webResponseStatus === "99") {
+    if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
       const failureType = classifyFailure(saleResult);
+      const apexError = safeApexError(saleResult);
       console.error("ApexECR request failed", {
         correlationId,
         operation: "Sale",
@@ -336,7 +345,7 @@ serve(async (req) => {
         contentType: saleResult.contentType,
         elapsedMs: saleResult.elapsedMs,
         webResponseStatus: saleResult.webResponseStatus,
-        error: saleResult.webResponseErrorDesc,
+        error: apexError,
       });
       return json(
         {
@@ -348,13 +357,18 @@ serve(async (req) => {
           outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
           error: failureType === "afs_network_block"
             ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
-            : saleResult.webResponseErrorDesc || "Terminal service error",
+            : apexError,
           diagnostics: {
             httpStatus: saleResult.httpStatus ?? null,
             contentType: saleResult.contentType ?? null,
             faultCode: saleResult.faultCode || null,
             faultMessage: saleResult.faultMessage || null,
             elapsedMs: saleResult.elapsedMs ?? null,
+            webResponseStatus: saleResult.webResponseStatus || null,
+            webResponseErrorDesc: saleResult.webResponseErrorDesc || null,
+            posRespStatus: saleResult.posRespStatus || null,
+            posRespCode: saleResult.posRespCode || null,
+            posRespText: saleResult.posRespText || null,
           },
         },
         200,

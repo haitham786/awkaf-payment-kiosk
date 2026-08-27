@@ -11,10 +11,8 @@ import { getCachedPaymentMode } from "@/lib/kioskConfig";
  */
 let lastWarmAt = 0;
 let warmInFlight: Promise<boolean> | null = null;
-let keepAliveTimer: number | null = null;
 let keepAliveUsers = 0;
 const WARM_THROTTLE_MS = 12_000;
-const KEEP_ALIVE_INTERVAL_MS = 15_000;
 
 function canWarmHardwarePos(): { kioskId: string } | null {
   try {
@@ -56,9 +54,9 @@ export function warmHardwarePos(force = false): Promise<boolean> {
 }
 
 /**
- * Starts one shared heartbeat for the lifetime of the kiosk app. Browsers and
- * Android WebViews pause timers in the background, so resume/online events also
- * trigger a forced warm-up before the next donor can confirm a payment.
+ * Warms once at app launch and again after lifecycle/network recovery. Repeated
+ * polling cannot keep an outbound connection alive across serverless isolates;
+ * it only creates competing backend/AFS requests and can delay a real SALE.
  */
 export function startHardwarePosKeepAlive(): () => void {
   keepAliveUsers += 1;
@@ -74,9 +72,8 @@ export function startHardwarePosKeepAlive(): () => void {
     if (document.visibilityState === "visible") warmWhenUsable(true);
   };
 
-  if (keepAliveTimer === null) {
+  if (keepAliveUsers === 1) {
     warmWhenUsable(true);
-    keepAliveTimer = window.setInterval(() => warmWhenUsable(), KEEP_ALIVE_INTERVAL_MS);
     window.addEventListener("focus", handleResume);
     window.addEventListener("pageshow", handleResume);
     window.addEventListener("online", handleResume);
@@ -85,10 +82,7 @@ export function startHardwarePosKeepAlive(): () => void {
 
   return () => {
     keepAliveUsers = Math.max(0, keepAliveUsers - 1);
-    if (keepAliveUsers > 0 || keepAliveTimer === null) return;
-
-    window.clearInterval(keepAliveTimer);
-    keepAliveTimer = null;
+    if (keepAliveUsers > 0) return;
     window.removeEventListener("focus", handleResume);
     window.removeEventListener("pageshow", handleResume);
     window.removeEventListener("online", handleResume);
