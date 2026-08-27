@@ -123,7 +123,7 @@ const KiosksManagement = () => {
 
     const { error } = await supabase
       .from('kiosk_secrets')
-      .upsert(payload, { onConflict: 'kiosk_id' });
+      .upsert(payload as any, { onConflict: 'kiosk_id' });
     if (error) throw error;
   };
 
