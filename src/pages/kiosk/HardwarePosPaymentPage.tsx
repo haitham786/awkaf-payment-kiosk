@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { getCachedTerminalTimeout } from "@/lib/kioskConfig";
 import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
 
@@ -120,13 +120,12 @@ const HardwarePosPaymentPage = () => {
 
   useEffect(() => {
     if (!kioskId) return;
-    void loadKioskRuntimeConfig(kioskId).then((config) => {
-      const configuredTimeout = config?.hardware_pos?.timeout_seconds;
-      if (typeof configuredTimeout === "number" && configuredTimeout >= 5) {
-        setTimeoutSeconds(configuredTimeout + 5);
-      }
-    }).catch((error) => console.error("Unable to load terminal timeout:", error));
+    // Read the countdown from the device cache only. Fetching it here would
+    // put a network round trip in front of the donor's SALE.
+    const cached = getCachedTerminalTimeout(kioskId);
+    if (cached) setTimeoutSeconds(cached + 5);
   }, [kioskId]);
+
 
   useEffect(() => {
     const fetchCategory = async () => {

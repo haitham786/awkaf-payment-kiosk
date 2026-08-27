@@ -514,6 +514,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      begin_apex_sale: {
+        Args: {
+          _kiosk_id: string
+          _lease_seconds?: number
+          _transaction_id: string
+        }
+        Returns: {
+          acquisition: string
+          configuration: Json
+          kiosk_status: string
+          owner_transaction_id: string
+          secure_key: string
+          session_state: string
+          stored_result: Json
+        }[]
+      }
+      claim_stale_apex_session: {
+        Args: { _kiosk_id: string; _transaction_id: string }
+        Returns: boolean
+      }
       finish_apex_terminal_session: {
         Args: {
           _kiosk_id: string

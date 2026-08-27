@@ -147,10 +147,71 @@ serve(async (req) => {
     const cached = terminalConfigCache.get(kioskId);
     let config: ApexEcrConfig;
     let kioskStatus: string;
+    // Set when the SALE fast path already reserved the terminal in the same
+    // database round trip that loaded the configuration.
+    let preAcquisition: TerminalAcquisition | null = null;
+    const saleLeaseSeconds = 120;
+
+    const buildConfig = (configuration: Record<string, unknown>, secureKey: string): ApexEcrConfig => {
+      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
+      return {
+        serviceUrl: String(hardware.service_url || "").trim(),
+        tid: String(hardware.tid || "").trim(),
+        mid: String(hardware.mid || "").trim(),
+        secureKey: String(secureKey || "").trim(),
+        currencyCode: String(hardware.currency_code || "512"),
+        tellerUserName: "KIOSK",
+        tellerFullName: "KIOSK",
+        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
+        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
+      };
+    };
+    const cacheConfig = () => {
+      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
+        terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
+      } else {
+        terminalConfigCache.delete(kioskId);
+      }
+    };
 
     if (cached && Date.now() - cached.cachedAt < CONFIG_CACHE_TTL_MS) {
       config = cached.config;
       kioskStatus = cached.status;
+    } else if (action === "sale") {
+      // Cold isolate on the hot path: one round trip loads the kiosk, its
+      // merchant key and reserves the terminal lease, instead of three.
+      const { data: beginRows, error: beginError } = await supabase.rpc("begin_apex_sale", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _lease_seconds: saleLeaseSeconds,
+      });
+      if (beginError) throw beginError;
+      const begun = (Array.isArray(beginRows) ? beginRows[0] : null) as
+        | {
+          kiosk_status: string;
+          configuration: Record<string, unknown> | null;
+          secure_key: string | null;
+          acquisition: string;
+          owner_transaction_id: string | null;
+          session_state: string | null;
+          stored_result: Record<string, unknown> | null;
+        }
+        | null;
+      if (!begun || begun.kiosk_status === "missing") {
+        return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
+      }
+      config = buildConfig(begun.configuration ?? {}, begun.secure_key ?? "");
+      kioskStatus = begun.kiosk_status;
+      cacheConfig();
+      if (begun.acquisition !== "skipped") {
+        preAcquisition = {
+          acquisition: begun.acquisition as TerminalAcquisition["acquisition"],
+          owner_transaction_id: begun.owner_transaction_id ?? "",
+          session_state: begun.session_state ?? "",
+          stored_result: begun.stored_result,
+        };
+      }
     } else {
       // Only load this kiosk. MID/TID uniqueness is enforced when configuration
       // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
@@ -163,32 +224,32 @@ serve(async (req) => {
         return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
       }
 
-      const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
-      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
-      config = {
-        serviceUrl: String(hardware.service_url || "").trim(),
-        tid: String(hardware.tid || "").trim(),
-        mid: String(hardware.mid || "").trim(),
-        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
-        currencyCode: String(hardware.currency_code || "512"),
-        tellerUserName: "KIOSK",
-        tellerFullName: "KIOSK",
-        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
-        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
-        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
-      };
+      config = buildConfig((kiosk.configuration ?? {}) as Record<string, unknown>, secretRes.data?.apex_secure_key || "");
       kioskStatus = kiosk.status;
       // Never cache an unusable configuration: a wiped or half-saved terminal
       // setup must be re-read on the next attempt instead of being pinned for
       // ten minutes inside a warm isolate.
-      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
-        terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
-      } else {
-        terminalConfigCache.delete(kioskId);
-      }
+      cacheConfig();
     }
 
+    /**
+     * The SALE fast path reserves the terminal while it loads the config. If we
+     * bail out before dispatching, the reservation must be handed straight back
+     * so the next donor is never blocked by a lease that never sent a command.
+     */
+    const releasePreAcquisitionIfHeld = async () => {
+      if (preAcquisition?.acquisition !== "acquired") return;
+      preAcquisition = null;
+      await supabase.rpc("finish_apex_terminal_session", {
+        _kiosk_id: kioskId,
+        _transaction_id: transactionId,
+        _state: "failed",
+        _result: { success: false, approved: false, reason: "sale_not_dispatched" },
+      }).catch(() => undefined);
+    };
+
     if (kioskStatus !== "active") {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
     }
 
@@ -200,6 +261,7 @@ serve(async (req) => {
         config.secureKey ? null : "Merchant Secure Key",
       ].filter(Boolean).join(", ");
       console.error("ApexECR configuration incomplete", { correlationId, kioskId, missing });
+      await releasePreAcquisitionIfHeld();
       return json(
         {
           success: false,
@@ -214,6 +276,7 @@ serve(async (req) => {
 
 
     if (!/^https:\/\//i.test(config.serviceUrl)) {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
 
@@ -360,21 +423,32 @@ serve(async (req) => {
 
       // Idle-only recovery: an expired lease means no live donor owns the
       // terminal, so the orphaned prompt is cleared before the next donor.
+      // The claim below is atomic: if a SALE has taken the terminal in the
+      // meantime, the claim fails and no cancellation is ever sent — a probe
+      // can therefore never cancel a live payment.
       if (body?.releaseStale === true && activeStates.includes(sessionState) && leaseExpired) {
-        const recovered = await cancelAtTerminal();
-        staleCleared = recovered.cancelled;
-        if (recovered.cancelled) {
-          await supabase.rpc("finish_apex_terminal_session", {
-            _kiosk_id: kioskId,
-            _transaction_id: sessionRow!.transaction_id,
-            _state: "cancelled",
-            _result: { success: true, cancelled: true, reason: "idle_stale_release" },
-          });
-          busy = false;
+        const { data: claimed } = await supabase.rpc("claim_stale_apex_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: sessionRow!.transaction_id,
+        });
+        if (claimed === true) {
+          const recovered = await cancelAtTerminal();
+          staleCleared = recovered.cancelled;
+          if (recovered.cancelled) {
+            await supabase.rpc("finish_apex_terminal_session", {
+              _kiosk_id: kioskId,
+              _transaction_id: sessionRow!.transaction_id,
+              _state: "cancelled",
+              _result: { success: true, cancelled: true, reason: "idle_stale_release" },
+            });
+            busy = false;
+          } else {
+            busy = true;
+          }
+          console.warn("ApexECR idle stale release", { correlationId, tid: config.tid, cleared: recovered.cancelled, error: recovered.error });
         } else {
           busy = true;
         }
-        console.warn("ApexECR idle stale release", { correlationId, tid: config.tid, cleared: recovered.cancelled, error: recovered.error });
       }
 
       console.log("ApexECR warm", {
@@ -548,21 +622,27 @@ serve(async (req) => {
 
     // ------------------------------------------------------------------ sale
     if (!Number.isInteger(amount) || amount < 100 || amount > 100000000) {
+      await releasePreAcquisitionIfHeld();
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
-    const leaseSeconds = Math.min(300, Math.max(30, Number(config.timeoutSeconds || 90) + 30));
-    const { data: acquisitionRows, error: acquisitionError } = await supabase.rpc(
-      "acquire_apex_terminal_session",
-      {
-        _kiosk_id: kioskId,
-        _terminal_id: config.tid,
-        _transaction_id: transactionId,
-        _lease_seconds: leaseSeconds,
-      },
-    );
-    if (acquisitionError) throw acquisitionError;
-    const acquisition = (Array.isArray(acquisitionRows) ? acquisitionRows[0] : null) as TerminalAcquisition | null;
+    const leaseSeconds = preAcquisition
+      ? saleLeaseSeconds
+      : Math.min(300, Math.max(30, Number(config.timeoutSeconds || 90) + 30));
+    let acquisition = preAcquisition;
+    if (!acquisition) {
+      const { data: acquisitionRows, error: acquisitionError } = await supabase.rpc(
+        "acquire_apex_terminal_session",
+        {
+          _kiosk_id: kioskId,
+          _terminal_id: config.tid,
+          _transaction_id: transactionId,
+          _lease_seconds: leaseSeconds,
+        },
+      );
+      if (acquisitionError) throw acquisitionError;
+      acquisition = (Array.isArray(acquisitionRows) ? acquisitionRows[0] : null) as TerminalAcquisition | null;
+    }
     if (!acquisition) throw new Error("Unable to coordinate the terminal session.");
 
     if (acquisition.acquisition === "completed" && acquisition.stored_result) {
@@ -681,13 +761,16 @@ serve(async (req) => {
 
     // The database lease proves no current app request owns this TID. A busy
     // response here can therefore only be an Apex-side orphan predating the
-    // lease; clear that orphan and retry this SALE exactly once.
-    const initialError = safeApexError(saleResult);
-    if (
-      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
-      isAnotherTransactionInProgress(initialError)
-    ) {
-      console.warn("ApexECR stale session detected", { correlationId, tid: config.tid });
+    // lease (terminal rebooted, battery died mid-prompt, previous request lost
+    // in transit). Clear that orphan and re-send this SALE; retried twice
+    // because a terminal that is switching state can reject the first attempt.
+    for (let recovery = 0; recovery < 2; recovery++) {
+      if (
+        isSuccessfulWebResponse(saleResult.webResponseStatus) ||
+        !isAnotherTransactionInProgress(safeApexError(saleResult))
+      ) break;
+
+      console.warn("ApexECR stale session detected", { correlationId, tid: config.tid, attempt: recovery + 1 });
       const cancellation = await cancelAtTerminal();
       console.log("ApexECR stale session cancellation", {
         correlationId,
@@ -696,10 +779,11 @@ serve(async (req) => {
         error: cancellation.error,
       });
 
-      if (cancellation.cancelled) {
-        // Give the terminal a short state-transition window; this is only paid
-        // on stale-session recovery and never slows the normal SALE path.
-        await new Promise((resolve) => setTimeout(resolve, 350));
+      // Re-send even when the cancellation reply is unclear: Apex frequently
+      // clears the orphan without acknowledging it, and a SALE that Apex never
+      // accepted cannot double-charge.
+      await new Promise((resolve) => setTimeout(resolve, cancellation.cancelled ? 350 : 700));
+      try {
         saleResult = await callApexEcr(
           config,
           buildSaleEnvelope(config, {
@@ -709,6 +793,12 @@ serve(async (req) => {
           }),
           APEX_SOAP_ACTIONS.sale,
         );
+      } catch (retryError) {
+        console.warn("ApexECR stale-session retry failed", {
+          correlationId,
+          error: retryError instanceof Error ? retryError.message : "unknown",
+        });
+        break;
       }
     }
     console.log("ApexECR sale response", {
