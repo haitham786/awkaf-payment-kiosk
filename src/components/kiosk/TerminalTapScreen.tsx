@@ -176,7 +176,16 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
                   ? "بانتظار البطاقة… / Waiting for card…"
                   : "جاري التحضير… / Preparing…"}
             </p>
+            {slowDispatch && !cancelling && (
+              <p className="text-amber-700 text-[0.7rem] mt-2 leading-snug">
+                شبكة جهاز الدفع بطيئة حالياً، المبلغ في طريقه إلى الجهاز
+                <span className="block text-amber-600/80">
+                  The terminal network is slow right now — the amount is still on its way.
+                </span>
+              </p>
+            )}
           </div>
+
 
           {/* Accepted payment methods */}
           <div className="mt-4 pt-4 w-full border-t border-white/70">
