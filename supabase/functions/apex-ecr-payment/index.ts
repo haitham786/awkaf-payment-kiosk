@@ -595,18 +595,23 @@ serve(async (req) => {
       return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
-    const leaseSeconds = Math.min(300, Math.max(30, Number(config.timeoutSeconds || 90) + 30));
-    const { data: acquisitionRows, error: acquisitionError } = await supabase.rpc(
-      "acquire_apex_terminal_session",
-      {
-        _kiosk_id: kioskId,
-        _terminal_id: config.tid,
-        _transaction_id: transactionId,
-        _lease_seconds: leaseSeconds,
-      },
-    );
-    if (acquisitionError) throw acquisitionError;
-    const acquisition = (Array.isArray(acquisitionRows) ? acquisitionRows[0] : null) as TerminalAcquisition | null;
+    const leaseSeconds = preAcquisition
+      ? saleLeaseSeconds
+      : Math.min(300, Math.max(30, Number(config.timeoutSeconds || 90) + 30));
+    let acquisition = preAcquisition;
+    if (!acquisition) {
+      const { data: acquisitionRows, error: acquisitionError } = await supabase.rpc(
+        "acquire_apex_terminal_session",
+        {
+          _kiosk_id: kioskId,
+          _terminal_id: config.tid,
+          _transaction_id: transactionId,
+          _lease_seconds: leaseSeconds,
+        },
+      );
+      if (acquisitionError) throw acquisitionError;
+      acquisition = (Array.isArray(acquisitionRows) ? acquisitionRows[0] : null) as TerminalAcquisition | null;
+    }
     if (!acquisition) throw new Error("Unable to coordinate the terminal session.");
 
     if (acquisition.acquisition === "completed" && acquisition.stored_result) {
