@@ -14,6 +14,8 @@ interface TerminalTapScreenProps {
   timeoutSeconds?: number;
   /** True while the cancellation is being pushed to the terminal. */
   cancelling?: boolean;
+  /** True when the terminal has not acknowledged the amount within a few seconds. */
+  slowDispatch?: boolean;
 }
 
 /**
@@ -28,7 +30,9 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
   onTimeout,
   timeoutSeconds = 90,
   cancelling = false,
+  slowDispatch = false,
 }) => {
+
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(
     () => localStorage.getItem("kiosk_background_url") || "",
