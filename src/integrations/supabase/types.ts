@@ -530,6 +530,10 @@ export type Database = {
           stored_result: Json
         }[]
       }
+      claim_stale_apex_session: {
+        Args: { _kiosk_id: string; _transaction_id: string }
+        Returns: boolean
+      }
       finish_apex_terminal_session: {
         Args: {
           _kiosk_id: string
