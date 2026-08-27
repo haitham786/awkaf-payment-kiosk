@@ -110,43 +110,13 @@ const HardwarePosPaymentPage = () => {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current || ignoreSaleResultRef.current) return;
       if (error) throw error;
-
-      const result = (data || {}) as ApexResponse;
-
-      if (result.approved) {
-        const ref = result.referenceNumber || result.rrn || transactionId;
-        navigate(
-          `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
-            `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReference}`,
-        );
-        return;
-      }
-
-      if (result.success === false && result.error) {
-        const arabic = result.failureType === "afs_network_block"
-          ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-          : result.failureType === "apex_rejected"
-            ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
-            : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
-        const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-        setRetryAllowed(result.outcomeUnknown !== true);
-        setErrorMessage(`${arabic}\n${result.error}${reference}`);
-        setStage("error");
-        return;
-      }
-
-      // Declined by the card/issuer — the terminal has finished with this session.
-      const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
-        .filter(Boolean)
-        .join(" · ");
-      setDeclineMessage(detail);
-      setStage("declined");
+      applyOutcome((data || {}) as ApexResponse, transactionId);
     } catch (err) {
-      if (cancellingRef.current || ignoreSaleResultRef.current) return;
+      if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
-  }, [amount, category, categoryReference, kioskId, navigate]);
+  }, [amount, applyOutcome, category, kioskId]);
 
   useEffect(() => {
     // The idle readiness loop must never probe while a donor is paying.
@@ -160,16 +130,35 @@ const HardwarePosPaymentPage = () => {
     void startSale();
   }, [startSale]);
 
+  // Outcome recovery: if the sale response is lost in transit (edge isolate
+  // recycled, flaky link), the backend still stored the terminal's outcome.
+  // Poll for it so an approved payment always reaches the Thank-You screen.
   useEffect(() => {
-    // Backend dispatch is normally ~150-250 ms. Anything past this threshold is
-    // terminal/bank-network transit, so it is surfaced instead of a silent wait.
-    if (stage !== "processing") {
-      setSlowDispatch(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setSlowDispatch(true), 6000);
-    return () => window.clearTimeout(timer);
-  }, [stage]);
+    if (stage !== "processing" || !kioskId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
+      const transactionId = transactionIdRef.current;
+      try {
+        const { data } = await supabase.functions.invoke("apex-ecr-payment", {
+          body: { action: "outcome", kioskId, transactionId },
+        });
+        if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
+        const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
+        if (data?.finished && stored) applyOutcome(stored, transactionId);
+      } catch {
+        // Polling is best-effort; the direct sale response remains authoritative.
+      }
+    };
+
+    const interval = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [applyOutcome, kioskId, stage]);
+
 
 
 
