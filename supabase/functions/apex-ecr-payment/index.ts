@@ -699,6 +699,10 @@ serve(async (req) => {
         error: "This payment request is already being processed by the terminal.",
       }, 200, corsHeaders);
     }
+    // Tracks a cancellation sent inside this request, so the SALE below waits
+    // out the same quarantine window as one sent by an earlier request.
+    let cancelDispatchedAt = 0;
+
     if (acquisition.acquisition === "busy") {
       // A kiosk owns exactly one terminal and serves one donor at a time, so a
       // brand-new SALE from this kiosk means the previous session was
@@ -711,6 +715,8 @@ serve(async (req) => {
         previousState: acquisition.session_state,
       });
       const takeover = await cancelAtTerminal();
+      cancelDispatchedAt = Date.now();
+
       await supabase.rpc("finish_apex_terminal_session", {
         _kiosk_id: kioskId,
         _transaction_id: acquisition.owner_transaction_id,
