@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      apex_invoice_map: {
+        Row: {
+          created_at: string
+          invoice_number: string
+          kiosk_id: string
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          invoice_number: string
+          kiosk_id: string
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          invoice_number?: string
+          kiosk_id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apex_invoice_map_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apex_invoice_sequences: {
+        Row: {
+          kiosk_id: string
+          next_value: number
+          updated_at: string
+        }
+        Insert: {
+          kiosk_id: string
+          next_value?: number
+          updated_at?: string
+        }
+        Update: {
+          kiosk_id?: string
+          next_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apex_invoice_sequences_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apex_terminal_sessions: {
         Row: {
           cancel_cooldown_until: string | null
@@ -284,6 +339,75 @@ export type Database = {
           },
         ]
       }
+      pos_diagnostics: {
+        Row: {
+          afs_round_trip_ms: number | null
+          amount_baisas: number | null
+          correlation_id: string | null
+          created_at: string
+          dispatch_attempts: number | null
+          dispatched: boolean | null
+          failure_type: string | null
+          http_status: number | null
+          id: string
+          invoice_number: string | null
+          kiosk_id: string | null
+          outcome: string | null
+          pos_resp_code: string | null
+          pos_resp_status: string | null
+          request_to_dispatch_ms: number | null
+          seconds_since_previous_attempt: number | null
+          session_state_before: string | null
+          transaction_id: string | null
+          web_response_error: string | null
+          web_response_status: string | null
+        }
+        Insert: {
+          afs_round_trip_ms?: number | null
+          amount_baisas?: number | null
+          correlation_id?: string | null
+          created_at?: string
+          dispatch_attempts?: number | null
+          dispatched?: boolean | null
+          failure_type?: string | null
+          http_status?: number | null
+          id?: string
+          invoice_number?: string | null
+          kiosk_id?: string | null
+          outcome?: string | null
+          pos_resp_code?: string | null
+          pos_resp_status?: string | null
+          request_to_dispatch_ms?: number | null
+          seconds_since_previous_attempt?: number | null
+          session_state_before?: string | null
+          transaction_id?: string | null
+          web_response_error?: string | null
+          web_response_status?: string | null
+        }
+        Update: {
+          afs_round_trip_ms?: number | null
+          amount_baisas?: number | null
+          correlation_id?: string | null
+          created_at?: string
+          dispatch_attempts?: number | null
+          dispatched?: boolean | null
+          failure_type?: string | null
+          http_status?: number | null
+          id?: string
+          invoice_number?: string | null
+          kiosk_id?: string | null
+          outcome?: string | null
+          pos_resp_code?: string | null
+          pos_resp_status?: string | null
+          request_to_dispatch_ms?: number | null
+          seconds_since_previous_attempt?: number | null
+          session_state_before?: string | null
+          transaction_id?: string | null
+          web_response_error?: string | null
+          web_response_status?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -517,6 +641,10 @@ export type Database = {
           _transaction_id: string
         }
         Returns: boolean
+      }
+      apex_invoice_for: {
+        Args: { _kiosk_id: string; _transaction_id: string }
+        Returns: string
       }
       begin_apex_sale: {
         Args: {

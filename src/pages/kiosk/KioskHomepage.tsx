@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
 import { persistPaymentMode } from "@/lib/kioskConfig";
-import { warmHardwarePos } from "@/lib/hardwarePosWarm";
+import { markKioskIdleOnHome, warmHardwarePos } from "@/lib/hardwarePosWarm";
 
 
 
@@ -40,6 +40,9 @@ const KioskHomepage = () => {
   const [kioskMessage, setKioskMessage] = useState('');
 
   useEffect(() => {
+    // The donor is idle on the home screen: this is the only context in which
+    // the readiness loop may release a stale terminal session (after 2 min).
+    markKioskIdleOnHome();
     checkKioskStatus();
     loadCategories();
     
@@ -128,6 +131,9 @@ const KioskHomepage = () => {
 
   const handleCategorySelect = (categoryId: string) => {
     if (kioskStatus !== 'active') return;
+    // The donor has started a donation: warm the terminal route now so the SALE
+    // at confirmation finds a hot isolate and an open TLS session.
+    void warmHardwarePos();
     navigate(`/kiosk/preset-amounts?category=${categoryId}`);
   };
 

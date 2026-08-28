@@ -37,6 +37,13 @@ export interface ApexEcrConfig {
   tenant?: string;
   /** Seconds to wait for the donor to tap the card at the terminal. */
   timeoutSeconds?: number;
+  /**
+   * Warm-up probe style. "wsdl" (default) only opens the TLS route to the AFS
+   * host; "enquiry" additionally sends a non-financial EnquiryByRef with
+   * impossible references. Use "enquiry" only after AFS confirms such probes
+   * are allowed to reach the terminal.
+   */
+  warmProbeMode?: "wsdl" | "enquiry";
 }
 
 export interface ApexSaleRequest {
@@ -246,7 +253,10 @@ export function isApprovedPosResponse(
 ): boolean {
   const status = String(posRespStatus || "").trim().toLowerCase();
   if (["1", "true", "approved", "approve", "success"].includes(status)) return true;
-  if (["0", "-1", "false", "declined", "decline"].includes(status)) return false;
+  // "-1" is documented as UNKNOWN, not declined: it must fall through to the
+  // issuer-response check below and ultimately to the enquiry path, or a live
+  // approval could be shown to the donor as a failure.
+  if (["0", "false", "declined", "decline"].includes(status)) return false;
 
   // Status missing/unknown: fall back to the issuer response.
   const code = String(posRespCode || "").trim();

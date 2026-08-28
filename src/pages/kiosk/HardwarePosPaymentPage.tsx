@@ -26,6 +26,9 @@ interface ApexResponse {
   correlationId?: string;
   failureType?: string;
   outcomeUnknown?: boolean;
+  /** False only when the backend guarantees no Sale command ever reached AFS. */
+  dispatched?: boolean;
+  dispatchAttempts?: number;
 }
 
 interface CancellationResponse {
@@ -55,6 +58,7 @@ const HardwarePosPaymentPage = () => {
   // Every attempt gets its own transaction id so the terminal never sees a
   // repeated invoice number after a decline or a cancelled session.
   const transactionIdRef = useRef<string>(searchParams.get("transactionId") || crypto.randomUUID());
+  const dispatchRetriedRef = useRef(false);
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
@@ -170,7 +174,20 @@ const HardwarePosPaymentPage = () => {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current || ignoreSaleResultRef.current) return;
       if (error) throw error;
-      applyOutcome((data || {}) as ApexResponse, transactionId);
+      const response = (data || {}) as ApexResponse;
+      // dispatched === false is the backend's guarantee that no Sale command
+      // ever left for AFS, so retrying once with a fresh transaction id is
+      // provably safe (no double charge possible) and invisible to the donor.
+      if (response.dispatched === false && !dispatchRetriedRef.current) {
+        dispatchRetriedRef.current = true;
+        console.warn("Sale was never dispatched; retrying once with a new transaction", response.failureType);
+        transactionIdRef.current = crypto.randomUUID();
+        startedRef.current = false;
+        recoveryDeadlineRef.current = Date.now() + RECOVERY_WINDOW_MS;
+        window.setTimeout(() => void startSale(), 0);
+        return;
+      }
+      applyOutcome(response, transactionId);
     } catch (err) {
       if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
       // The request itself failed, so the card may still have been charged.
@@ -304,6 +321,7 @@ const HardwarePosPaymentPage = () => {
     if (!retryAllowed) return;
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
+    dispatchRetriedRef.current = false;
     ignoreSaleResultRef.current = false;
     outcomeHandledRef.current = false;
     pendingUnknownRef.current = null;
