@@ -7,9 +7,6 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  THAWANI_MAVEN_USER: ThawaniMobile
-  THAWANI_MAVEN_TOKEN: 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
-  LAMSA_SDK_VERSION: 0.0.31
 
 permissions:
   contents: write
@@ -115,36 +112,6 @@ jobs:
       # Thawani Lamsa SDK is distributed via GitHub Packages with PUBLIC credentials
       # published in their official integration docs: https://thawani.gitbook.io/lamsa
       # These are NOT private - Thawani publishes them so any developer can pull the SDK.
-      - name: Set Thawani Maven credentials (public, from Thawani docs)
-        shell: bash
-        run: |
-          set -euxo pipefail
-          test -n "${THAWANI_MAVEN_USER:-}"
-          test -n "${THAWANI_MAVEN_TOKEN:-}"
-          test -n "${LAMSA_SDK_VERSION:-}"
-
-      - name: Verify Thawani SDK package access
-        shell: bash
-        env:
-          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
-          LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
-        run: |
-          set -euxo pipefail
-          # GitHub Packages returns 302 redirect to the actual blob URL on objects.githubusercontent.com.
-          # Use -L to follow redirects so we get the final 200 OK from the storage backend.
-          STATUS_CODE="$(curl -sSL -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/${LAMSA_SDK_VERSION}/lamsa.sdk-${LAMSA_SDK_VERSION}.pom" || true)"
-          echo "Thawani SDK ${LAMSA_SDK_VERSION} POM check: HTTP ${STATUS_CODE}"
-          # Accept 200 (direct hit) or 302 (redirect — package exists, follow chain may strip auth header)
-          if [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "302" ]; then
-            echo "::error::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} from GitHub Packages (HTTP ${STATUS_CODE})."
-            echo "::error::This usually means Thawani rotated their public credentials in the docs."
-            echo "::error::Check https://thawani.gitbook.io/lamsa for the latest username/token."
-            cat /tmp/thawani-sdk-check.txt || true
-            exit 1
-          fi
-          echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible"
-
       - name: Ensure Maven repositories (JitPack + Thawani)
         shell: bash
         env:
