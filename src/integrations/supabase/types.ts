@@ -10,12 +10,13 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
       apex_terminal_sessions: {
         Row: {
+          cancel_cooldown_until: string | null
           cancel_requested: boolean
           created_at: string
           kiosk_id: string
@@ -28,6 +29,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_cooldown_until?: string | null
           cancel_requested?: boolean
           created_at?: string
           kiosk_id: string
@@ -40,6 +42,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_cooldown_until?: string | null
           cancel_requested?: boolean
           created_at?: string
           kiosk_id?: string
@@ -501,6 +504,7 @@ export type Database = {
         }
         Returns: {
           acquisition: string
+          cancel_cooldown_until: string
           owner_transaction_id: string
           session_state: string
           stored_result: Json
@@ -522,6 +526,7 @@ export type Database = {
         }
         Returns: {
           acquisition: string
+          cancel_cooldown_until: string
           configuration: Json
           kiosk_status: string
           owner_transaction_id: string
@@ -550,6 +555,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      mark_apex_cancel_dispatched: {
+        Args: { _cooldown_ms?: number; _kiosk_id: string }
+        Returns: undefined
       }
       request_apex_terminal_cancellation: {
         Args: { _kiosk_id: string; _transaction_id: string }

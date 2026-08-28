@@ -27,7 +27,17 @@ interface TerminalAcquisition {
   owner_transaction_id: string;
   session_state: string;
   stored_result: Record<string, unknown> | null;
+  cancel_cooldown_until?: string | null;
 }
+
+/**
+ * AFS applies a CANCEL to whatever transaction is arriving at the terminal, so
+ * a SALE sent too soon after a cancellation comes back as "Cancelled By ECR".
+ * Every cancellation therefore opens a short quarantine window that the next
+ * SALE must respect before it is dispatched.
+ */
+const CANCEL_QUARANTINE_MS = 900;
+
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
 function invoiceNumberFor(transactionId: string): string {
@@ -47,8 +57,12 @@ function classifyFailure(result: { httpStatus?: number; contentType?: string; we
   if (result.httpStatus === 522 || /WAF|HTML page/i.test(result.webResponseErrorDesc)) return "afs_network_block";
   if (result.faultCode || result.faultMessage) return "soap_fault";
   if (result.httpStatus && result.httpStatus >= 400) return "afs_http_error";
+  // "Cancelled By ECR": AFS applied a cancellation to this SALE. The card was
+  // never read, so this is a clean, safely retryable outcome — not a decline.
+  if (/cancell?ed\s+by\s+ecr|cancell?ed/i.test(result.webResponseErrorDesc)) return "terminal_cancelled";
   return "apex_rejected";
 }
+
 
 function safeApexError(result: { webResponseErrorDesc: string; posRespText: string; posRespCode: string }): string {
   const message = result.webResponseErrorDesc || result.posRespText;
@@ -196,6 +210,7 @@ serve(async (req) => {
           owner_transaction_id: string | null;
           session_state: string | null;
           stored_result: Record<string, unknown> | null;
+          cancel_cooldown_until: string | null;
         }
         | null;
       if (!begun || begun.kiosk_status === "missing") {
@@ -210,8 +225,10 @@ serve(async (req) => {
           owner_transaction_id: begun.owner_transaction_id ?? "",
           session_state: begun.session_state ?? "",
           stored_result: begun.stored_result,
+          cancel_cooldown_until: begun.cancel_cooldown_until,
         };
       }
+
     } else {
       // Only load this kiosk. MID/TID uniqueness is enforced when configuration
       // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
@@ -240,13 +257,18 @@ serve(async (req) => {
     const releasePreAcquisitionIfHeld = async () => {
       if (preAcquisition?.acquisition !== "acquired") return;
       preAcquisition = null;
-      await supabase.rpc("finish_apex_terminal_session", {
-        _kiosk_id: kioskId,
-        _transaction_id: transactionId,
-        _state: "failed",
-        _result: { success: false, approved: false, reason: "sale_not_dispatched" },
-      }).catch(() => undefined);
+      try {
+        await supabase.rpc("finish_apex_terminal_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: transactionId,
+          _state: "failed",
+          _result: { success: false, approved: false, reason: "sale_not_dispatched" },
+        });
+      } catch {
+        // Lease expiry is the backstop if the release itself fails.
+      }
     };
+
 
     if (kioskStatus !== "active") {
       await releasePreAcquisitionIfHeld();
@@ -358,13 +380,40 @@ serve(async (req) => {
     }
 
     /**
+     * Waits out the quarantine window opened by a recent cancellation, so a
+     * SALE is never dispatched while AFS is still applying a CANCEL to this
+     * terminal. Bounded, and normally already elapsed by the time we get here.
+     */
+    const waitForCancelQuarantine = async (until?: string | null) => {
+      if (!until) return 0;
+      const remaining = new Date(until).getTime() - Date.now();
+      if (!(remaining > 0)) return 0;
+      const waitMs = Math.min(remaining, CANCEL_QUARANTINE_MS);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return waitMs;
+    };
+
+    /**
      * Sends RequestCancellation to the terminal. Kept on a short timeout so the
      * donor never waits: the terminal must drop back to its idle screen quickly.
      * Retried once because a terminal that is mid-prompt can reject the first
-     * cancellation while it switches state.
+     * cancellation while it switches state. Every attempt opens the quarantine
+     * window above so the next SALE cannot collide with it.
      */
     const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
       let lastError: string | undefined;
+      const noteCancelDispatched = async () => {
+        try {
+          await supabase.rpc("mark_apex_cancel_dispatched", {
+            _kiosk_id: kioskId,
+            _cooldown_ms: CANCEL_QUARANTINE_MS,
+          });
+        } catch {
+          // Best effort: the in-request quarantine below still applies.
+        }
+      };
+
+
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const result = await callApexEcr(
@@ -373,6 +422,7 @@ serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
+          void noteCancelDispatched();
           if (
             isSuccessfulWebResponse(result.webResponseStatus) ||
             /transaction\s+not\s+found|no\s+(?:active|pending)\s+transaction/i.test(result.webResponseErrorDesc)
@@ -381,12 +431,15 @@ serve(async (req) => {
           }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
         } catch (err) {
+          void noteCancelDispatched();
           lastError = err instanceof Error ? err.message : "Cancellation failed";
         }
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
       return { cancelled: false, error: lastError };
     };
+
+
 
     // ------------------------------------------------------------------ warm
     // Idle readiness probe. Keeps this isolate hot, primes the terminal
@@ -484,7 +537,7 @@ serve(async (req) => {
         .maybeSingle();
 
       // Cancelled sessions are owned by the cancellation path.
-      const finishedStates = ["approved", "declined", "failed"];
+      const finishedStates = ["approved", "declined", "failed", "rejected"];
 
       const matches = sessionRow?.transaction_id === transactionId;
       const state = matches ? String(sessionRow?.state || "missing") : "missing";
@@ -575,7 +628,7 @@ serve(async (req) => {
       if (ownershipError) throw ownershipError;
       const ownership = Array.isArray(ownershipRows) ? ownershipRows[0] : null;
       if (ownership?.allowed !== true) {
-        const alreadyFinished = ["approved", "declined", "failed", "cancelled"].includes(String(ownership?.session_state || ""));
+        const alreadyFinished = ["approved", "declined", "failed", "rejected", "cancelled"].includes(String(ownership?.session_state || ""));
         return json({
           success: alreadyFinished,
           cancelled: ownership?.session_state === "cancelled",
@@ -657,6 +710,10 @@ serve(async (req) => {
         error: "This payment request is already being processed by the terminal.",
       }, 200, corsHeaders);
     }
+    // Tracks a cancellation sent inside this request, so the SALE below waits
+    // out the same quarantine window as one sent by an earlier request.
+    let cancelDispatchedAt = 0;
+
     if (acquisition.acquisition === "busy") {
       // A kiosk owns exactly one terminal and serves one donor at a time, so a
       // brand-new SALE from this kiosk means the previous session was
@@ -669,6 +726,8 @@ serve(async (req) => {
         previousState: acquisition.session_state,
       });
       const takeover = await cancelAtTerminal();
+      cancelDispatchedAt = Date.now();
+
       await supabase.rpc("finish_apex_terminal_session", {
         _kiosk_id: kioskId,
         _transaction_id: acquisition.owner_transaction_id,
@@ -697,22 +756,53 @@ serve(async (req) => {
           error: "The terminal is still finishing the previous payment. Please try again in a moment.",
         }, 200, corsHeaders);
       }
-      // Short state-transition window after clearing the previous prompt.
-      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
+
     if (acquisition.acquisition === "stale_recovery") {
-      console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid });
-      const recovered = await cancelAtTerminal();
-      if (!recovered.cancelled) {
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: acquisition.owner_transaction_id,
-          _state: "unknown",
-          _result: { success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." },
-        });
-        return json({ success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." }, 200, corsHeaders);
+      // Enquiry first. Blindly cancelling here is what produced most of the
+      // "Cancelled By ECR" rejections: the cancellation caught the SALE that
+      // was dispatched moments later instead of the abandoned session. We only
+      // cancel when the terminal itself says a transaction is still live.
+      let needsCancel = false;
+      try {
+        const priorEnquiry = await callApexEcr(
+          config,
+          buildEnquiryByRefEnvelope(
+            config,
+            invoiceNumberFor(acquisition.owner_transaction_id),
+            "",
+            "",
+            acquisition.owner_transaction_id,
+          ),
+          APEX_SOAP_ACTIONS.enquiryByRef,
+          8000,
+        );
+        needsCancel = isAnotherTransactionInProgress(
+          priorEnquiry.webResponseErrorDesc || priorEnquiry.posRespText || "",
+        );
+      } catch {
+        // The enquiry could not be answered. Sending a cancellation on a guess
+        // risks killing the SALE we are about to send, so we skip it.
+        needsCancel = false;
       }
+      console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid, needsCancel });
+
+      if (needsCancel) {
+        const recovered = await cancelAtTerminal();
+        cancelDispatchedAt = Date.now();
+
+        if (!recovered.cancelled) {
+          await supabase.rpc("finish_apex_terminal_session", {
+            _kiosk_id: kioskId,
+            _transaction_id: acquisition.owner_transaction_id,
+            _state: "unknown",
+            _result: { success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." },
+          });
+          return json({ success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." }, 200, corsHeaders);
+        }
+      }
+
       const { data: activated, error: activationError } = await supabase.rpc(
         "activate_recovered_apex_session",
         { _kiosk_id: kioskId, _transaction_id: transactionId, _lease_seconds: leaseSeconds },
@@ -720,16 +810,26 @@ serve(async (req) => {
       if (activationError || activated !== true) {
         return json({ success: false, approved: false, failureType: "terminal_busy", outcomeUnknown: true, error: "The terminal session changed during recovery. Please wait before trying again." }, 200, corsHeaders);
       }
-      await new Promise((resolve) => setTimeout(resolve, 350));
     }
+
+    // Never let a SALE collide with a cancellation AFS is still applying —
+    // whether that cancellation came from this request or an earlier one.
+    const quarantineWaitMs = await waitForCancelQuarantine(
+      cancelDispatchedAt
+        ? new Date(cancelDispatchedAt + CANCEL_QUARANTINE_MS).toISOString()
+        : acquisition.cancel_cooldown_until,
+    );
+
 
     const saleDispatchStartedAt = Date.now();
     console.log("ApexECR sale dispatch", {
       correlationId,
       tid: config.tid,
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
+      quarantineWaitMs,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
+
     let saleResult: ApexEcrResult;
     try {
       saleResult = await callApexEcr(
@@ -781,8 +881,12 @@ serve(async (req) => {
 
       // Re-send even when the cancellation reply is unclear: Apex frequently
       // clears the orphan without acknowledging it, and a SALE that Apex never
-      // accepted cannot double-charge.
-      await new Promise((resolve) => setTimeout(resolve, cancellation.cancelled ? 350 : 700));
+      // accepted cannot double-charge. The quarantine window still applies, or
+      // AFS applies this cancellation to the SALE we are about to re-send.
+      await new Promise((resolve) =>
+        setTimeout(resolve, cancellation.cancelled ? CANCEL_QUARANTINE_MS : CANCEL_QUARANTINE_MS + 350)
+      );
+
       try {
         saleResult = await callApexEcr(
           config,
@@ -813,7 +917,47 @@ serve(async (req) => {
       posRespText: saleResult.posRespText,
     });
 
+    // "Cancelled By ECR" is AFS applying a cancellation to this SALE. The card
+    // was never read, no amount reached the terminal and nothing can be double
+    // charged, so we wait out the quarantine and re-send once. This is the
+    // single largest source of "the amount never appeared on the terminal".
+    if (
+      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
+      classifyFailure(saleResult) === "terminal_cancelled"
+    ) {
+      const { data: liveSession } = await supabase
+        .from("apex_terminal_sessions")
+        .select("transaction_id, cancel_requested, state")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+      const donorCancelled = liveSession?.cancel_requested === true ||
+        ["cancelling", "cancelled"].includes(String(liveSession?.state || ""));
+      const stillOurs = liveSession?.transaction_id === transactionId;
+
+      if (stillOurs && !donorCancelled) {
+        console.warn("ApexECR re-sending SALE after ECR cancellation", { correlationId, tid: config.tid });
+        await new Promise((resolve) => setTimeout(resolve, CANCEL_QUARANTINE_MS));
+        try {
+          saleResult = await callApexEcr(
+            config,
+            buildSaleEnvelope(config, {
+              amount: baisasToDecimalString(amount),
+              invoiceNumber,
+              referenceNumber: transactionId,
+            }),
+            APEX_SOAP_ACTIONS.sale,
+          );
+        } catch (resendError) {
+          console.warn("ApexECR SALE re-send failed", {
+            correlationId,
+            error: resendError instanceof Error ? resendError.message : "unknown",
+          });
+        }
+      }
+    }
+
     if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
+
       const failureType = classifyFailure(saleResult);
       const apexError = safeApexError(saleResult);
       console.error("ApexECR request failed", {
@@ -832,10 +976,15 @@ serve(async (req) => {
           invoiceNumber,
           correlationId,
           failureType,
+          // A terminal-side cancellation is a clean, known outcome: nothing was
+          // charged, so it must not keep the donor on a recovery screen.
           outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
+          retryable: failureType === "terminal_cancelled",
           error: failureType === "afs_network_block"
             ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
-            : apexError,
+            : failureType === "terminal_cancelled"
+              ? "The terminal cleared this request before the card was read. Please try again."
+              : apexError,
           diagnostics: {
             httpStatus: saleResult.httpStatus ?? null,
             contentType: saleResult.contentType ?? null,
@@ -849,12 +998,20 @@ serve(async (req) => {
             posRespText: saleResult.posRespText || null,
           },
         };
+      // Every terminal outcome closes the lease — including this one — so a
+      // rejected sale can never leave the session "active" and block the next
+      // donor behind a stale-recovery cancellation.
       await supabase.rpc("finish_apex_terminal_session", {
         _kiosk_id: kioskId,
         _transaction_id: transactionId,
-        _state: responseBody.outcomeUnknown ? "unknown" : "failed",
+        _state: responseBody.outcomeUnknown
+          ? "unknown"
+          : failureType === "terminal_cancelled"
+            ? "rejected"
+            : "failed",
         _result: responseBody,
       });
+
       return json(responseBody, 200, corsHeaders);
     }
 
