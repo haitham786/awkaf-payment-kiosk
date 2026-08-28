@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedPaymentMode } from "@/lib/kioskConfig";
+import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 /**
  * Keeps the hardware POS path permanently ready.
@@ -31,6 +31,14 @@ let keepAliveUsers = 0;
 let consecutiveFailures = 0;
 let sessionBusy = false;
 let loopTimer: number | null = null;
+// Set when the donor is sitting idle on the home screen. Stale-terminal release
+// is only allowed after two uninterrupted minutes there, so a periodic probe
+// can never clear a terminal session while a donor is mid-donation.
+let idleOnHomeSince = 0;
+
+export function markKioskIdleOnHome() {
+  idleOnHomeSince = Date.now();
+}
 
 let snapshot: ReadinessSnapshot = { status: "unknown", checkedAt: 0 };
 const listeners = new Set<(snapshot: ReadinessSnapshot) => void>();
@@ -67,6 +75,7 @@ function canWarmHardwarePos(): { kioskId: string } | null {
 export function setHardwarePosSessionBusy(busy: boolean) {
   sessionBusy = busy;
   if (busy) {
+    idleOnHomeSince = 0;
     publish("busy");
     if (loopTimer !== null) {
       window.clearTimeout(loopTimer);
@@ -137,13 +146,37 @@ function runProbe() {
     return;
   }
 
-  void warmHardwarePos(true, true).finally(() => {
+  // Stale release is gated on genuine idle time at the home screen: a periodic
+  // probe that fires while a donor is anywhere else in the flow must never
+  // carry release authority — the backend re-checks too, but the kiosk is the
+  // first line of defence against cancelling a live payment prompt.
+  const idleLongEnough = idleOnHomeSince > 0 && Date.now() - idleOnHomeSince > 120_000;
+  void warmHardwarePos(true, idleLongEnough).finally(() => {
     if (keepAliveUsers === 0 || sessionBusy) return;
     const backoff = consecutiveFailures > 0
       ? Math.min(MAX_BACKOFF_MS, READY_INTERVAL_MS * 2 ** Math.min(consecutiveFailures, 4))
       : READY_INTERVAL_MS;
     scheduleNextProbe(backoff);
   });
+}
+
+/**
+ * Cold-install bootstrap: the readiness loop used to stay silent until a kiosk
+ * config fetch had cached the payment mode, so the very first payment after an
+ * install paid the full cold-start cost. This fetches the configuration first
+ * when the kiosk id is known but nothing is cached yet, so the keep-alive and
+ * warm probes work from the first app launch.
+ */
+export async function ensureHardwarePosReadiness(): Promise<boolean> {
+  if (canWarmHardwarePos()) return true;
+  try {
+    const kioskId = localStorage.getItem("kiosk_id");
+    if (!kioskId) return false;
+    await loadKioskRuntimeConfig(kioskId);
+    return canWarmHardwarePos() !== null;
+  } catch {
+    return false;
+  }
 }
 
 /**

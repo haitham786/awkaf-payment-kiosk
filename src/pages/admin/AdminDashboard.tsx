@@ -310,6 +310,10 @@ const AdminDashboard = () => {
               <BarChart3 className="mr-2 h-4 w-4" />
               Enhanced Statistics
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/pos-diagnostics')}>
+              <Activity className="mr-2 h-4 w-4" />
+              POS Diagnostics
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/sms-settings')}>
               <Settings className="mr-2 h-4 w-4" />
               SMS Settings

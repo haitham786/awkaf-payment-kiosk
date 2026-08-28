@@ -145,7 +145,7 @@ const ConfirmationPage = () => {
             variant="outline"
             size="xl"
             soundEffect="navigation"
-            onClick={handleConfirm}
+            onPointerDown={handleConfirm}
             className="min-w-[160px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
             <span className="flex flex-col items-end">
