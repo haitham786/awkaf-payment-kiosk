@@ -3,6 +3,8 @@ import {
   baisasToDecimalString,
   buildSaleEnvelope,
   isAnotherTransactionInProgress,
+  isNoTransactionFound,
+  isSafePreDispatchFailure,
   isSuccessfulWebResponse,
   parseApexResponse,
   type ApexEcrConfig,
@@ -58,4 +60,18 @@ Deno.test("recognizes the Apex terminal-busy response for stale-session recovery
     true,
   );
   assertEquals(isAnotherTransactionInProgress("Terminal is offline"), false);
+});
+
+Deno.test("only retries AFS failures proven to happen before terminal dispatch", () => {
+  assertEquals(isSafePreDispatchFailure(
+    "Connection Timeout Expired while attempting to consume the pre-login handshake acknowledgement",
+  ), true);
+  assertEquals(isSafePreDispatchFailure("The terminal did not respond in time"), false);
+  assertEquals(isSafePreDispatchFailure("Cancelled By ECR"), false);
+});
+
+Deno.test("recognizes explicit no-transaction enquiry results", () => {
+  assertEquals(isNoTransactionFound("Transaction not found"), true);
+  assertEquals(isNoTransactionFound("No matching transaction"), true);
+  assertEquals(isNoTransactionFound("Connection timeout"), false);
 });

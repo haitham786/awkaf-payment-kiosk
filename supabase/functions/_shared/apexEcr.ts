@@ -276,6 +276,24 @@ export function isAnotherTransactionInProgress(message: string): boolean {
     .test(String(message || ""));
 }
 
+/**
+ * Failures that AFS reports before a Sale can be handed to the terminal. These
+ * are safe to retry with the exact same transaction/invoice reference. Keep
+ * this deliberately narrow: an ordinary network timeout is outcome-unknown
+ * and must be reconciled instead of replayed.
+ */
+export function isSafePreDispatchFailure(message: string): boolean {
+  const value = String(message || "");
+  return /pre-login\s+handshake|while\s+attempting\s+to\s+connect\s+to\s+this\s+server|database\s+(?:connection|login)\s+(?:timeout|failed)|sql\s+server\s+(?:is\s+)?(?:unavailable|not\s+accessible)/i
+    .test(value);
+}
+
+/** AFS explicitly confirms that no terminal transaction exists for a reference. */
+export function isNoTransactionFound(message: string): boolean {
+  return /transaction\s+not\s+found|no\s+(?:active|pending|matching)\s+transaction|reference\s+(?:was\s+)?not\s+found|record\s+not\s+found/i
+    .test(String(message || ""));
+}
+
 /** Last four digits of a masked PAN such as "470468******4250". */
 export function panLastFour(pan: string): string | null {
   const digits = String(pan || "").replace(/[^0-9]/g, "");

@@ -11,6 +11,8 @@ import {
   callApexEcr,
   APEX_SOAP_ACTIONS,
   isAnotherTransactionInProgress,
+  isSafePreDispatchFailure,
+  isNoTransactionFound,
   isSuccessfulWebResponse,
   isApprovedPosResponse,
   redactApexRaw,
@@ -498,9 +500,49 @@ serve(async (req) => {
       );
     } catch (saleError) {
       const message = saleError instanceof Error ? saleError.message : "Terminal request failed.";
-      const responseBody = { success: false, approved: false, timedOut: /abort/i.test(message), outcomeUnknown: true, failureType: "terminal_timeout", error: /abort/i.test(message) ? "The terminal did not respond in time." : message };
-      await supabase.rpc("finish_apex_terminal_session", { _kiosk_id: kioskId, _transaction_id: transactionId, _state: "unknown", _result: responseBody });
-      return json(responseBody, 200, corsHeaders);
+      console.warn("ApexECR Sale transport failed; reconciling", { correlationId, tid: config.tid, error: message });
+      try {
+        const enquiry = await callApexEcr(
+          config,
+          buildEnquiryByRefEnvelope(config, invoiceNumber, "", "", transactionId),
+          APEX_SOAP_ACTIONS.enquiryByRef,
+          15000,
+        );
+        if (isSuccessfulWebResponse(enquiry.webResponseStatus) && enquiry.approved) {
+          saleResult = enquiry;
+        } else {
+          const enquiryError = safeApexError(enquiry);
+          const definitelyMissing = isNoTransactionFound(enquiryError);
+          const responseBody = {
+            success: false,
+            approved: false,
+            timedOut: /abort/i.test(message),
+            outcomeUnknown: !definitelyMissing,
+            failureType: definitelyMissing ? "terminal_unavailable" : "terminal_timeout",
+            error: definitelyMissing ? "AFS did not deliver the request to the terminal." : "The payment outcome could not be confirmed. Please do not retry yet.",
+            correlationId,
+          };
+          await supabase.rpc("finish_apex_terminal_session", {
+            _kiosk_id: kioskId,
+            _transaction_id: transactionId,
+            _state: definitelyMissing ? "failed" : "unknown",
+            _result: responseBody,
+          });
+          return json(responseBody, 200, corsHeaders);
+        }
+      } catch {
+        const responseBody = {
+          success: false,
+          approved: false,
+          timedOut: /abort/i.test(message),
+          outcomeUnknown: true,
+          failureType: "terminal_timeout",
+          error: "The payment outcome could not be confirmed. Please do not retry yet.",
+          correlationId,
+        };
+        await supabase.rpc("finish_apex_terminal_session", { _kiosk_id: kioskId, _transaction_id: transactionId, _state: "unknown", _result: responseBody });
+        return json(responseBody, 200, corsHeaders);
+      }
     }
 
     console.log("ApexECR sale response", {
@@ -558,9 +600,66 @@ serve(async (req) => {
       posRespText: saleResult.posRespText,
     });
 
+    // AFS occasionally fails before handing the Sale to the terminal because
+    // its own database cannot complete the pre-login handshake. That response
+    // proves the terminal did not receive the Sale, so replay the identical
+    // transaction once after a bounded delay. Never replay generic timeouts.
+    if (
+      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
+      isSafePreDispatchFailure(safeApexError(saleResult))
+    ) {
+      console.warn("ApexECR safe transient failure; retrying Sale", {
+        correlationId,
+        tid: config.tid,
+        firstAttemptMs: saleResult.elapsedMs ?? null,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      saleResult = await callApexEcr(
+        config,
+        buildSaleEnvelope(config, {
+          amount: baisasToDecimalString(amount),
+          invoiceNumber,
+          referenceNumber: transactionId,
+        }),
+        APEX_SOAP_ACTIONS.sale,
+      );
+      console.log("ApexECR Sale retry response", {
+        correlationId,
+        tid: config.tid,
+        elapsedMs: saleResult.elapsedMs ?? null,
+        webResponseStatus: saleResult.webResponseStatus,
+        posRespStatus: saleResult.posRespStatus,
+      });
+    }
+
     if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
       const failureType = classifyFailure(saleResult);
       const apexError = safeApexError(saleResult);
+      let outcomeUnknown = failureType === "afs_network_block" || failureType === "afs_http_error" || failureType === "soap_fault";
+
+      // A failed web response can still hide a completed terminal transaction.
+      // Reconcile the original invoice before declaring it safe to retry.
+      if (!isSafePreDispatchFailure(apexError)) {
+        try {
+          const enquiry = await callApexEcr(
+            config,
+            buildEnquiryByRefEnvelope(config, invoiceNumber, saleResult.posRRN || "", saleResult.posAuthCode || "", transactionId),
+            APEX_SOAP_ACTIONS.enquiryByRef,
+            15000,
+          );
+          if (isSuccessfulWebResponse(enquiry.webResponseStatus) && enquiry.approved) {
+            saleResult = enquiry;
+          } else {
+            outcomeUnknown = !isNoTransactionFound(safeApexError(enquiry));
+          }
+        } catch {
+          outcomeUnknown = true;
+        }
+      }
+
+      if (saleResult.approved) {
+        console.log("ApexECR failed response reconciled as approved", { correlationId, tid: config.tid });
+      } else {
       console.error("ApexECR request failed", {
         correlationId,
         operation: "Sale",
@@ -577,7 +676,7 @@ serve(async (req) => {
           invoiceNumber,
           correlationId,
           failureType,
-          outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
+          outcomeUnknown,
           error: failureType === "afs_network_block"
             ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
             : apexError,
@@ -601,6 +700,7 @@ serve(async (req) => {
         _result: responseBody,
       });
       return json(responseBody, 200, corsHeaders);
+      }
     }
 
     // Ambiguous approval: AFS accepted the request but the terminal-level
