@@ -4,6 +4,7 @@ import {
   assertStringIncludes,
 } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
+  type ApexEcrConfig,
   baisasToDecimalString,
   buildSaleEnvelope,
   isAnotherTransactionInProgress,
@@ -11,7 +12,6 @@ import {
   isSafePreDispatchFailure,
   isSuccessfulWebResponse,
   parseApexResponse,
-  type ApexEcrConfig,
 } from "../_shared/apexEcr.ts";
 
 const config: ApexEcrConfig = {
