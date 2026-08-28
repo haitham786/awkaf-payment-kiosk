@@ -965,10 +965,15 @@ serve(async (req) => {
           invoiceNumber,
           correlationId,
           failureType,
+          // A terminal-side cancellation is a clean, known outcome: nothing was
+          // charged, so it must not keep the donor on a recovery screen.
           outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
+          retryable: failureType === "terminal_cancelled",
           error: failureType === "afs_network_block"
             ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
-            : apexError,
+            : failureType === "terminal_cancelled"
+              ? "The terminal cleared this request before the card was read. Please try again."
+              : apexError,
           diagnostics: {
             httpStatus: saleResult.httpStatus ?? null,
             contentType: saleResult.contentType ?? null,
@@ -982,12 +987,20 @@ serve(async (req) => {
             posRespText: saleResult.posRespText || null,
           },
         };
+      // Every terminal outcome closes the lease — including this one — so a
+      // rejected sale can never leave the session "active" and block the next
+      // donor behind a stale-recovery cancellation.
       await supabase.rpc("finish_apex_terminal_session", {
         _kiosk_id: kioskId,
         _transaction_id: transactionId,
-        _state: responseBody.outcomeUnknown ? "unknown" : "failed",
+        _state: responseBody.outcomeUnknown
+          ? "unknown"
+          : failureType === "terminal_cancelled"
+            ? "rejected"
+            : "failed",
         _result: responseBody,
       });
+
       return json(responseBody, 200, corsHeaders);
     }
 
