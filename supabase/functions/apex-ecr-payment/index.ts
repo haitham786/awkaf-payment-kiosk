@@ -745,9 +745,8 @@ serve(async (req) => {
           error: "The terminal is still finishing the previous payment. Please try again in a moment.",
         }, 200, corsHeaders);
       }
-      // Short state-transition window after clearing the previous prompt.
-      await new Promise((resolve) => setTimeout(resolve, 300));
     }
+
 
     if (acquisition.acquisition === "stale_recovery") {
       // Enquiry first. Blindly cancelling here is what produced most of the
