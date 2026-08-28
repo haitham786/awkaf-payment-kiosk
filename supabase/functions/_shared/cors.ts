@@ -34,10 +34,6 @@ export function getCorsHeaders(req: Request): Record<string, string> {
     'Access-Control-Allow-Origin': allowed ? origin : 'https://awkaf-payment-kiosk.lovable.app',
     'Access-Control-Allow-Headers':
       'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    // Cache the preflight for a day. Without this every kiosk call pays an
-    // extra 250-400 ms OPTIONS round trip before the SALE can even start.
-    'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   };
 }

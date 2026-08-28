@@ -30,13 +30,12 @@ import AddAdminPage from "./pages/admin/AddAdminPage";
 import SMSSettings from "./pages/admin/SMSSettings";
 import WhatsAppSettings from "./pages/admin/WhatsAppSettings";
 import EnhancedStatistics from "./pages/admin/EnhancedStatistics";
-import PosDiagnosticsPage from "./pages/admin/PosDiagnosticsPage";
 import ProfilePage from "./pages/admin/ProfilePage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
 import { startBackgroundSync } from "./services/offlineQueueService";
-import { ensureHardwarePosReadiness, startHardwarePosKeepAlive } from "./lib/hardwarePosWarm";
+import { startHardwarePosKeepAlive } from "./lib/hardwarePosWarm";
 
 const queryClient = new QueryClient();
 
@@ -49,9 +48,6 @@ const AppContent = () => {
   
   React.useEffect(() => {
     startBackgroundSync();
-    // On a cold install the payment mode is not cached yet: fetch it first so
-    // the terminal keep-alive and warm probes work from the very first launch.
-    void ensureHardwarePosReadiness();
     return startHardwarePosKeepAlive();
   }, []);
 
@@ -99,7 +95,6 @@ const AppContent = () => {
             <Route path="/admin/sms-settings" element={<AdminPanelLayout><SMSSettings /></AdminPanelLayout>} />
             <Route path="/admin/whatsapp-settings" element={<AdminPanelLayout><WhatsAppSettings /></AdminPanelLayout>} />
             <Route path="/admin/statistics" element={<AdminPanelLayout><EnhancedStatistics /></AdminPanelLayout>} />
-            <Route path="/admin/pos-diagnostics" element={<AdminPanelLayout><PosDiagnosticsPage /></AdminPanelLayout>} />
             <Route path="/admin/profile" element={<AdminPanelLayout><ProfilePage /></AdminPanelLayout>} />
             
             <Route path="*" element={<NotFound />} />

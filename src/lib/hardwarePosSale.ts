@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
 
 interface HardwarePosSaleRequest {
   kioskId: string;
@@ -20,11 +19,6 @@ const pendingSales = new Map<string, SaleInvocation>();
 export function beginHardwarePosSale(request: HardwarePosSaleRequest): SaleInvocation {
   const existing = pendingSales.get(request.transactionId);
   if (existing) return existing;
-
-  // Claim the terminal for this donor *before* the request leaves the device.
-  // The readiness probe is suspended from this exact moment, so an idle probe
-  // can never overlap — or cancel — a SALE that is already in flight.
-  setHardwarePosSessionBusy(true);
 
   const invocation = supabase.functions.invoke("apex-ecr-payment", {
     body: { action: "sale", ...request },

@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { getCachedTerminalTimeout } from "@/lib/kioskConfig";
+import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
 
@@ -26,9 +26,6 @@ interface ApexResponse {
   correlationId?: string;
   failureType?: string;
   outcomeUnknown?: boolean;
-  /** False only when the backend guarantees no Sale command ever reached AFS. */
-  dispatched?: boolean;
-  dispatchAttempts?: number;
 }
 
 interface CancellationResponse {
@@ -58,7 +55,6 @@ const HardwarePosPaymentPage = () => {
   // Every attempt gets its own transaction id so the terminal never sees a
   // repeated invoice number after a decline or a cancelled session.
   const transactionIdRef = useRef<string>(searchParams.get("transactionId") || crypto.randomUUID());
-  const dispatchRetriedRef = useRef(false);
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
@@ -67,20 +63,12 @@ const HardwarePosPaymentPage = () => {
   const categoryReferenceRef = useRef(categoryReference);
   categoryReferenceRef.current = categoryReference;
 
-  // While an outcome is "unknown" the card may still have been charged, so we
-  // keep the tap screen up and let the backend interrogate the terminal
-  // instead of telling the donor it failed. Only after this window do we
-  // surface the error.
-  const RECOVERY_WINDOW_MS = 45000;
-  const recoveryDeadlineRef = useRef<number>(Date.now() + RECOVERY_WINDOW_MS);
-  const pendingUnknownRef = useRef<ApexResponse | null>(null);
-
   /** Single place where a terminal outcome moves the donor forward. */
   const applyOutcome = useCallback((result: ApexResponse, transactionId: string) => {
     if (outcomeHandledRef.current || cancellingRef.current || ignoreSaleResultRef.current) return;
+    outcomeHandledRef.current = true;
 
     if (result.approved) {
-      outcomeHandledRef.current = true;
       const ref = result.referenceNumber || result.rrn || transactionId;
       navigate(
         `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
@@ -90,32 +78,19 @@ const HardwarePosPaymentPage = () => {
     }
 
     if (result.success === false && result.error) {
-      // Unknown outcome (timeout, lost response, terminal still busy): keep
-      // waiting so the recovery poll can find the real result at the terminal.
-      if (result.outcomeUnknown && Date.now() < recoveryDeadlineRef.current) {
-        pendingUnknownRef.current = result;
-        setStage("processing");
-        return;
-      }
-
-      outcomeHandledRef.current = true;
       const arabic = result.failureType === "afs_network_block"
         ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-        : result.failureType === "terminal_cancelled"
-          ? "تم إلغاء الطلب قبل قراءة البطاقة ولم يتم خصم أي مبلغ. يرجى المحاولة مرة أخرى."
-          : result.failureType === "apex_rejected"
-            ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
-            : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+        : result.failureType === "apex_rejected"
+          ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
+          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
       const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-      setRetryAllowed(true);
+      setRetryAllowed(result.outcomeUnknown !== true);
       setErrorMessage(`${arabic}\n${result.error}${reference}`);
       setStage("error");
-
       return;
     }
 
     // Declined by the card/issuer — the terminal has finished with this session.
-    outcomeHandledRef.current = true;
     const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
       .filter(Boolean)
       .join(" · ");
@@ -124,15 +99,15 @@ const HardwarePosPaymentPage = () => {
   }, [amount, category, navigate]);
 
 
-
   useEffect(() => {
     if (!kioskId) return;
-    // Read the countdown from the device cache only. Fetching it here would
-    // put a network round trip in front of the donor's SALE.
-    const cached = getCachedTerminalTimeout(kioskId);
-    if (cached) setTimeoutSeconds(cached + 5);
+    void loadKioskRuntimeConfig(kioskId).then((config) => {
+      const configuredTimeout = config?.hardware_pos?.timeout_seconds;
+      if (typeof configuredTimeout === "number" && configuredTimeout >= 5) {
+        setTimeoutSeconds(configuredTimeout + 5);
+      }
+    }).catch((error) => console.error("Unable to load terminal timeout:", error));
   }, [kioskId]);
-
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -174,33 +149,12 @@ const HardwarePosPaymentPage = () => {
       const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
       if (cancellingRef.current || ignoreSaleResultRef.current) return;
       if (error) throw error;
-      const response = (data || {}) as ApexResponse;
-      // dispatched === false is the backend's guarantee that no Sale command
-      // ever left for AFS, so retrying once with a fresh transaction id is
-      // provably safe (no double charge possible) and invisible to the donor.
-      if (response.dispatched === false && !dispatchRetriedRef.current) {
-        dispatchRetriedRef.current = true;
-        console.warn("Sale was never dispatched; retrying once with a new transaction", response.failureType);
-        transactionIdRef.current = crypto.randomUUID();
-        startedRef.current = false;
-        recoveryDeadlineRef.current = Date.now() + RECOVERY_WINDOW_MS;
-        window.setTimeout(() => void startSale(), 0);
-        return;
-      }
-      applyOutcome(response, transactionId);
+      applyOutcome((data || {}) as ApexResponse, transactionId);
     } catch (err) {
       if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
-      // The request itself failed, so the card may still have been charged.
-      // Treat it as an unknown outcome and let the recovery poll decide.
-      applyOutcome({
-        success: false,
-        approved: false,
-        outcomeUnknown: true,
-        failureType: "transport_error",
-        error: err instanceof Error ? err.message : "Could not reach the payment terminal.",
-      }, transactionId);
+      setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
+      setStage("error");
     }
-
   }, [amount, applyOutcome, category, kioskId]);
 
   useEffect(() => {
@@ -216,9 +170,8 @@ const HardwarePosPaymentPage = () => {
   }, [startSale]);
 
   // Outcome recovery: if the sale response is lost in transit (edge isolate
-  // recycled, flaky link) the backend still knows — or can ask the terminal —
-  // what happened. Poll so an approved payment always reaches the Thank-You
-  // screen and is always recorded for billing.
+  // recycled, flaky link), the backend still stored the terminal's outcome.
+  // Poll for it so an approved payment always reaches the Thank-You screen.
   useEffect(() => {
     if (stage !== "processing" || !kioskId) return;
     let cancelled = false;
@@ -228,36 +181,22 @@ const HardwarePosPaymentPage = () => {
       const transactionId = transactionIdRef.current;
       try {
         const { data } = await supabase.functions.invoke("apex-ecr-payment", {
-          body: { action: "outcome", kioskId, transactionId, amount, category },
+          body: { action: "outcome", kioskId, transactionId },
         });
         if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
         const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
-        if (data?.finished && stored) {
-          applyOutcome(stored, transactionId);
-          return;
-        }
+        if (data?.finished && stored) applyOutcome(stored, transactionId);
       } catch {
         // Polling is best-effort; the direct sale response remains authoritative.
       }
-
-      // The recovery window has closed without any terminal outcome — show the
-      // last known failure so the donor is never left on a dead screen.
-      if (!cancelled && !outcomeHandledRef.current && Date.now() >= recoveryDeadlineRef.current) {
-        const pending = pendingUnknownRef.current;
-        if (pending) {
-          pendingUnknownRef.current = null;
-          applyOutcome({ ...pending, outcomeUnknown: false }, transactionId);
-        }
-      }
     };
 
-    const interval = window.setInterval(poll, 3000);
+    const interval = window.setInterval(poll, 5000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [amount, applyOutcome, category, kioskId, stage]);
-
+  }, [applyOutcome, kioskId, stage]);
 
 
 
@@ -321,17 +260,13 @@ const HardwarePosPaymentPage = () => {
     if (!retryAllowed) return;
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
-    dispatchRetriedRef.current = false;
     ignoreSaleResultRef.current = false;
     outcomeHandledRef.current = false;
-    pendingUnknownRef.current = null;
-    recoveryDeadlineRef.current = Date.now() + RECOVERY_WINDOW_MS;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
     void startSale();
   };
-
 
   useEffect(() => {
     if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
