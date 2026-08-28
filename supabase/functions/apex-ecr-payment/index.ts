@@ -779,6 +779,8 @@ serve(async (req) => {
 
       if (needsCancel) {
         const recovered = await cancelAtTerminal();
+        cancelDispatchedAt = Date.now();
+
         if (!recovered.cancelled) {
           await supabase.rpc("finish_apex_terminal_session", {
             _kiosk_id: kioskId,
@@ -799,8 +801,14 @@ serve(async (req) => {
       }
     }
 
-    // Never let a SALE collide with a cancellation AFS is still applying.
-    const quarantineWaitMs = await waitForCancelQuarantine(acquisition.cancel_cooldown_until);
+    // Never let a SALE collide with a cancellation AFS is still applying —
+    // whether that cancellation came from this request or an earlier one.
+    const quarantineWaitMs = await waitForCancelQuarantine(
+      cancelDispatchedAt
+        ? new Date(cancelDispatchedAt + CANCEL_QUARANTINE_MS).toISOString()
+        : acquisition.cancel_cooldown_until,
+    );
+
 
     const saleDispatchStartedAt = Date.now();
     console.log("ApexECR sale dispatch", {
