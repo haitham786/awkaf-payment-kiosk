@@ -51,13 +51,6 @@ const emptyHardwarePos = () => ({
   timeout_seconds: 90,
 });
 
-const normalizeApexSecureKey = (value: string): string | null => {
-  const raw = value.trim();
-  if (/^[0-9a-f]{32}$/i.test(raw)) return raw;
-  const tokens = raw.match(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi) || [];
-  return tokens.length === 1 ? tokens[0] : null;
-};
-
 const KiosksManagement = () => {
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -86,22 +79,12 @@ const KiosksManagement = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [verifyingTerminal, setVerifyingTerminal] = useState(false);
   const [terminalDiagnostic, setTerminalDiagnostic] = useState<string | null>(null);
-  const [testRials, setTestRials] = useState('0');
-  const [testBaisas, setTestBaisas] = useState('100');
-  const [cancellingTerminal, setCancellingTerminal] = useState(false);
-
-
 
 
   const separateKioskSecret = (configuration: KioskConfiguration) => {
     const { soft_pos, hardware_pos, ...restConfig } = configuration;
     const authKey = soft_pos?.auth_key?.trim() || '';
-    const rawApexSecureKey = hardware_pos?.secure_key?.trim() || '';
-    const apexSecureKey = rawApexSecureKey ? normalizeApexSecureKey(rawApexSecureKey) : '';
-
-    if (rawApexSecureKey && !apexSecureKey) {
-      throw new Error('Merchant Secure Key must contain exactly one 32-character hexadecimal key.');
-    }
+    const apexSecureKey = hardware_pos?.secure_key?.trim() || '';
 
     return {
       publicConfig: {
@@ -128,22 +111,15 @@ const KiosksManagement = () => {
     };
   };
 
-  /**
-   * Credentials are only ever overwritten with a real value. A blank field means
-   * "leave the stored key untouched", so saving the kiosk for an unrelated reason
-   * can never wipe the ApexECR secure key or the Soft POS auth key.
-   */
   const saveKioskSecret = async (kioskId: string, authKey: string, apexSecureKey = '') => {
-    const payload: Record<string, any> = { kiosk_id: kioskId };
-    if (authKey) payload.soft_pos_auth_key = authKey;
-    if (apexSecureKey) payload.apex_secure_key = apexSecureKey;
-
     const { error } = await supabase
       .from('kiosk_secrets')
-      .upsert(payload as any, { onConflict: 'kiosk_id' });
+      .upsert(
+        { kiosk_id: kioskId, soft_pos_auth_key: authKey, apex_secure_key: apexSecureKey },
+        { onConflict: 'kiosk_id' },
+      );
     if (error) throw error;
   };
-
 
   useEffect(() => {
     checkAuth();
@@ -243,118 +219,40 @@ const KiosksManagement = () => {
     );
   };
 
-  /**
-   * Sends a real SALE to the paired terminal using exactly the same backend path
-   * the kiosk uses, so the amount entered here appears on the POS screen just as
-   * it does for a donor. Nothing is recorded as a donation (testMode).
-   */
-  const handleTestConnection = async () => {
+  const handleVerifyTerminal = async () => {
     const hardware = formData.configuration.hardware_pos;
     if (!editingId) {
-      toast.error('Save the kiosk first, then test its terminal.');
+      toast.error('Save the kiosk first, then verify its terminal.');
       return;
     }
-    if (!hardware?.tid?.trim() || !hardware?.mid?.trim() || !hardware?.service_url?.trim()) {
-      toast.error('Enter the Service URL, MID and TID before testing.');
+    if (!hardware?.tid?.trim() || !hardware?.mid?.trim()) {
+      toast.error('Enter both MID and TID before verifying.');
       return;
     }
-
-    const rials = Number(testRials || 0);
-    const baisas = Number(testBaisas || 0);
-    if (!Number.isFinite(rials) || !Number.isFinite(baisas) || rials < 0 || baisas < 0 || baisas > 999) {
-      toast.error('Enter a valid amount. Baisas must be between 0 and 999.');
-      return;
-    }
-    const amountBaisas = Math.round(rials * 1000 + baisas);
-    if (amountBaisas < 100) {
-      toast.error('The minimum test amount is 100 baisas.');
-      return;
-    }
-
     setVerifyingTerminal(true);
     setTerminalDiagnostic(null);
     try {
-      const startedAt = Date.now();
-      const testTransactionId = crypto.randomUUID();
-      sessionStorage.setItem(`apex_test_transaction_${editingId}`, testTransactionId);
       const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: {
-          action: 'sale',
-          kioskId: editingId,
-          transactionId: testTransactionId,
-          amount: amountBaisas,
-          category: 'donation',
-          testMode: true,
-          refreshConfig: true,
-        },
+        body: { action: 'diagnose', kioskId: editingId },
       });
       if (error) throw error;
-
-      const elapsed = `${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
-      const amountLabel = `${rials}.${String(baisas).padStart(3, '0')} OMR`;
-
-      if (data?.success === false) {
-        const message = `${data.error || 'The terminal did not accept the request.'}${data.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
-        setTerminalDiagnostic(message);
-        toast.error(message);
-        return;
-      }
-
-      if (data?.approved) {
-        const message = `Approved at the terminal — ${amountLabel} in ${elapsed}. RRN ${data.rrn || '—'}.`;
+      if (data?.success) {
+        const message = `AFS service and SOAP routing responded. Reference: ${data.correlationId}`;
         setTerminalDiagnostic(message);
         toast.success(message);
-        return;
+      } else {
+        const soapProbe = Array.isArray(data?.probes) ? data.probes.find((probe: any) => probe?.probe === 'soap') : null;
+        const detail = soapProbe?.webResponseErrorDesc || soapProbe?.faultMessage || data?.error;
+        const message = `${detail || 'AFS did not accept the SOAP request.'}${data?.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
+        setTerminalDiagnostic(message);
+        toast.error(message);
       }
-
-      const detail = [data?.responseText, data?.responseCode ? `Code ${data.responseCode}` : null]
-        .filter(Boolean)
-        .join(' · ');
-      const message = `Terminal reached in ${elapsed} and showed ${amountLabel}, but the card was not approved. ${detail}`;
-      setTerminalDiagnostic(message);
-      toast.warning(message);
     } catch (error: any) {
-      const message = `Terminal test failed: ${error.message}`;
-      setTerminalDiagnostic(message);
-      toast.error(message);
+      toast.error(`Terminal verification failed: ${error.message}`);
     } finally {
       setVerifyingTerminal(false);
     }
   };
-
-  /** Clears the amount currently displayed on the paired terminal. */
-  const handleCancelTerminal = async () => {
-    if (!editingId) {
-      toast.error('Save the kiosk first, then cancel at its terminal.');
-      return;
-    }
-    setCancellingTerminal(true);
-    try {
-      const transactionId = sessionStorage.getItem(`apex_test_transaction_${editingId}`);
-      if (!transactionId) {
-        toast.error('No active terminal test is available to cancel.');
-        return;
-      }
-      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'cancel', kioskId: editingId, transactionId, refreshConfig: true },
-      });
-      if (error) throw error;
-      if (data?.cancelled) {
-        sessionStorage.removeItem(`apex_test_transaction_${editingId}`);
-        setTerminalDiagnostic('Cancellation accepted — the terminal screen has been cleared.');
-        toast.success('Cancellation sent to the terminal.');
-      } else {
-        const message = data?.error || 'The terminal did not confirm the cancellation.';
-        setTerminalDiagnostic(message);
-        toast.error(message);
-      }
-    } catch (error: any) {
-      toast.error(`Cancellation failed: ${error.message}`);
-    } finally {
-      setCancellingTerminal(false);
-    }
-  };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -934,60 +832,18 @@ const KiosksManagement = () => {
                         </p>
                       ) : null;
                     })()}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="apex_test_rials">Test Amount — Rials</Label>
-                        <Input
-                          id="apex_test_rials"
-                          type="number"
-                          min={0}
-                          value={testRials}
-                          onChange={(e) => setTestRials(e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="apex_test_baisas">Test Amount — Baisas</Label>
-                        <Input
-                          id="apex_test_baisas"
-                          type="number"
-                          min={0}
-                          max={999}
-                          value={testBaisas}
-                          onChange={(e) => setTestBaisas(e.target.value)}
-                          placeholder="100"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      "Test Connection" pushes this exact amount to the paired terminal through the same
-                      route a donor uses. It is never recorded as a donation. Use "Cancel" to clear the
-                      amount from the terminal screen.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleTestConnection}
-                        disabled={verifyingTerminal || cancellingTerminal}
-                      >
-                        {verifyingTerminal ? 'Sending to terminal…' : 'Test Connection'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleCancelTerminal}
-                        disabled={cancellingTerminal}
-                      >
-                        {cancellingTerminal ? 'Cancelling…' : 'Cancel'}
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleVerifyTerminal}
+                      disabled={verifyingTerminal}
+                    >
+                      {verifyingTerminal ? 'Checking AFS connection…' : 'Test AFS Connection'}
+                    </Button>
                     {terminalDiagnostic && (
                       <p className="text-xs text-muted-foreground break-words">{terminalDiagnostic}</p>
                     )}
-
                   </div>
                 </div>
               )}

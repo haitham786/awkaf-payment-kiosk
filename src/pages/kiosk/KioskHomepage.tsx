@@ -9,9 +9,6 @@ import { Button } from "@/components/ui/button";
 import { CategoryInfoDialog } from "@/components/kiosk/CategoryInfoDialog";
 import { primeCategoryCache, readCachedCategories } from "@/lib/kioskCategoryCache";
 import { persistPaymentMode } from "@/lib/kioskConfig";
-import { warmHardwarePos } from "@/lib/hardwarePosWarm";
-
-
 
 const SETTINGS_CACHE_KEY = "kiosk_home_settings";
 
@@ -87,9 +84,6 @@ const KioskHomepage = () => {
         return;
       }
       persistPaymentMode(kioskId, data.kiosk.configuration?.payment_mode);
-      if (data.kiosk.configuration?.payment_mode === 'hardware_pos') {
-        void warmHardwarePos(true);
-      }
       setKioskStatus(data.kiosk.status);
       if (data.kiosk.status === 'pending_approval') setKioskMessage('في انتظار الموافقة من الإدارة على تفعيل هذا الكشك.');
       else if (data.kiosk.status === 'inactive') setKioskMessage('هذا الكشك غير نشط حالياً. يرجى التواصل مع الإدارة.');
@@ -213,7 +207,6 @@ const KioskHomepage = () => {
             Choose the category of donation
           </p>
         </div>
-
 
         <div className="grid grid-cols-2 gap-2 mb-2 flex-1 min-h-0 content-start">
           {loading ? (

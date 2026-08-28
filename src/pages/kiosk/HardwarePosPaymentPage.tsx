@@ -8,11 +8,15 @@ import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
-import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
-import { setHardwarePosSessionBusy } from "@/lib/hardwarePosWarm";
-
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
+
+/**
+ * Marks whether the terminal may still be sitting on a prompt from a previous
+ * session. When set, the next SALE asks the backend to clear the terminal first
+ * so a new amount always reaches it.
+ */
+const SESSION_FLAG = "apex_session_open";
 
 interface ApexResponse {
   success?: boolean;
@@ -28,13 +32,6 @@ interface ApexResponse {
   outcomeUnknown?: boolean;
 }
 
-interface CancellationResponse {
-  success?: boolean;
-  cancelled?: boolean;
-  error?: string;
-  state?: string;
-}
-
 const HardwarePosPaymentPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -45,8 +42,6 @@ const HardwarePosPaymentPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [retryAllowed, setRetryAllowed] = useState(true);
   const [timeoutSeconds, setTimeoutSeconds] = useState(90);
-
-
   const [declineMessage, setDeclineMessage] = useState("");
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
@@ -54,50 +49,10 @@ const HardwarePosPaymentPage = () => {
 
   // Every attempt gets its own transaction id so the terminal never sees a
   // repeated invoice number after a decline or a cancelled session.
-  const transactionIdRef = useRef<string>(searchParams.get("transactionId") || crypto.randomUUID());
+  const transactionIdRef = useRef<string>(crypto.randomUUID());
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
-  const ignoreSaleResultRef = useRef(false);
-  const outcomeHandledRef = useRef(false);
-  const categoryReferenceRef = useRef(categoryReference);
-  categoryReferenceRef.current = categoryReference;
-
-  /** Single place where a terminal outcome moves the donor forward. */
-  const applyOutcome = useCallback((result: ApexResponse, transactionId: string) => {
-    if (outcomeHandledRef.current || cancellingRef.current || ignoreSaleResultRef.current) return;
-    outcomeHandledRef.current = true;
-
-    if (result.approved) {
-      const ref = result.referenceNumber || result.rrn || transactionId;
-      navigate(
-        `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
-          `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReferenceRef.current}`,
-      );
-      return;
-    }
-
-    if (result.success === false && result.error) {
-      const arabic = result.failureType === "afs_network_block"
-        ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-        : result.failureType === "apex_rejected"
-          ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
-          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
-      const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
-      setRetryAllowed(result.outcomeUnknown !== true);
-      setErrorMessage(`${arabic}\n${result.error}${reference}`);
-      setStage("error");
-      return;
-    }
-
-    // Declined by the card/issuer — the terminal has finished with this session.
-    const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
-      .filter(Boolean)
-      .join(" · ");
-    setDeclineMessage(detail);
-    setStage("declined");
-  }, [amount, category, navigate]);
-
 
   useEffect(() => {
     if (!kioskId) return;
@@ -145,23 +100,53 @@ const HardwarePosPaymentPage = () => {
     }
 
     const transactionId = transactionIdRef.current;
+    // Mark the session locally for lifecycle tracking, but never block a new SALE
+    // behind a cancellation request. The amount must be dispatched immediately.
+    localStorage.setItem(SESSION_FLAG, kioskId);
+
     try {
-      const { data, error } = await beginHardwarePosSale({ kioskId, transactionId, amount, category });
-      if (cancellingRef.current || ignoreSaleResultRef.current) return;
+      const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
+        body: { action: "sale", kioskId, transactionId, amount, category },
+      });
+      if (cancellingRef.current) return;
       if (error) throw error;
-      applyOutcome((data || {}) as ApexResponse, transactionId);
+
+      const result = (data || {}) as ApexResponse;
+
+      if (result.approved) {
+        localStorage.removeItem(SESSION_FLAG);
+        const ref = result.referenceNumber || result.rrn || transactionId;
+        navigate(
+          `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
+            `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReference}`,
+        );
+        return;
+      }
+
+      if (result.success === false && result.error) {
+        const arabic = result.failureType === "afs_network_block"
+          ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
+          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+        const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
+        setRetryAllowed(result.outcomeUnknown !== true);
+        setErrorMessage(`${arabic}\n${result.error}${reference}`);
+        setStage("error");
+        return;
+      }
+
+      // Declined by the card/issuer — the terminal has finished with this session.
+      localStorage.removeItem(SESSION_FLAG);
+      const detail = [result.responseText, result.responseCode ? `Code: ${result.responseCode}` : null]
+        .filter(Boolean)
+        .join(" · ");
+      setDeclineMessage(detail);
+      setStage("declined");
     } catch (err) {
-      if (cancellingRef.current || ignoreSaleResultRef.current || outcomeHandledRef.current) return;
+      if (cancellingRef.current) return;
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
-  }, [amount, applyOutcome, category, kioskId]);
-
-  useEffect(() => {
-    // The idle readiness loop must never probe while a donor is paying.
-    setHardwarePosSessionBusy(true);
-    return () => setHardwarePosSessionBusy(false);
-  }, []);
+  }, [amount, category, categoryReference, kioskId, navigate]);
 
   useEffect(() => {
     // Send the SALE immediately — the tap prompt renders in the same frame.
@@ -169,99 +154,49 @@ const HardwarePosPaymentPage = () => {
     void startSale();
   }, [startSale]);
 
-  // Outcome recovery: if the sale response is lost in transit (edge isolate
-  // recycled, flaky link), the backend still stored the terminal's outcome.
-  // Poll for it so an approved payment always reaches the Thank-You screen.
-  useEffect(() => {
-    if (stage !== "processing" || !kioskId) return;
-    let cancelled = false;
-
-    const poll = async () => {
-      if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
-      const transactionId = transactionIdRef.current;
-      try {
-        const { data } = await supabase.functions.invoke("apex-ecr-payment", {
-          body: { action: "outcome", kioskId, transactionId },
-        });
-        if (cancelled || outcomeHandledRef.current || cancellingRef.current) return;
-        const stored = (data as { finished?: boolean; result?: ApexResponse } | null)?.result;
-        if (data?.finished && stored) applyOutcome(stored, transactionId);
-      } catch {
-        // Polling is best-effort; the direct sale response remains authoritative.
-      }
-    };
-
-    const interval = window.setInterval(poll, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [applyOutcome, kioskId, stage]);
-
-
-
-
   const cancelAtTerminal = useCallback(async () => {
     if (!kioskId) return false;
     try {
       const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
-        body: { action: "cancel", kioskId, transactionId: transactionIdRef.current },
+        body: { action: "cancel", kioskId },
       });
       if (error) throw error;
-      const result = (data || {}) as CancellationResponse;
-      const safeToLeave = result.cancelled === true || (
-        result.success === true && ["approved", "declined", "failed", "cancelled"].includes(result.state || "")
-      );
-      if (!safeToLeave && result.error) console.error("Terminal rejected cancellation:", result.error);
-      return safeToLeave;
+      const cancelled = data?.cancelled === true;
+      if (cancelled) localStorage.removeItem(SESSION_FLAG);
+      return cancelled;
     } catch (err) {
       console.error("Terminal cancellation failed:", err);
       return false;
     }
   }, [kioskId]);
 
-  /**
-   * Cancel leaves the payment screen as soon as the terminal acknowledges, or
-   * after a short grace period if Apex is slow — the cancel request keeps
-   * running in the background so the terminal prompt is always cleared.
-   */
-  const leaveAfterCancel = useCallback((graceMs = 4000) => {
-    ignoreSaleResultRef.current = true;
-    outcomeHandledRef.current = true;
+  const handleCancel = useCallback(async () => {
+    if (cancellingRef.current) return;
     cancellingRef.current = true;
     setStage("cancelling");
 
-    let left = false;
-    const leave = () => {
-      if (left) return;
-      left = true;
-      navigate("/kiosk");
-    };
-    const grace = window.setTimeout(leave, graceMs);
-    void cancelAtTerminal().then(() => {
-      window.clearTimeout(grace);
-      leave();
-    });
+    // Always push the cancellation to the terminal so the amount clears from
+    // its screen. The request keeps running in the background if it is slow —
+    // the donor is never held on the kiosk for more than a few seconds.
+    const cancelRequest = cancelAtTerminal();
+    await Promise.race([
+      cancelRequest,
+      new Promise((resolve) => window.setTimeout(resolve, 6000)),
+    ]);
+    navigate("/kiosk");
   }, [cancelAtTerminal, navigate]);
 
-  const handleCancel = useCallback(() => {
-    if (cancellingRef.current) return;
-    leaveAfterCancel();
-  }, [leaveAfterCancel]);
 
   const handleTimeout = () => {
-    // Apex cancellation always targets the last request. Clear the terminal
-    // prompt so the next donor is never met by an orphaned session.
-    if (cancellingRef.current) return;
-    leaveAfterCancel();
+    setRetryAllowed(false);
+    setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
+    setStage("error");
   };
 
   const handleTryAgain = () => {
     if (!retryAllowed) return;
     transactionIdRef.current = crypto.randomUUID();
     startedRef.current = false;
-    ignoreSaleResultRef.current = false;
-    outcomeHandledRef.current = false;
     setErrorMessage("");
     setDeclineMessage("");
     setStage("processing");
@@ -288,10 +223,9 @@ const HardwarePosPaymentPage = () => {
     );
   }
 
-
   if (stage === "error") {
     return (
-      <KioskLayout showHomeButton={false}>
+      <KioskLayout>
         <div className="w-full max-w-xl mx-auto space-y-3">
           <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
             <div className="space-y-4">
@@ -327,7 +261,7 @@ const HardwarePosPaymentPage = () => {
   }
 
   return (
-    <KioskLayout showHomeButton={false}>
+    <KioskLayout>
       <div className="w-full max-w-md mx-auto flex flex-col justify-center gap-3 pb-24">
         <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm text-center rounded-xl">
           <div className="space-y-5">

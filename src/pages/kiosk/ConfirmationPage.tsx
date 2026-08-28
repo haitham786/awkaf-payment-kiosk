@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
@@ -9,7 +9,6 @@ import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { getCachedPaymentMode, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import { warmHardwarePos } from "@/lib/hardwarePosWarm";
-import { beginHardwarePosSale } from "@/lib/hardwarePosSale";
 
 const ConfirmationPage = () => {
   const navigate = useNavigate();
@@ -17,7 +16,6 @@ const ConfirmationPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
-  const confirmingRef = useRef(false);
 
   // Final wake-up so the SALE dispatches the instant the donor confirms.
   useEffect(() => {
@@ -48,8 +46,6 @@ const ConfirmationPage = () => {
   };
 
   const handleConfirm = () => {
-    if (confirmingRef.current) return;
-    confirmingRef.current = true;
     const kioskId = localStorage.getItem('kiosk_id');
     if (kioskId) {
       const mode = getCachedPaymentMode(kioskId);
@@ -62,11 +58,7 @@ const ConfirmationPage = () => {
         return;
       }
       if (mode === 'hardware_pos') {
-        const transactionId = crypto.randomUUID();
-        // Dispatch before navigation so rendering the payment screen adds zero
-        // latency between the donor's tap and the terminal command.
-        void beginHardwarePosSale({ kioskId, transactionId, amount, category });
-        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}&transactionId=${transactionId}`);
+        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
         return;
       }
       if (mode === 'soft_pos') {
@@ -80,7 +72,6 @@ const ConfirmationPage = () => {
         console.warn('Unable to refresh kiosk payment mode:', error);
       });
     }
-    confirmingRef.current = false;
     navigate(`/kiosk/payment-request?category=${category}&amount=${amount}`);
   };
 

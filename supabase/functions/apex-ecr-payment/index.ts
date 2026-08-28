@@ -1,43 +1,20 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
-  APEX_SOAP_ACTIONS,
   ApexEcrConfig,
-  ApexEcrResult,
   baisasToDecimalString,
   buildCancelEnvelope,
   buildEnquiryByRefEnvelope,
   buildSaleEnvelope,
   callApexEcr,
-  isAnotherTransactionInProgress,
-  isApprovedPosResponse,
-  isNoTransactionFound,
-  isSafePreDispatchFailure,
-  isSuccessfulWebResponse,
-  normalizeApexSecureKey,
+  APEX_SOAP_ACTIONS,
   panLastFour,
-  redactApexRaw,
 } from "../_shared/apexEcr.ts";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONFIG_CACHE_TTL_MS = 600_000;
-const terminalConfigCache = new Map<
-  string,
-  { config: ApexEcrConfig; status: string; cachedAt: number }
->();
-
-interface TerminalAcquisition {
-  acquisition:
-    | "acquired"
-    | "completed"
-    | "duplicate_active"
-    | "stale_recovery"
-    | "busy";
-  owner_transaction_id: string;
-  session_state: string;
-  stored_result: Record<string, unknown> | null;
-}
+const terminalConfigCache = new Map<string, { config: ApexEcrConfig; status: string; cachedAt: number }>();
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
 function invoiceNumberFor(transactionId: string): string {
@@ -46,54 +23,23 @@ function invoiceNumberFor(transactionId: string): string {
   return String(num).padStart(6, "0");
 }
 
-function json(
-  body: unknown,
-  status: number,
-  corsHeaders: Record<string, string>,
-) {
+function json(body: unknown, status: number, corsHeaders: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-function classifyFailure(result: {
-  httpStatus?: number;
-  contentType?: string;
-  webResponseErrorDesc: string;
-  faultCode?: string;
-  faultMessage?: string;
-}) {
-  if (
-    result.httpStatus === 522 ||
-    /WAF|HTML page/i.test(result.webResponseErrorDesc)
-  ) {
-    return "afs_network_block";
-  }
+function classifyFailure(result: { httpStatus?: number; contentType?: string; webResponseErrorDesc: string; faultCode?: string; faultMessage?: string }) {
+  if (result.httpStatus === 522 || /WAF|HTML page/i.test(result.webResponseErrorDesc)) return "afs_network_block";
   if (result.faultCode || result.faultMessage) return "soap_fault";
   if (result.httpStatus && result.httpStatus >= 400) return "afs_http_error";
   return "apex_rejected";
 }
 
-function safeApexError(result: {
-  webResponseErrorDesc: string;
-  posRespText: string;
-  posRespCode: string;
-}): string {
-  const message = result.webResponseErrorDesc || result.posRespText;
-  return (
-    message ||
-    (result.posRespCode
-      ? `AFS response code ${result.posRespCode}`
-      : "AFS did not route the request to the terminal.")
-  );
-}
-
-Deno.serve(async (req) => {
+serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const requestStartedAt = Date.now();
@@ -109,16 +55,10 @@ Deno.serve(async (req) => {
       return json({ success: false, error: "Invalid kiosk" }, 400, corsHeaders);
     }
     if (
-      action !== "diagnose" &&
-      action !== "wsdl" &&
-      action !== "warm" &&
+      action !== "cancel" && action !== "diagnose" && action !== "wsdl" && action !== "warm" &&
       !UUID_REGEX.test(transactionId)
     ) {
-      return json(
-        { success: false, error: "Invalid transaction" },
-        400,
-        corsHeaders,
-      );
+      return json({ success: false, error: "Invalid transaction" }, 400, corsHeaders);
     }
 
     const supabase = createClient(
@@ -128,8 +68,6 @@ Deno.serve(async (req) => {
     );
 
     const configLookupStartedAt = Date.now();
-    const refreshConfig = body?.refreshConfig === true;
-    if (refreshConfig) terminalConfigCache.delete(kioskId);
     const cached = terminalConfigCache.get(kioskId);
     let config: ApexEcrConfig;
     let kioskStatus: string;
@@ -141,138 +79,80 @@ Deno.serve(async (req) => {
       // Only load this kiosk. MID/TID uniqueness is enforced when configuration
       // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
       const [kioskRes, secretRes] = await Promise.all([
-        supabase
-          .from("kiosks")
-          .select("id, status, configuration")
-          .eq("id", kioskId)
-          .maybeSingle(),
-        supabase
-          .from("kiosk_secrets")
-          .select("apex_secure_key")
-          .eq("kiosk_id", kioskId)
-          .maybeSingle(),
+        supabase.from("kiosks").select("id, status, configuration").eq("id", kioskId).maybeSingle(),
+        supabase.from("kiosk_secrets").select("apex_secure_key").eq("kiosk_id", kioskId).maybeSingle(),
       ]);
       const kiosk = kioskRes.data;
       if (kioskRes.error || !kiosk) {
-        return json(
-          { success: false, error: "Kiosk is not active" },
-          400,
-          corsHeaders,
-        );
+        return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
       }
 
-      const configuration = (kiosk.configuration ?? {}) as Record<
-        string,
-        unknown
-      >;
-      const hardware = (configuration.hardware_pos ?? {}) as Record<
-        string,
-        unknown
-      >;
+      const configuration = (kiosk.configuration ?? {}) as Record<string, unknown>;
+      const hardware = (configuration.hardware_pos ?? {}) as Record<string, unknown>;
       config = {
         serviceUrl: String(hardware.service_url || "").trim(),
         tid: String(hardware.tid || "").trim(),
         mid: String(hardware.mid || "").trim(),
-        secureKey: normalizeApexSecureKey(
-          String(secretRes.data?.apex_secure_key || ""),
-        ) || "",
+        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
         currencyCode: String(hardware.currency_code || "512"),
         tellerUserName: "KIOSK",
         tellerFullName: "KIOSK",
-        temNamespace: hardware.tem_namespace
-          ? String(hardware.tem_namespace)
-          : undefined,
-        dataNamespace: hardware.data_namespace
-          ? String(hardware.data_namespace)
-          : undefined,
-        timeoutSeconds: Number(hardware.timeout_seconds) > 0
-          ? Number(hardware.timeout_seconds)
-          : 90,
+        temNamespace: hardware.tem_namespace ? String(hardware.tem_namespace) : undefined,
+        dataNamespace: hardware.data_namespace ? String(hardware.data_namespace) : undefined,
+        timeoutSeconds: Number(hardware.timeout_seconds) > 0 ? Number(hardware.timeout_seconds) : 90,
       };
       kioskStatus = kiosk.status;
-      // Never cache an unusable configuration: a wiped or half-saved terminal
-      // setup must be re-read on the next attempt instead of being pinned for
-      // ten minutes inside a warm isolate.
-      if (config.serviceUrl && config.tid && config.mid && config.secureKey) {
-        terminalConfigCache.set(kioskId, {
-          config,
-          status: kioskStatus,
-          cachedAt: Date.now(),
-        });
-      } else {
-        terminalConfigCache.delete(kioskId);
-      }
+      terminalConfigCache.set(kioskId, { config, status: kioskStatus, cachedAt: Date.now() });
     }
 
     if (kioskStatus !== "active") {
-      return json(
-        { success: false, error: "Kiosk is not active" },
-        400,
-        corsHeaders,
-      );
+      return json({ success: false, error: "Kiosk is not active" }, 400, corsHeaders);
     }
 
     if (!config.serviceUrl || !config.tid || !config.mid || !config.secureKey) {
-      const missing = [
-        config.serviceUrl ? null : "Service URL",
-        config.mid ? null : "MID",
-        config.tid ? null : "TID",
-        config.secureKey ? null : "Merchant Secure Key",
-      ]
-        .filter(Boolean)
-        .join(", ");
-      console.error("ApexECR configuration incomplete", {
-        correlationId,
-        kioskId,
-        missing,
-      });
       return json(
-        {
-          success: false,
-          error:
-            `Hardware POS is not fully configured for this kiosk. Missing: ${missing}. Open Manage Kiosks → Edit kiosk → Hardware POS and re-enter these values.`,
-          missing,
-          failureType: "not_configured",
-        },
+        { success: false, error: "Hardware POS is not fully configured for this kiosk." },
         400,
         corsHeaders,
       );
     }
 
     if (!/^https:\/\//i.test(config.serviceUrl)) {
-      return json(
-        { success: false, error: "ApexECR service URL must use HTTPS." },
-        400,
-        corsHeaders,
-      );
+      return json({ success: false, error: "ApexECR service URL must use HTTPS." }, 400, corsHeaders);
     }
+
+    // ------------------------------------------------------------------ warm
+    // Called while the donor is still selecting a category or typing an amount.
+    // Boots this isolate, primes the terminal configuration cache above and
+    // opens the TLS session to the AFS host so the SALE goes out instantly.
+    if (action === "warm") {
+      let hostReachable = false;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET", signal: controller.signal });
+        clearTimeout(timer);
+        await res.arrayBuffer();
+        hostReachable = res.status < 500;
+      } catch {
+        hostReachable = false;
+      }
+      console.log("ApexECR warm", { correlationId, tid: config.tid, hostReachable, ms: Date.now() - requestStartedAt });
+      return json({ success: true, warmed: true, hostReachable }, 200, corsHeaders);
+    }
+
 
     // ------------------------------------------------------------------ wsdl
     // Fetches the service contract (or an imported schema) so the exact SOAP
     // operations and namespaces can be verified against the live service.
     if (action === "wsdl") {
       const target = String(body?.url || `${config.serviceUrl}?wsdl`);
-      if (
-        !target.startsWith(config.serviceUrl.split("/").slice(0, 3).join("/"))
-      ) {
-        return json(
-          { success: false, error: "URL outside the ApexECR host" },
-          400,
-          corsHeaders,
-        );
+      if (!target.startsWith(config.serviceUrl.split("/").slice(0, 3).join("/"))) {
+        return json({ success: false, error: "URL outside the ApexECR host" }, 400, corsHeaders);
       }
       const res = await fetch(target, { method: "GET" });
       const text = await res.text();
-      return json(
-        {
-          success: true,
-          status: res.status,
-          length: text.length,
-          body: text.slice(0, 90000),
-        },
-        200,
-        corsHeaders,
-      );
+      return json({ success: true, status: res.status, length: text.length, body: text.slice(0, 90000) }, 200, corsHeaders);
     }
 
     // -------------------------------------------------------------- diagnose
@@ -283,9 +163,7 @@ Deno.serve(async (req) => {
       const probes: Record<string, unknown>[] = [];
 
       try {
-        const wsdlRes = await fetch(`${config.serviceUrl}?wsdl`, {
-          method: "GET",
-        });
+        const wsdlRes = await fetch(`${config.serviceUrl}?wsdl`, { method: "GET" });
         const wsdlText = await wsdlRes.text();
         probes.push({
           probe: "wsdl",
@@ -294,29 +172,18 @@ Deno.serve(async (req) => {
           isWsdl: /wsdl:definitions|<definitions/i.test(wsdlText),
         });
       } catch (err) {
-        probes.push({
-          probe: "wsdl",
-          error: err instanceof Error ? err.message : "failed",
-        });
+        probes.push({ probe: "wsdl", error: err instanceof Error ? err.message : "failed" });
       }
 
       try {
         const soap = await callApexEcr(
           config,
-          buildEnquiryByRefEnvelope(
-            config,
-            "000000",
-            "000000000000",
-            "",
-            `VERIFY-${correlationId.slice(0, 8)}`,
-          ),
+          buildEnquiryByRefEnvelope(config, "000000", "000000000000", "", `VERIFY-${correlationId.slice(0, 8)}`),
           APEX_SOAP_ACTIONS.enquiryByRef,
         );
         probes.push({
           probe: "soap",
-          ok: soap.httpStatus === 200 &&
-            isSuccessfulWebResponse(soap.webResponseStatus) &&
-            !soap.faultCode,
+          ok: soap.httpStatus === 200 && soap.webResponseStatus !== "99" && !soap.faultCode,
           status: soap.httpStatus ?? null,
           contentType: soap.contentType ?? null,
           webResponseStatus: soap.webResponseStatus,
@@ -327,45 +194,25 @@ Deno.serve(async (req) => {
           faultCode: soap.faultCode || null,
           faultMessage: soap.faultMessage || null,
           elapsedMs: soap.elapsedMs ?? null,
-          failureType: !isSuccessfulWebResponse(soap.webResponseStatus)
-            ? classifyFailure(soap)
-            : null,
+          failureType: soap.webResponseStatus === "99" ? classifyFailure(soap) : null,
         });
       } catch (err) {
-        probes.push({
-          probe: "soap",
-          error: err instanceof Error ? err.message : "failed",
-        });
+        probes.push({ probe: "soap", error: err instanceof Error ? err.message : "failed" });
       }
 
-      const wsdlOk = probes.some(
-        (probe) =>
-          probe.probe === "wsdl" &&
-          probe.status === 200 &&
-          probe.isWsdl === true,
-      );
-      const soapOk = probes.some(
-        (probe) => probe.probe === "soap" && probe.ok === true,
-      );
-      return json(
-        {
-          success: wsdlOk && soapOk,
-          correlationId,
-          checks: {
-            serviceReachable: wsdlOk,
-            soapAccepted: soapOk,
-            terminalAvailable: null,
-          },
-          error: !wsdlOk
-            ? "The AFS service contract is unreachable."
-            : !soapOk
-            ? "The AFS service is reachable, but it rejected the terminal request. Check the returned AFS error and ask AFS/Ahli Bank to confirm this TID is online and paired to the supplied MID and merchant key."
+      const wsdlOk = probes.some((probe) => probe.probe === "wsdl" && probe.status === 200 && probe.isWsdl === true);
+      const soapOk = probes.some((probe) => probe.probe === "soap" && probe.ok === true);
+      return json({
+        success: wsdlOk && soapOk,
+        correlationId,
+        checks: { serviceReachable: wsdlOk, soapAccepted: soapOk, terminalAvailable: null },
+        error: !wsdlOk
+          ? "The AFS service contract is unreachable."
+          : !soapOk
+            ? "The AFS service is reachable, but SOAP requests are blocked or rejected."
             : undefined,
-          probes,
-        },
-        200,
-        corsHeaders,
-      );
+        probes,
+      }, 200, corsHeaders);
     }
 
     /**
@@ -374,10 +221,7 @@ Deno.serve(async (req) => {
      * Retried once because a terminal that is mid-prompt can reject the first
      * cancellation while it switches state.
      */
-    const cancelAtTerminal = async (): Promise<{
-      cancelled: boolean;
-      error?: string;
-    }> => {
+    const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
       let lastError: string | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -387,206 +231,24 @@ Deno.serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
-          if (
-            isSuccessfulWebResponse(result.webResponseStatus) ||
-            /transaction\s+not\s+found|no\s+(?:active|pending)\s+transaction/i
-              .test(
-                result.webResponseErrorDesc,
-              )
-          ) {
-            return { cancelled: true };
-          }
+           const cancellationStatus = result.webResponseStatus.trim().toLowerCase();
+           if (["0", "success", "ok", "completed", "successful"].includes(cancellationStatus)) {
+             return { cancelled: true };
+           }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
         } catch (err) {
-          lastError = err instanceof Error
-            ? err.message
-            : "Cancellation failed";
+          lastError = err instanceof Error ? err.message : "Cancellation failed";
         }
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
       return { cancelled: false, error: lastError };
     };
 
-    // ------------------------------------------------------------------ warm
-    // Idle readiness probe. Keeps this isolate hot, primes the terminal
-    // configuration cache above and re-opens the TLS session to the AFS host so
-    // the SALE goes out instantly. It also reports the coordinator state so the
-    // kiosk can show live readiness, and — only when nothing is paying — clears
-    // a terminal session whose lease has already expired.
-    if (action === "warm") {
-      let hostReachable = false;
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`${config.serviceUrl}?wsdl`, {
-          method: "GET",
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        await res.arrayBuffer();
-        hostReachable = res.status < 500;
-      } catch {
-        hostReachable = false;
-      }
-
-      const { data: sessionRow } = await supabase
-        .from("apex_terminal_sessions")
-        .select("transaction_id, state, lease_expires_at")
-        .eq("kiosk_id", kioskId)
-        .maybeSingle();
-
-      const activeStates = ["active", "cancelling", "recovering"];
-      const sessionState = String(sessionRow?.state || "idle");
-      const leaseExpired = sessionRow
-        ? new Date(sessionRow.lease_expires_at).getTime() <= Date.now()
-        : true;
-      let busy = activeStates.includes(sessionState) && !leaseExpired;
-      let staleCleared: boolean | null = null;
-
-      // Idle-only recovery: an expired lease means no live donor owns the
-      // terminal, so the orphaned prompt is cleared before the next donor.
-      if (
-        body?.releaseStale === true &&
-        activeStates.includes(sessionState) &&
-        leaseExpired
-      ) {
-        const recovered = await cancelAtTerminal();
-        staleCleared = recovered.cancelled;
-        if (recovered.cancelled) {
-          await supabase.rpc("finish_apex_terminal_session", {
-            _kiosk_id: kioskId,
-            _transaction_id: sessionRow!.transaction_id,
-            _state: "cancelled",
-            _result: {
-              success: true,
-              cancelled: true,
-              reason: "idle_stale_release",
-            },
-          });
-          busy = false;
-        } else {
-          busy = true;
-        }
-        console.warn("ApexECR idle stale release", {
-          correlationId,
-          tid: config.tid,
-          cleared: recovered.cancelled,
-          error: recovered.error,
-        });
-      }
-
-      console.log("ApexECR warm", {
-        correlationId,
-        tid: config.tid,
-        hostReachable,
-        sessionState,
-        busy,
-        ms: Date.now() - requestStartedAt,
-      });
-      return json(
-        {
-          success: true,
-          warmed: true,
-          hostReachable,
-          sessionState,
-          leaseExpired,
-          busy,
-          staleCleared,
-        },
-        200,
-        corsHeaders,
-      );
-    }
-
-    // --------------------------------------------------------------- outcome
-    // Read-only recovery path. If the kiosk lost the SALE response, it polls
-    // here for the outcome the backend already stored for this transaction.
-    if (action === "outcome") {
-      const { data: sessionRow } = await supabase
-        .from("apex_terminal_sessions")
-        .select("transaction_id, state, result")
-        .eq("kiosk_id", kioskId)
-        .maybeSingle();
-
-      // Cancelled / unknown sessions are owned by the cancellation path, so
-      // only real terminal outcomes are handed back to a polling kiosk.
-      const finishedStates = [
-        "approved",
-        "declined",
-        "failed",
-        "cancelled",
-        "unknown",
-      ];
-
-      const matches = sessionRow?.transaction_id === transactionId;
-      const finished = matches &&
-        finishedStates.includes(String(sessionRow?.state || ""));
-      return json(
-        {
-          success: true,
-          finished,
-          state: matches ? (sessionRow?.state ?? "missing") : "missing",
-          result: finished ? (sessionRow?.result ?? null) : null,
-        },
-        200,
-        corsHeaders,
-      );
-    }
-
     // ---------------------------------------------------------------- cancel
     if (action === "cancel") {
-      const { data: ownershipRows, error: ownershipError } = await supabase.rpc(
-        "request_apex_terminal_cancellation",
-        { _kiosk_id: kioskId, _transaction_id: transactionId },
-      );
-      if (ownershipError) throw ownershipError;
-      const ownership = Array.isArray(ownershipRows) ? ownershipRows[0] : null;
-      if (ownership?.allowed !== true) {
-        const alreadyFinished = [
-          "approved",
-          "declined",
-          "failed",
-          "cancelled",
-        ].includes(String(ownership?.session_state || ""));
-        return json(
-          {
-            success: alreadyFinished,
-            cancelled: ownership?.session_state === "cancelled",
-            state: ownership?.session_state || "missing",
-            error: alreadyFinished
-              ? "This payment session has already finished."
-              : "This cancellation does not own the active terminal session.",
-          },
-          200,
-          corsHeaders,
-        );
-      }
-
       const outcome = await cancelAtTerminal();
-      await supabase.rpc("finish_apex_terminal_session", {
-        _kiosk_id: kioskId,
-        _transaction_id: transactionId,
-        _state: outcome.cancelled ? "cancelled" : "unknown",
-        _result: {
-          success: outcome.cancelled,
-          cancelled: outcome.cancelled,
-          error: outcome.error || null,
-        },
-      });
-      console.log("ApexECR cancel", {
-        correlationId,
-        tid: config.tid,
-        cancelled: outcome.cancelled,
-      });
-      return json(
-        {
-          success: outcome.cancelled,
-          cancelled: outcome.cancelled,
-          error: outcome.error,
-        },
-        200,
-        corsHeaders,
-      );
+      console.log("ApexECR cancel", { correlationId, tid: config.tid, cancelled: outcome.cancelled });
+      return json({ success: true, cancelled: outcome.cancelled, error: outcome.error }, 200, corsHeaders);
     }
 
     const invoiceNumber = invoiceNumberFor(transactionId);
@@ -595,13 +257,7 @@ Deno.serve(async (req) => {
     if (action === "enquiry") {
       const result = await callApexEcr(
         config,
-        buildEnquiryByRefEnvelope(
-          config,
-          invoiceNumber,
-          String(body?.rrn || ""),
-          String(body?.authCode || ""),
-          transactionId,
-        ),
+        buildEnquiryByRefEnvelope(config, invoiceNumber, String(body?.rrn || ""), String(body?.authCode || ""), transactionId),
         APEX_SOAP_ACTIONS.enquiryByRef,
       );
       return json(
@@ -620,119 +276,7 @@ Deno.serve(async (req) => {
 
     // ------------------------------------------------------------------ sale
     if (!Number.isInteger(amount) || amount < 100 || amount > 100000000) {
-      return json(
-        { success: false, error: "Invalid amount" },
-        400,
-        corsHeaders,
-      );
-    }
-
-    const leaseSeconds = Math.min(
-      300,
-      Math.max(30, Number(config.timeoutSeconds || 90) + 30),
-    );
-    const { data: acquisitionRows, error: acquisitionError } = await supabase
-      .rpc("acquire_apex_terminal_session", {
-        _kiosk_id: kioskId,
-        _terminal_id: config.tid,
-        _transaction_id: transactionId,
-        _lease_seconds: leaseSeconds,
-      });
-    if (acquisitionError) throw acquisitionError;
-    const acquisition = (
-      Array.isArray(acquisitionRows) ? acquisitionRows[0] : null
-    ) as TerminalAcquisition | null;
-    if (!acquisition) {
-      throw new Error("Unable to coordinate the terminal session.");
-    }
-
-    if (acquisition.acquisition === "completed" && acquisition.stored_result) {
-      return json(acquisition.stored_result, 200, corsHeaders);
-    }
-    if (acquisition.acquisition === "duplicate_active") {
-      return json(
-        {
-          success: false,
-          approved: false,
-          failureType: "session_in_progress",
-          outcomeUnknown: true,
-          error:
-            "This payment request is already being processed by the terminal.",
-        },
-        200,
-        corsHeaders,
-      );
-    }
-    if (acquisition.acquisition === "busy") {
-      return json(
-        {
-          success: false,
-          approved: false,
-          failureType: "terminal_busy",
-          outcomeUnknown: true,
-          error:
-            "The terminal is completing the previous payment. Please wait for it to return to the idle screen.",
-        },
-        200,
-        corsHeaders,
-      );
-    }
-    if (acquisition.acquisition === "stale_recovery") {
-      console.warn("ApexECR expired session recovery", {
-        correlationId,
-        tid: config.tid,
-      });
-      const recovered = await cancelAtTerminal();
-      if (!recovered.cancelled) {
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: acquisition.owner_transaction_id,
-          _state: "unknown",
-          _result: {
-            success: false,
-            approved: false,
-            failureType: "stale_session",
-            outcomeUnknown: true,
-            error: recovered.error ||
-              "Unable to clear the expired terminal session.",
-          },
-        });
-        return json(
-          {
-            success: false,
-            approved: false,
-            failureType: "stale_session",
-            outcomeUnknown: true,
-            error: recovered.error ||
-              "Unable to clear the expired terminal session.",
-          },
-          200,
-          corsHeaders,
-        );
-      }
-      const { data: activated, error: activationError } = await supabase.rpc(
-        "activate_recovered_apex_session",
-        {
-          _kiosk_id: kioskId,
-          _transaction_id: transactionId,
-          _lease_seconds: leaseSeconds,
-        },
-      );
-      if (activationError || activated !== true) {
-        return json(
-          {
-            success: false,
-            approved: false,
-            failureType: "terminal_busy",
-            outcomeUnknown: true,
-            error:
-              "The terminal session changed during recovery. Please wait before trying again.",
-          },
-          200,
-          corsHeaders,
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      return json({ success: false, error: "Invalid amount" }, 400, corsHeaders);
     }
 
     const saleDispatchStartedAt = Date.now();
@@ -742,521 +286,123 @@ Deno.serve(async (req) => {
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
-    let saleResult: ApexEcrResult;
-    try {
-      saleResult = await callApexEcr(
-        config,
-        buildSaleEnvelope(config, {
-          amount: baisasToDecimalString(amount),
-          invoiceNumber,
-          referenceNumber: transactionId,
-        }),
-        APEX_SOAP_ACTIONS.sale,
-      );
-    } catch (saleError) {
-      const message = saleError instanceof Error
-        ? saleError.message
-        : "Terminal request failed.";
-      console.warn("ApexECR Sale transport failed; reconciling", {
-        correlationId,
-        tid: config.tid,
-        error: message,
-      });
-      try {
-        const enquiry = await callApexEcr(
-          config,
-          buildEnquiryByRefEnvelope(
-            config,
-            invoiceNumber,
-            "",
-            "",
-            transactionId,
-          ),
-          APEX_SOAP_ACTIONS.enquiryByRef,
-          15000,
-        );
-        if (
-          isSuccessfulWebResponse(enquiry.webResponseStatus) &&
-          enquiry.approved
-        ) {
-          saleResult = enquiry;
-        } else {
-          const enquiryError = safeApexError(enquiry);
-          const definitelyMissing = isNoTransactionFound(enquiryError);
-          const responseBody = {
-            success: false,
-            approved: false,
-            timedOut: /abort/i.test(message),
-            outcomeUnknown: !definitelyMissing,
-            failureType: definitelyMissing
-              ? "terminal_unavailable"
-              : "terminal_timeout",
-            error: definitelyMissing
-              ? "AFS did not deliver the request to the terminal."
-              : "The payment outcome could not be confirmed. Please do not retry yet.",
-            correlationId,
-          };
-          await supabase.rpc("finish_apex_terminal_session", {
-            _kiosk_id: kioskId,
-            _transaction_id: transactionId,
-            _state: definitelyMissing ? "failed" : "unknown",
-            _result: responseBody,
-          });
-          return json(responseBody, 200, corsHeaders);
-        }
-      } catch {
-        const responseBody = {
-          success: false,
-          approved: false,
-          timedOut: /abort/i.test(message),
-          outcomeUnknown: true,
-          failureType: "terminal_timeout",
-          error:
-            "The payment outcome could not be confirmed. Please do not retry yet.",
-          correlationId,
-        };
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: transactionId,
-          _state: "unknown",
-          _result: responseBody,
-        });
-        return json(responseBody, 200, corsHeaders);
-      }
-    }
-
-    console.log("ApexECR sale response", {
-      correlationId,
-      tid: config.tid,
-      afsRoundTripMs: Date.now() - saleDispatchStartedAt,
-      totalMs: Date.now() - requestStartedAt,
-      webResponseStatus: saleResult.webResponseStatus,
-      posRespStatus: saleResult.posRespStatus,
-    });
-
-    // The database lease proves no current app request owns this TID. A busy
-    // response here can therefore only be an Apex-side orphan predating the
-    // lease; clear that orphan and retry this SALE exactly once.
-    const initialError = safeApexError(saleResult);
-    if (
-      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
-      isAnotherTransactionInProgress(initialError)
-    ) {
-      console.warn("ApexECR stale session detected", {
-        correlationId,
-        tid: config.tid,
-      });
-      const cancellation = await cancelAtTerminal();
-      console.log("ApexECR stale session cancellation", {
-        correlationId,
-        tid: config.tid,
-        cancelled: cancellation.cancelled,
-        error: cancellation.error,
-      });
-
-      if (cancellation.cancelled) {
-        // Give the terminal a short state-transition window; this is only paid
-        // on stale-session recovery and never slows the normal SALE path.
-        await new Promise((resolve) => setTimeout(resolve, 350));
-        saleResult = await callApexEcr(
-          config,
-          buildSaleEnvelope(config, {
-            amount: baisasToDecimalString(amount),
-            invoiceNumber,
-            referenceNumber: transactionId,
-          }),
-          APEX_SOAP_ACTIONS.sale,
-        );
-      }
-    }
+    const saleResult = await callApexEcr(
+      config,
+      buildSaleEnvelope(config, {
+        amount: baisasToDecimalString(amount),
+        invoiceNumber,
+        referenceNumber: transactionId,
+      }),
+      APEX_SOAP_ACTIONS.sale,
+    );
     console.log("ApexECR sale response", {
       correlationId,
       tid: config.tid,
       dispatchToResponseMs: Date.now() - saleDispatchStartedAt,
       approved: saleResult.approved,
       webResponseStatus: saleResult.webResponseStatus,
-      webResponseErrorDesc: saleResult.webResponseErrorDesc,
       posRespStatus: saleResult.posRespStatus,
-      posRespCode: saleResult.posRespCode,
-      posRespText: saleResult.posRespText,
     });
 
-    // AFS occasionally fails before handing the Sale to the terminal because
-    // its own database cannot complete the pre-login handshake. That response
-    // proves the terminal did not receive the Sale, so replay the identical
-    // transaction once after a bounded delay. Never replay generic timeouts.
-    if (
-      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
-      isSafePreDispatchFailure(safeApexError(saleResult))
-    ) {
-      console.warn("ApexECR safe transient failure; retrying Sale", {
-        correlationId,
-        tid: config.tid,
-        firstAttemptMs: saleResult.elapsedMs ?? null,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 750));
-      try {
-        saleResult = await callApexEcr(
-          config,
-          buildSaleEnvelope(config, {
-            amount: baisasToDecimalString(amount),
-            invoiceNumber,
-            referenceNumber: transactionId,
-          }),
-          APEX_SOAP_ACTIONS.sale,
-        );
-      } catch (retryError) {
-        const retryMessage = retryError instanceof Error
-          ? retryError.message
-          : "Terminal retry failed.";
-        const responseBody = {
-          success: false,
-          approved: false,
-          timedOut: /abort/i.test(retryMessage),
-          outcomeUnknown: true,
-          failureType: "terminal_timeout",
-          error:
-            "The payment outcome could not be confirmed. Please do not retry yet.",
-          correlationId,
-        };
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: transactionId,
-          _state: "unknown",
-          _result: responseBody,
-        });
-        return json(responseBody, 200, corsHeaders);
-      }
-      console.log("ApexECR Sale retry response", {
-        correlationId,
-        tid: config.tid,
-        elapsedMs: saleResult.elapsedMs ?? null,
-        webResponseStatus: saleResult.webResponseStatus,
-        posRespStatus: saleResult.posRespStatus,
-      });
-    }
-
-    // A generic Apex timeout is not safe to replay by itself: the terminal may
-    // have received it. If EnquiryByRef explicitly proves that the original
-    // reference does not exist, however, the Sale was never accepted and the
-    // identical request can be submitted once without risking a second charge.
-    if (
-      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
-      !isSafePreDispatchFailure(safeApexError(saleResult))
-    ) {
-      try {
-        const deliveryEnquiry = await callApexEcr(
-          config,
-          buildEnquiryByRefEnvelope(
-            config,
-            invoiceNumber,
-            saleResult.posRRN || "",
-            saleResult.posAuthCode || "",
-            transactionId,
-          ),
-          APEX_SOAP_ACTIONS.enquiryByRef,
-          15000,
-        );
-        const enquiryError = safeApexError(deliveryEnquiry);
-        if (isNoTransactionFound(enquiryError)) {
-          console.warn("ApexECR delivery not found; retrying Sale", {
-            correlationId,
-            tid: config.tid,
-          });
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          saleResult = await callApexEcr(
-            config,
-            buildSaleEnvelope(config, {
-              amount: baisasToDecimalString(amount),
-              invoiceNumber,
-              referenceNumber: transactionId,
-            }),
-            APEX_SOAP_ACTIONS.sale,
-          );
-          console.log("ApexECR confirmed-missing retry response", {
-            correlationId,
-            tid: config.tid,
-            elapsedMs: saleResult.elapsedMs ?? null,
-            webResponseStatus: saleResult.webResponseStatus,
-            posRespStatus: saleResult.posRespStatus,
-          });
-        }
-      } catch (deliveryEnquiryError) {
-        console.warn("ApexECR delivery enquiry failed", {
-          correlationId,
-          tid: config.tid,
-          error: deliveryEnquiryError instanceof Error
-            ? deliveryEnquiryError.message
-            : "unknown",
-        });
-      }
-    }
-
-    if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
+    if (saleResult.webResponseStatus === "99") {
       const failureType = classifyFailure(saleResult);
-      const apexError = safeApexError(saleResult);
-      let outcomeUnknown = failureType === "afs_network_block" ||
-        failureType === "afs_http_error" ||
-        failureType === "soap_fault";
-
-      // A failed web response can still hide a completed terminal transaction.
-      // Reconcile the original invoice before declaring it safe to retry.
-      if (!isSafePreDispatchFailure(apexError)) {
-        try {
-          const enquiry = await callApexEcr(
-            config,
-            buildEnquiryByRefEnvelope(
-              config,
-              invoiceNumber,
-              saleResult.posRRN || "",
-              saleResult.posAuthCode || "",
-              transactionId,
-            ),
-            APEX_SOAP_ACTIONS.enquiryByRef,
-            15000,
-          );
-          if (
-            isSuccessfulWebResponse(enquiry.webResponseStatus) &&
-            enquiry.approved
-          ) {
-            saleResult = enquiry;
-          } else {
-            outcomeUnknown = !isNoTransactionFound(safeApexError(enquiry));
-          }
-        } catch {
-          outcomeUnknown = true;
-        }
-      }
-
-      if (saleResult.approved) {
-        console.log("ApexECR failed response reconciled as approved", {
-          correlationId,
-          tid: config.tid,
-        });
-      } else {
-        console.error("ApexECR request failed", {
-          correlationId,
-          operation: "Sale",
-          failureType,
-          httpStatus: saleResult.httpStatus,
-          contentType: saleResult.contentType,
-          elapsedMs: saleResult.elapsedMs,
-          webResponseStatus: saleResult.webResponseStatus,
-          error: apexError,
-        });
-        const responseBody = {
+      console.error("ApexECR request failed", {
+        correlationId,
+        operation: "Sale",
+        failureType,
+        httpStatus: saleResult.httpStatus,
+        contentType: saleResult.contentType,
+        elapsedMs: saleResult.elapsedMs,
+        webResponseStatus: saleResult.webResponseStatus,
+        error: saleResult.webResponseErrorDesc,
+      });
+      return json(
+        {
           success: false,
           approved: false,
           invoiceNumber,
           correlationId,
           failureType,
-          outcomeUnknown,
+          outcomeUnknown: failureType === "afs_network_block" || failureType === "afs_http_error",
           error: failureType === "afs_network_block"
             ? "AFS received the request but its gateway timed out (HTTP 522). Please ask AFS/Ahli Bank to allow and route cloud SOAP POST requests to ApexECR."
-            : apexError,
+            : saleResult.webResponseErrorDesc || "Terminal service error",
           diagnostics: {
             httpStatus: saleResult.httpStatus ?? null,
             contentType: saleResult.contentType ?? null,
             faultCode: saleResult.faultCode || null,
             faultMessage: saleResult.faultMessage || null,
             elapsedMs: saleResult.elapsedMs ?? null,
-            webResponseStatus: saleResult.webResponseStatus || null,
-            webResponseErrorDesc: saleResult.webResponseErrorDesc || null,
-            posRespStatus: saleResult.posRespStatus || null,
-            posRespCode: saleResult.posRespCode || null,
-            posRespText: saleResult.posRespText || null,
           },
-        };
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: transactionId,
-          _state: responseBody.outcomeUnknown ? "unknown" : "failed",
-          _result: responseBody,
-        });
-        return json(responseBody, 200, corsHeaders);
-      }
+        },
+        200,
+        corsHeaders,
+      );
     }
-
-    // Ambiguous approval: AFS accepted the request but the terminal-level
-    // fields do not clearly say approved. Ask the terminal's own record
-    // (EnquiryByRef) before telling the donor the payment failed.
-    if (!saleResult.approved) {
-      console.warn("ApexECR non-approved sale reply", {
-        correlationId,
-        tid: config.tid,
-        posRespStatus: saleResult.posRespStatus || null,
-        posRespCode: saleResult.posRespCode || null,
-        posRespText: saleResult.posRespText || null,
-        posRRN: saleResult.posRRN || null,
-        posAuthCode: saleResult.posAuthCode || null,
-        raw: redactApexRaw(saleResult.raw),
-      });
-
-      const clearlyDeclined =
-        ["0", "-1", "false", "declined", "decline"].includes(
-          String(saleResult.posRespStatus || "")
-            .trim()
-            .toLowerCase(),
-        ) &&
-        !saleResult.posAuthCode &&
-        !saleResult.posRRN;
-
-      if (!clearlyDeclined) {
-        try {
-          const enquiry = await callApexEcr(
-            config,
-            buildEnquiryByRefEnvelope(
-              config,
-              invoiceNumber,
-              saleResult.posRRN || "",
-              saleResult.posAuthCode || "",
-              transactionId,
-            ),
-            APEX_SOAP_ACTIONS.enquiryByRef,
-            15000,
-          );
-          const enquiryApproved =
-            isSuccessfulWebResponse(enquiry.webResponseStatus) &&
-            isApprovedPosResponse(
-              enquiry.posRespStatus,
-              enquiry.posRespCode,
-              enquiry.posAuthCode,
-              enquiry.posRRN,
-              enquiry.posRespText,
-            );
-          console.log("ApexECR outcome enquiry", {
-            correlationId,
-            tid: config.tid,
-            enquiryApproved,
-            posRespStatus: enquiry.posRespStatus || null,
-            posRespCode: enquiry.posRespCode || null,
-          });
-          if (enquiryApproved) {
-            saleResult = {
-              ...saleResult,
-              approved: true,
-              posRespStatus: enquiry.posRespStatus || saleResult.posRespStatus,
-              posRespCode: enquiry.posRespCode || saleResult.posRespCode,
-              posRespText: enquiry.posRespText || saleResult.posRespText,
-              posRRN: enquiry.posRRN || saleResult.posRRN,
-              posAuthCode: enquiry.posAuthCode || saleResult.posAuthCode,
-              posPan: enquiry.posPan || saleResult.posPan,
-              posIssuerName: enquiry.posIssuerName || saleResult.posIssuerName,
-            };
-          }
-        } catch (enquiryError) {
-          console.warn("ApexECR outcome enquiry failed", {
-            correlationId,
-            error: enquiryError instanceof Error
-              ? enquiryError.message
-              : "unknown",
-          });
-        }
-      }
-    }
-
-    const terminalResponse = {
-      success: true,
-      approved: saleResult.approved,
-      invoiceNumber,
-      referenceNumber: null as string | null,
-      rrn: saleResult.posRRN,
-      authCode: saleResult.posAuthCode,
-      responseCode: saleResult.posRespCode,
-      responseText: saleResult.posRespText,
-      cardType: saleResult.posIssuerName,
-      cardLastFour: panLastFour(saleResult.posPan),
-    };
-
-    // The terminal outcome is authoritative and must be durable before any
-    // secondary reporting call. This prevents a charged Sale from remaining
-    // "active" if transaction recording is slow or the isolate is recycled.
-    await supabase.rpc("finish_apex_terminal_session", {
-      _kiosk_id: kioskId,
-      _transaction_id: transactionId,
-      _state: saleResult.approved ? "approved" : "declined",
-      _result: terminalResponse,
-    });
 
     // Record the transaction through the existing pipeline so reporting,
     // reference numbers and receipts behave exactly as they do today.
-    // Admin connection tests take the identical terminal path but are never
-    // stored as donations.
-    const testMode = body?.testMode === true;
     const internalToken = Deno.env.get("INTERNAL_PAYMENT_TOKEN") ?? "";
     let referenceNumber: string | null = null;
 
     try {
-      if (testMode) throw new Error("skip-recording");
-
-      const processController = new AbortController();
-      const processTimer = setTimeout(() => processController.abort(), 8000);
-      let processRes: Response;
-      try {
-        processRes = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${
-                Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-              }`,
-              "x-internal-token": internalToken,
-            },
-            body: JSON.stringify({
-              transactionId,
-              kioskId,
-              amount,
-              category,
-              mobileNumber: null,
-              paymentType: "hardware_pos",
-              provider: "apex_ecr",
-              posResponse: {
-                success: saleResult.approved,
-                responseCode: saleResult.posRespCode ||
-                  (saleResult.approved ? "00" : "05"),
-                rrn: saleResult.posRRN || null,
-                authCode: saleResult.posAuthCode || null,
-                tid: config.tid,
-                mid: config.mid,
-                cardType: saleResult.posIssuerName || null,
-                cardLastFour: panLastFour(saleResult.posPan),
-                invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
-                batchNumber: saleResult.posBatchNumber || null,
-                stan: saleResult.posStan || null,
-                posDate: saleResult.posDate || null,
-                posTime: saleResult.posTime || null,
-                respText: saleResult.posRespText || null,
-                cvmId: saleResult.posCVMId || null,
-              },
-            }),
-            signal: processController.signal,
+      const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "x-internal-token": internalToken,
+        },
+        body: JSON.stringify({
+          transactionId,
+          kioskId,
+          amount,
+          category,
+          mobileNumber: null,
+          paymentType: "hardware_pos",
+          provider: "apex_ecr",
+          posResponse: {
+            success: saleResult.approved,
+            responseCode: saleResult.posRespCode || (saleResult.approved ? "00" : "05"),
+            rrn: saleResult.posRRN || null,
+            authCode: saleResult.posAuthCode || null,
+            tid: config.tid,
+            mid: config.mid,
+            cardType: saleResult.posIssuerName || null,
+            cardLastFour: panLastFour(saleResult.posPan),
+            invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
+            batchNumber: saleResult.posBatchNumber || null,
+            stan: saleResult.posStan || null,
+            posDate: saleResult.posDate || null,
+            posTime: saleResult.posTime || null,
+            respText: saleResult.posRespText || null,
+            cvmId: saleResult.posCVMId || null,
           },
-        );
-      } finally {
-        clearTimeout(processTimer);
-      }
+        }),
+      });
 
       const processBody = await processRes.json().catch(() => ({}));
       referenceNumber = processBody?.transaction?.reference_number ?? null;
     } catch (recordError) {
-      if (!testMode) {
-        console.error(
-          "Failed to record hardware POS transaction:",
-          recordError,
-        );
-      }
+      console.error("Failed to record hardware POS transaction:", recordError);
     }
 
-    const responseBody = { ...terminalResponse, referenceNumber };
-    await supabase.rpc("finish_apex_terminal_session", {
-      _kiosk_id: kioskId,
-      _transaction_id: transactionId,
-      _state: saleResult.approved ? "approved" : "declined",
-      _result: responseBody,
-    });
-    return json(responseBody, 200, corsHeaders);
+    return json(
+      {
+        success: true,
+        approved: saleResult.approved,
+        invoiceNumber,
+        referenceNumber,
+        rrn: saleResult.posRRN,
+        authCode: saleResult.posAuthCode,
+        responseCode: saleResult.posRespCode,
+        responseText: saleResult.posRespText,
+        cardType: saleResult.posIssuerName,
+        cardLastFour: panLastFour(saleResult.posPan),
+      },
+      200,
+      corsHeaders,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
     const aborted = /abort/i.test(message);
@@ -1265,9 +411,7 @@ Deno.serve(async (req) => {
       {
         success: false,
         approved: false,
-        error: aborted
-          ? "The terminal did not respond in time."
-          : "Terminal request failed.",
+        error: aborted ? "The terminal did not respond in time." : "Terminal request failed.",
         timedOut: aborted,
       },
       200,

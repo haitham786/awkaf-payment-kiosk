@@ -35,7 +35,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
 import { startBackgroundSync } from "./services/offlineQueueService";
-import { startHardwarePosKeepAlive } from "./lib/hardwarePosWarm";
 
 const queryClient = new QueryClient();
 
@@ -48,7 +47,6 @@ const AppContent = () => {
   
   React.useEffect(() => {
     startBackgroundSync();
-    return startHardwarePosKeepAlive();
   }, []);
 
   return (
