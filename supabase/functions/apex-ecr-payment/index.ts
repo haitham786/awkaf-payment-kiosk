@@ -906,7 +906,47 @@ serve(async (req) => {
       posRespText: saleResult.posRespText,
     });
 
+    // "Cancelled By ECR" is AFS applying a cancellation to this SALE. The card
+    // was never read, no amount reached the terminal and nothing can be double
+    // charged, so we wait out the quarantine and re-send once. This is the
+    // single largest source of "the amount never appeared on the terminal".
+    if (
+      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
+      classifyFailure(saleResult) === "terminal_cancelled"
+    ) {
+      const { data: liveSession } = await supabase
+        .from("apex_terminal_sessions")
+        .select("transaction_id, cancel_requested, state")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+      const donorCancelled = liveSession?.cancel_requested === true ||
+        ["cancelling", "cancelled"].includes(String(liveSession?.state || ""));
+      const stillOurs = liveSession?.transaction_id === transactionId;
+
+      if (stillOurs && !donorCancelled) {
+        console.warn("ApexECR re-sending SALE after ECR cancellation", { correlationId, tid: config.tid });
+        await new Promise((resolve) => setTimeout(resolve, CANCEL_QUARANTINE_MS));
+        try {
+          saleResult = await callApexEcr(
+            config,
+            buildSaleEnvelope(config, {
+              amount: baisasToDecimalString(amount),
+              invoiceNumber,
+              referenceNumber: transactionId,
+            }),
+            APEX_SOAP_ACTIONS.sale,
+          );
+        } catch (resendError) {
+          console.warn("ApexECR SALE re-send failed", {
+            correlationId,
+            error: resendError instanceof Error ? resendError.message : "unknown",
+          });
+        }
+      }
+    }
+
     if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
+
       const failureType = classifyFailure(saleResult);
       const apexError = safeApexError(saleResult);
       console.error("ApexECR request failed", {
