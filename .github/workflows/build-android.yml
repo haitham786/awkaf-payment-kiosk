@@ -123,27 +123,28 @@ jobs:
           test -n "${THAWANI_MAVEN_TOKEN:-}"
           test -n "${LAMSA_SDK_VERSION:-}"
 
-      - name: Verify Thawani SDK package access
+      - name: Verify Thawani SDK package access (optional)
         shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
         run: |
-          set -euxo pipefail
-          # GitHub Packages returns 302 redirect to the actual blob URL on objects.githubusercontent.com.
-          # Use -L to follow redirects so we get the final 200 OK from the storage backend.
+          set -uxo pipefail
+          # Thawani discontinued Soft POS; their published Maven token is frequently
+          # rotated/revoked (HTTP 401). The kiosk now uses the Apex hardware POS and the
+          # Lamsa bridge loads through reflection, so the SDK is OPTIONAL for the build.
           STATUS_CODE="$(curl -sSL -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/${LAMSA_SDK_VERSION}/lamsa.sdk-${LAMSA_SDK_VERSION}.pom" || true)"
           echo "Thawani SDK ${LAMSA_SDK_VERSION} POM check: HTTP ${STATUS_CODE}"
-          # Accept 200 (direct hit) or 302 (redirect — package exists, follow chain may strip auth header)
-          if [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "302" ]; then
-            echo "::error::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} from GitHub Packages (HTTP ${STATUS_CODE})."
-            echo "::error::This usually means Thawani rotated their public credentials in the docs."
-            echo "::error::Check https://thawani.gitbook.io/lamsa for the latest username/token."
-            cat /tmp/thawani-sdk-check.txt || true
-            exit 1
+          if [ "$STATUS_CODE" = "200" ] || [ "$STATUS_CODE" = "302" ]; then
+            echo "LAMSA_SDK_AVAILABLE=true" >> "$GITHUB_ENV"
+            echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible - it will be bundled"
+          else
+            echo "LAMSA_SDK_AVAILABLE=false" >> "$GITHUB_ENV"
+            echo "::warning::Thawani Lamsa SDK ${LAMSA_SDK_VERSION} is not accessible (HTTP ${STATUS_CODE}). Building WITHOUT the Soft POS SDK; the Apex hardware POS flow is unaffected."
           fi
-          echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible"
+          exit 0
+
 
       - name: Ensure Maven repositories (JitPack + Thawani)
         shell: bash
