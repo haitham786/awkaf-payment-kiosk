@@ -151,6 +151,7 @@ jobs:
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           python3 - << 'PY'
@@ -178,6 +179,11 @@ jobs:
           ]
           thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}]
           thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}]
+          import os
+          if os.environ.get("LAMSA_SDK_AVAILABLE", "false") != "true":
+              thawani_groovy_snippets = []
+              thawani_kts_snippets = []
+              print("Thawani SDK unavailable - skipping its Maven repository")
           for f in ["android/settings.gradle"]:
               patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
           for f in ["android/settings.gradle.kts"]:
@@ -197,10 +203,12 @@ jobs:
         shell: bash
         env:
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           python3 - "$LAMSA_SDK_VERSION" << 'PY'
-          import sys, re
+          import sys, re, os
+          sdk_available = os.environ.get("LAMSA_SDK_AVAILABLE", "false") == "true"
           from pathlib import Path
           version = sys.argv[1]
           for vars_name in ["android/variables.gradle", "android/variables.gradle.kts"]:
@@ -226,11 +234,10 @@ jobs:
               # Replace any existing Lamsa/Kotlin implementation lines, then add the current versions
               text = re.sub(r'\n\s*implementation\(?["\']om\.thawani:lamsa\.sdk:[^"\']+["\']\)?', '', text)
               text = re.sub(r'\n\s*implementation\(?["\']org\.jetbrains\.kotlin:kotlin-stdlib:[^"\']+["\']\)?', '', text)
-              text = re.sub(
-                  r"(dependencies\s*\{)",
-                  rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")',
-                  text
-              )
+              deps = '\\1\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")'
+              if sdk_available:
+                  deps = f'\\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")'
+              text = re.sub(r"(dependencies\s*\{)", deps, text)
               p.write_text(text, encoding="utf-8")
               print(f"Patched {p} with minSdk 26 + dataBinding + Lamsa SDK {version}")
           proguard = Path("android/app/proguard-rules.pro")
@@ -362,7 +369,9 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
+          import os
+          sdk_available = os.environ.get("LAMSA_SDK_AVAILABLE", "false") == "true"
+          if sdk_available and 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
               activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
               xml = xml.replace('</application>', activity + '    </application>', 1)
           xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
@@ -507,6 +516,8 @@ jobs:
       - name: Verify Thawani Lamsa SDK and Capacitor bridge are bundled in APK
         if: success()
         shell: bash
+        env:
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           APK="release-apks/awkaf-kiosk-usb.apk"
@@ -514,13 +525,17 @@ jobs:
           rm -rf /tmp/apk-dex-check
           mkdir -p /tmp/apk-dex-check
           unzip -q "$APK" 'classes*.dex' -d /tmp/apk-dex-check
-          if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
-            exit 1
-          fi
-          if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
-            exit 1
+          if [ "${LAMSA_SDK_AVAILABLE:-false}" = "true" ]; then
+            if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
+              exit 1
+            fi
+            if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
+              exit 1
+            fi
+          else
+            echo "Thawani SDK not bundled (unavailable) - skipping SDK class checks"
           fi
           if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
             echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
