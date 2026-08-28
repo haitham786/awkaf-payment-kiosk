@@ -257,13 +257,18 @@ serve(async (req) => {
     const releasePreAcquisitionIfHeld = async () => {
       if (preAcquisition?.acquisition !== "acquired") return;
       preAcquisition = null;
-      await supabase.rpc("finish_apex_terminal_session", {
-        _kiosk_id: kioskId,
-        _transaction_id: transactionId,
-        _state: "failed",
-        _result: { success: false, approved: false, reason: "sale_not_dispatched" },
-      }).catch(() => undefined);
+      try {
+        await supabase.rpc("finish_apex_terminal_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: transactionId,
+          _state: "failed",
+          _result: { success: false, approved: false, reason: "sale_not_dispatched" },
+        });
+      } catch {
+        // Lease expiry is the backstop if the release itself fails.
+      }
     };
+
 
     if (kioskStatus !== "active") {
       await releasePreAcquisitionIfHeld();
