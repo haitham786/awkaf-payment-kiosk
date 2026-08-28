@@ -744,17 +744,47 @@ serve(async (req) => {
     }
 
     if (acquisition.acquisition === "stale_recovery") {
-      console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid });
-      const recovered = await cancelAtTerminal();
-      if (!recovered.cancelled) {
-        await supabase.rpc("finish_apex_terminal_session", {
-          _kiosk_id: kioskId,
-          _transaction_id: acquisition.owner_transaction_id,
-          _state: "unknown",
-          _result: { success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." },
-        });
-        return json({ success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." }, 200, corsHeaders);
+      // Enquiry first. Blindly cancelling here is what produced most of the
+      // "Cancelled By ECR" rejections: the cancellation caught the SALE that
+      // was dispatched moments later instead of the abandoned session. We only
+      // cancel when the terminal itself says a transaction is still live.
+      let needsCancel = false;
+      try {
+        const priorEnquiry = await callApexEcr(
+          config,
+          buildEnquiryByRefEnvelope(
+            config,
+            invoiceNumberFor(acquisition.owner_transaction_id),
+            "",
+            "",
+            acquisition.owner_transaction_id,
+          ),
+          APEX_SOAP_ACTIONS.enquiryByRef,
+          8000,
+        );
+        needsCancel = isAnotherTransactionInProgress(
+          priorEnquiry.webResponseErrorDesc || priorEnquiry.posRespText || "",
+        );
+      } catch {
+        // The enquiry could not be answered. Sending a cancellation on a guess
+        // risks killing the SALE we are about to send, so we skip it.
+        needsCancel = false;
       }
+      console.warn("ApexECR expired session recovery", { correlationId, tid: config.tid, needsCancel });
+
+      if (needsCancel) {
+        const recovered = await cancelAtTerminal();
+        if (!recovered.cancelled) {
+          await supabase.rpc("finish_apex_terminal_session", {
+            _kiosk_id: kioskId,
+            _transaction_id: acquisition.owner_transaction_id,
+            _state: "unknown",
+            _result: { success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." },
+          });
+          return json({ success: false, approved: false, failureType: "stale_session", outcomeUnknown: true, error: recovered.error || "Unable to clear the expired terminal session." }, 200, corsHeaders);
+        }
+      }
+
       const { data: activated, error: activationError } = await supabase.rpc(
         "activate_recovered_apex_session",
         { _kiosk_id: kioskId, _transaction_id: transactionId, _lease_seconds: leaseSeconds },
@@ -762,16 +792,20 @@ serve(async (req) => {
       if (activationError || activated !== true) {
         return json({ success: false, approved: false, failureType: "terminal_busy", outcomeUnknown: true, error: "The terminal session changed during recovery. Please wait before trying again." }, 200, corsHeaders);
       }
-      await new Promise((resolve) => setTimeout(resolve, 350));
     }
+
+    // Never let a SALE collide with a cancellation AFS is still applying.
+    const quarantineWaitMs = await waitForCancelQuarantine(acquisition.cancel_cooldown_until);
 
     const saleDispatchStartedAt = Date.now();
     console.log("ApexECR sale dispatch", {
       correlationId,
       tid: config.tid,
       configLookupMs: saleDispatchStartedAt - configLookupStartedAt,
+      quarantineWaitMs,
       requestToDispatchMs: saleDispatchStartedAt - requestStartedAt,
     });
+
     let saleResult: ApexEcrResult;
     try {
       saleResult = await callApexEcr(
