@@ -1,4 +1,8 @@
-import { assert, assertEquals, assertStringIncludes } from "https://deno.land/std@0.168.0/testing/asserts.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
   baisasToDecimalString,
   buildSaleEnvelope,
@@ -28,7 +32,9 @@ Deno.test("builds Sale in the live AFS data-contract order", () => {
   const amountIndex = xml.indexOf("<ns:EcrAmount>1.250</ns:EcrAmount>");
   const printerIndex = xml.indexOf("<ns:Printer>");
 
-  assert(configIndex > -1 && configIndex < amountIndex && amountIndex < printerIndex);
+  assert(
+    configIndex > -1 && configIndex < amountIndex && amountIndex < printerIndex,
+  );
   assertStringIncludes(xml, "<tem:Sale>");
   assertStringIncludes(xml, "<ns:EcrCurrencyCode>512</ns:EcrCurrencyCode>");
   assertStringIncludes(xml, "<ns:Tid>12345678</ns:Tid>");
@@ -54,21 +60,35 @@ Deno.test("recognizes successful web response values and formats OMR", () => {
   assertEquals(baisasToDecimalString(1250), "1.250");
 });
 
-Deno.test("recognizes the Apex terminal-busy response for stale-session recovery", () => {
-  assertEquals(
-    isAnotherTransactionInProgress("Another transaction under processing, waiting for POS feedback"),
-    true,
-  );
-  assertEquals(isAnotherTransactionInProgress("Terminal is offline"), false);
-});
+Deno.test(
+  "recognizes the Apex terminal-busy response for stale-session recovery",
+  () => {
+    assertEquals(
+      isAnotherTransactionInProgress(
+        "Another transaction under processing, waiting for POS feedback",
+      ),
+      true,
+    );
+    assertEquals(isAnotherTransactionInProgress("Terminal is offline"), false);
+  },
+);
 
-Deno.test("only retries AFS failures proven to happen before terminal dispatch", () => {
-  assertEquals(isSafePreDispatchFailure(
-    "Connection Timeout Expired while attempting to consume the pre-login handshake acknowledgement",
-  ), true);
-  assertEquals(isSafePreDispatchFailure("The terminal did not respond in time"), false);
-  assertEquals(isSafePreDispatchFailure("Cancelled By ECR"), false);
-});
+Deno.test(
+  "only retries AFS failures proven to happen before terminal dispatch",
+  () => {
+    assertEquals(
+      isSafePreDispatchFailure(
+        "Connection Timeout Expired while attempting to consume the pre-login handshake acknowledgement",
+      ),
+      true,
+    );
+    assertEquals(
+      isSafePreDispatchFailure("The terminal did not respond in time"),
+      false,
+    );
+    assertEquals(isSafePreDispatchFailure("Cancelled By ECR"), false);
+  },
+);
 
 Deno.test("recognizes explicit no-transaction enquiry results", () => {
   assertEquals(isNoTransactionFound("Transaction not found"), true);
