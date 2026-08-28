@@ -97,13 +97,16 @@ const HardwarePosPaymentPage = () => {
       outcomeHandledRef.current = true;
       const arabic = result.failureType === "afs_network_block"
         ? "تعذر على بوابة AFS الوصول إلى خدمة جهاز الدفع. يرجى التواصل مع AFS أو البنك الأهلي لتفعيل مسار الاتصال."
-        : result.failureType === "apex_rejected"
-          ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
-          : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
+        : result.failureType === "terminal_cancelled"
+          ? "تم إلغاء الطلب قبل قراءة البطاقة ولم يتم خصم أي مبلغ. يرجى المحاولة مرة أخرى."
+          : result.failureType === "apex_rejected"
+            ? "رفضت بوابة AFS إرسال الطلب إلى جهاز الدفع. يرجى التحقق من تفعيل وربط الجهاز مع AFS أو البنك الأهلي."
+            : "تعذر الاتصال بجهاز الدفع. يرجى المحاولة لاحقاً.";
       const reference = result.correlationId ? `\nReference: ${result.correlationId}` : "";
       setRetryAllowed(true);
       setErrorMessage(`${arabic}\n${result.error}${reference}`);
       setStage("error");
+
       return;
     }
 

@@ -526,7 +526,7 @@ serve(async (req) => {
         .maybeSingle();
 
       // Cancelled sessions are owned by the cancellation path.
-      const finishedStates = ["approved", "declined", "failed"];
+      const finishedStates = ["approved", "declined", "failed", "rejected"];
 
       const matches = sessionRow?.transaction_id === transactionId;
       const state = matches ? String(sessionRow?.state || "missing") : "missing";
@@ -617,7 +617,7 @@ serve(async (req) => {
       if (ownershipError) throw ownershipError;
       const ownership = Array.isArray(ownershipRows) ? ownershipRows[0] : null;
       if (ownership?.allowed !== true) {
-        const alreadyFinished = ["approved", "declined", "failed", "cancelled"].includes(String(ownership?.session_state || ""));
+        const alreadyFinished = ["approved", "declined", "failed", "rejected", "cancelled"].includes(String(ownership?.session_state || ""));
         return json({
           success: alreadyFinished,
           cancelled: ownership?.session_state === "cancelled",
