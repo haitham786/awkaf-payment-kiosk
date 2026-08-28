@@ -15,6 +15,7 @@ import {
   isNoTransactionFound,
   isSafePreDispatchFailure,
   isSuccessfulWebResponse,
+  normalizeApexSecureKey,
   panLastFour,
   redactApexRaw,
 } from "../_shared/apexEcr.ts";
@@ -173,7 +174,9 @@ serve(async (req) => {
         serviceUrl: String(hardware.service_url || "").trim(),
         tid: String(hardware.tid || "").trim(),
         mid: String(hardware.mid || "").trim(),
-        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
+        secureKey: normalizeApexSecureKey(
+          String(secretRes.data?.apex_secure_key || ""),
+        ) || "",
         currencyCode: String(hardware.currency_code || "512"),
         tellerUserName: "KIOSK",
         tellerFullName: "KIOSK",

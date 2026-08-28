@@ -51,6 +51,13 @@ const emptyHardwarePos = () => ({
   timeout_seconds: 90,
 });
 
+const normalizeApexSecureKey = (value: string): string | null => {
+  const raw = value.trim();
+  if (/^[0-9a-f]{32}$/i.test(raw)) return raw;
+  const tokens = raw.match(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi) || [];
+  return tokens.length === 1 ? tokens[0] : null;
+};
+
 const KiosksManagement = () => {
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +96,12 @@ const KiosksManagement = () => {
   const separateKioskSecret = (configuration: KioskConfiguration) => {
     const { soft_pos, hardware_pos, ...restConfig } = configuration;
     const authKey = soft_pos?.auth_key?.trim() || '';
-    const apexSecureKey = hardware_pos?.secure_key?.trim() || '';
+    const rawApexSecureKey = hardware_pos?.secure_key?.trim() || '';
+    const apexSecureKey = rawApexSecureKey ? normalizeApexSecureKey(rawApexSecureKey) : '';
+
+    if (rawApexSecureKey && !apexSecureKey) {
+      throw new Error('Merchant Secure Key must contain exactly one 32-character hexadecimal key.');
+    }
 
     return {
       publicConfig: {

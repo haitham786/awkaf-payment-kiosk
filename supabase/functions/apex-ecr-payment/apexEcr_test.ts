@@ -11,6 +11,7 @@ import {
   isNoTransactionFound,
   isSafePreDispatchFailure,
   isSuccessfulWebResponse,
+  normalizeApexSecureKey,
   parseApexResponse,
 } from "../_shared/apexEcr.ts";
 
@@ -95,4 +96,15 @@ Deno.test("recognizes explicit no-transaction enquiry results", () => {
   assertEquals(isNoTransactionFound("Transaction does not exist"), true);
   assertEquals(isNoTransactionFound("No matching transaction"), true);
   assertEquals(isNoTransactionFound("Connection timeout"), false);
+});
+
+Deno.test("normalizes and validates AFS Merchant Secure Keys", () => {
+  const key = "0123456789abcdef0123456789ABCDEF";
+  assertEquals(normalizeApexSecureKey(key), key);
+  assertEquals(
+    normalizeApexSecureKey(`Merchant Secure Key: ${key}`),
+    key,
+  );
+  assertEquals(normalizeApexSecureKey("Merchant Secure Key: invalid"), null);
+  assertEquals(normalizeApexSecureKey(`${key} ${key}`), null);
 });
