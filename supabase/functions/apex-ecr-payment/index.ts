@@ -501,7 +501,13 @@ serve(async (req) => {
 
       // Cancelled / unknown sessions are owned by the cancellation path, so
       // only real terminal outcomes are handed back to a polling kiosk.
-      const finishedStates = ["approved", "declined", "failed"];
+      const finishedStates = [
+        "approved",
+        "declined",
+        "failed",
+        "cancelled",
+        "unknown",
+      ];
 
       const matches = sessionRow?.transaction_id === transactionId;
       const finished =
