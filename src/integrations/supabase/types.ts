@@ -10,12 +10,68 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      apex_invoice_map: {
+        Row: {
+          created_at: string
+          invoice_number: string
+          kiosk_id: string
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          invoice_number: string
+          kiosk_id: string
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          invoice_number?: string
+          kiosk_id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apex_invoice_map_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apex_invoice_sequences: {
+        Row: {
+          kiosk_id: string
+          next_value: number
+          updated_at: string
+        }
+        Insert: {
+          kiosk_id: string
+          next_value?: number
+          updated_at?: string
+        }
+        Update: {
+          kiosk_id?: string
+          next_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apex_invoice_sequences_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apex_terminal_sessions: {
         Row: {
+          cancel_cooldown_until: string | null
           cancel_requested: boolean
           created_at: string
           kiosk_id: string
@@ -28,6 +84,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_cooldown_until?: string | null
           cancel_requested?: boolean
           created_at?: string
           kiosk_id: string
@@ -40,6 +97,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_cooldown_until?: string | null
           cancel_requested?: boolean
           created_at?: string
           kiosk_id?: string
@@ -281,6 +339,75 @@ export type Database = {
           },
         ]
       }
+      pos_diagnostics: {
+        Row: {
+          afs_round_trip_ms: number | null
+          amount_baisas: number | null
+          correlation_id: string | null
+          created_at: string
+          dispatch_attempts: number | null
+          dispatched: boolean | null
+          failure_type: string | null
+          http_status: number | null
+          id: string
+          invoice_number: string | null
+          kiosk_id: string | null
+          outcome: string | null
+          pos_resp_code: string | null
+          pos_resp_status: string | null
+          request_to_dispatch_ms: number | null
+          seconds_since_previous_attempt: number | null
+          session_state_before: string | null
+          transaction_id: string | null
+          web_response_error: string | null
+          web_response_status: string | null
+        }
+        Insert: {
+          afs_round_trip_ms?: number | null
+          amount_baisas?: number | null
+          correlation_id?: string | null
+          created_at?: string
+          dispatch_attempts?: number | null
+          dispatched?: boolean | null
+          failure_type?: string | null
+          http_status?: number | null
+          id?: string
+          invoice_number?: string | null
+          kiosk_id?: string | null
+          outcome?: string | null
+          pos_resp_code?: string | null
+          pos_resp_status?: string | null
+          request_to_dispatch_ms?: number | null
+          seconds_since_previous_attempt?: number | null
+          session_state_before?: string | null
+          transaction_id?: string | null
+          web_response_error?: string | null
+          web_response_status?: string | null
+        }
+        Update: {
+          afs_round_trip_ms?: number | null
+          amount_baisas?: number | null
+          correlation_id?: string | null
+          created_at?: string
+          dispatch_attempts?: number | null
+          dispatched?: boolean | null
+          failure_type?: string | null
+          http_status?: number | null
+          id?: string
+          invoice_number?: string | null
+          kiosk_id?: string | null
+          outcome?: string | null
+          pos_resp_code?: string | null
+          pos_resp_status?: string | null
+          request_to_dispatch_ms?: number | null
+          seconds_since_previous_attempt?: number | null
+          session_state_before?: string | null
+          transaction_id?: string | null
+          web_response_error?: string | null
+          web_response_status?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -501,6 +628,7 @@ export type Database = {
         }
         Returns: {
           acquisition: string
+          cancel_cooldown_until: string
           owner_transaction_id: string
           session_state: string
           stored_result: Json
@@ -512,6 +640,31 @@ export type Database = {
           _lease_seconds?: number
           _transaction_id: string
         }
+        Returns: boolean
+      }
+      apex_invoice_for: {
+        Args: { _kiosk_id: string; _transaction_id: string }
+        Returns: string
+      }
+      begin_apex_sale: {
+        Args: {
+          _kiosk_id: string
+          _lease_seconds?: number
+          _transaction_id: string
+        }
+        Returns: {
+          acquisition: string
+          cancel_cooldown_until: string
+          configuration: Json
+          kiosk_status: string
+          owner_transaction_id: string
+          secure_key: string
+          session_state: string
+          stored_result: Json
+        }[]
+      }
+      claim_stale_apex_session: {
+        Args: { _kiosk_id: string; _transaction_id: string }
         Returns: boolean
       }
       finish_apex_terminal_session: {
@@ -530,6 +683,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      mark_apex_cancel_dispatched: {
+        Args: { _cooldown_ms?: number; _kiosk_id: string }
+        Returns: undefined
       }
       request_apex_terminal_cancellation: {
         Args: { _kiosk_id: string; _transaction_id: string }
