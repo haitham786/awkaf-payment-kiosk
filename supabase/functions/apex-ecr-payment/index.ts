@@ -210,6 +210,7 @@ serve(async (req) => {
           owner_transaction_id: string | null;
           session_state: string | null;
           stored_result: Record<string, unknown> | null;
+          cancel_cooldown_until: string | null;
         }
         | null;
       if (!begun || begun.kiosk_status === "missing") {
@@ -224,8 +225,10 @@ serve(async (req) => {
           owner_transaction_id: begun.owner_transaction_id ?? "",
           session_state: begun.session_state ?? "",
           stored_result: begun.stored_result,
+          cancel_cooldown_until: begun.cancel_cooldown_until,
         };
       }
+
     } else {
       // Only load this kiosk. MID/TID uniqueness is enforced when configuration
       // is saved, so no unrelated-kiosk scan belongs on the SALE hot path.
@@ -372,13 +375,34 @@ serve(async (req) => {
     }
 
     /**
+     * Waits out the quarantine window opened by a recent cancellation, so a
+     * SALE is never dispatched while AFS is still applying a CANCEL to this
+     * terminal. Bounded, and normally already elapsed by the time we get here.
+     */
+    const waitForCancelQuarantine = async (until?: string | null) => {
+      if (!until) return 0;
+      const remaining = new Date(until).getTime() - Date.now();
+      if (!(remaining > 0)) return 0;
+      const waitMs = Math.min(remaining, CANCEL_QUARANTINE_MS);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return waitMs;
+    };
+
+    /**
      * Sends RequestCancellation to the terminal. Kept on a short timeout so the
      * donor never waits: the terminal must drop back to its idle screen quickly.
      * Retried once because a terminal that is mid-prompt can reject the first
-     * cancellation while it switches state.
+     * cancellation while it switches state. Every attempt opens the quarantine
+     * window above so the next SALE cannot collide with it.
      */
     const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
       let lastError: string | undefined;
+      const noteCancelDispatched = () =>
+        supabase.rpc("mark_apex_cancel_dispatched", {
+          _kiosk_id: kioskId,
+          _cooldown_ms: CANCEL_QUARANTINE_MS,
+        }).catch(() => undefined);
+
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const result = await callApexEcr(
@@ -387,6 +411,7 @@ serve(async (req) => {
             APEX_SOAP_ACTIONS.cancel,
             12000,
           );
+          void noteCancelDispatched();
           if (
             isSuccessfulWebResponse(result.webResponseStatus) ||
             /transaction\s+not\s+found|no\s+(?:active|pending)\s+transaction/i.test(result.webResponseErrorDesc)
@@ -395,12 +420,15 @@ serve(async (req) => {
           }
           lastError = result.webResponseErrorDesc || "Cancellation rejected";
         } catch (err) {
+          void noteCancelDispatched();
           lastError = err instanceof Error ? err.message : "Cancellation failed";
         }
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
       return { cancelled: false, error: lastError };
     };
+
+
 
     // ------------------------------------------------------------------ warm
     // Idle readiness probe. Keeps this isolate hot, primes the terminal
