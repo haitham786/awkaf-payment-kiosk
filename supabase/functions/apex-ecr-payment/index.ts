@@ -27,7 +27,17 @@ interface TerminalAcquisition {
   owner_transaction_id: string;
   session_state: string;
   stored_result: Record<string, unknown> | null;
+  cancel_cooldown_until?: string | null;
 }
+
+/**
+ * AFS applies a CANCEL to whatever transaction is arriving at the terminal, so
+ * a SALE sent too soon after a cancellation comes back as "Cancelled By ECR".
+ * Every cancellation therefore opens a short quarantine window that the next
+ * SALE must respect before it is dispatched.
+ */
+const CANCEL_QUARANTINE_MS = 900;
+
 
 /** Deterministic 6-digit ECR invoice number derived from our transaction id. */
 function invoiceNumberFor(transactionId: string): string {
@@ -47,8 +57,12 @@ function classifyFailure(result: { httpStatus?: number; contentType?: string; we
   if (result.httpStatus === 522 || /WAF|HTML page/i.test(result.webResponseErrorDesc)) return "afs_network_block";
   if (result.faultCode || result.faultMessage) return "soap_fault";
   if (result.httpStatus && result.httpStatus >= 400) return "afs_http_error";
+  // "Cancelled By ECR": AFS applied a cancellation to this SALE. The card was
+  // never read, so this is a clean, safely retryable outcome — not a decline.
+  if (/cancell?ed\s+by\s+ecr|cancell?ed/i.test(result.webResponseErrorDesc)) return "terminal_cancelled";
   return "apex_rejected";
 }
+
 
 function safeApexError(result: { webResponseErrorDesc: string; posRespText: string; posRespCode: string }): string {
   const message = result.webResponseErrorDesc || result.posRespText;
