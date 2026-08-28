@@ -900,11 +900,12 @@ serve(async (req) => {
       // cancel when the terminal itself says a transaction is still live.
       let needsCancel = false;
       try {
+        const priorInvoice = await invoiceNumberFor(supabase, kioskId, acquisition.owner_transaction_id);
         const priorEnquiry = await callApexEcr(
           config,
           buildEnquiryByRefEnvelope(
             config,
-            invoiceNumberFor(acquisition.owner_transaction_id),
+            priorInvoice,
             "",
             "",
             acquisition.owner_transaction_id,
