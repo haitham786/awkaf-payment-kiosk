@@ -870,8 +870,12 @@ serve(async (req) => {
 
       // Re-send even when the cancellation reply is unclear: Apex frequently
       // clears the orphan without acknowledging it, and a SALE that Apex never
-      // accepted cannot double-charge.
-      await new Promise((resolve) => setTimeout(resolve, cancellation.cancelled ? 350 : 700));
+      // accepted cannot double-charge. The quarantine window still applies, or
+      // AFS applies this cancellation to the SALE we are about to re-send.
+      await new Promise((resolve) =>
+        setTimeout(resolve, cancellation.cancelled ? CANCEL_QUARANTINE_MS : CANCEL_QUARANTINE_MS + 350)
+      );
+
       try {
         saleResult = await callApexEcr(
           config,
