@@ -924,6 +924,62 @@ serve(async (req) => {
       });
     }
 
+    // A generic Apex timeout is not safe to replay by itself: the terminal may
+    // have received it. If EnquiryByRef explicitly proves that the original
+    // reference does not exist, however, the Sale was never accepted and the
+    // identical request can be submitted once without risking a second charge.
+    if (
+      !isSuccessfulWebResponse(saleResult.webResponseStatus) &&
+      !isSafePreDispatchFailure(safeApexError(saleResult))
+    ) {
+      try {
+        const deliveryEnquiry = await callApexEcr(
+          config,
+          buildEnquiryByRefEnvelope(
+            config,
+            invoiceNumber,
+            saleResult.posRRN || "",
+            saleResult.posAuthCode || "",
+            transactionId,
+          ),
+          APEX_SOAP_ACTIONS.enquiryByRef,
+          15000,
+        );
+        const enquiryError = safeApexError(deliveryEnquiry);
+        if (isNoTransactionFound(enquiryError)) {
+          console.warn("ApexECR delivery not found; retrying Sale", {
+            correlationId,
+            tid: config.tid,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          saleResult = await callApexEcr(
+            config,
+            buildSaleEnvelope(config, {
+              amount: baisasToDecimalString(amount),
+              invoiceNumber,
+              referenceNumber: transactionId,
+            }),
+            APEX_SOAP_ACTIONS.sale,
+          );
+          console.log("ApexECR confirmed-missing retry response", {
+            correlationId,
+            tid: config.tid,
+            elapsedMs: saleResult.elapsedMs ?? null,
+            webResponseStatus: saleResult.webResponseStatus,
+            posRespStatus: saleResult.posRespStatus,
+          });
+        }
+      } catch (deliveryEnquiryError) {
+        console.warn("ApexECR delivery enquiry failed", {
+          correlationId,
+          tid: config.tid,
+          error: deliveryEnquiryError instanceof Error
+            ? deliveryEnquiryError.message
+            : "unknown",
+        });
+      }
+    }
+
     if (!isSuccessfulWebResponse(saleResult.webResponseStatus)) {
       const failureType = classifyFailure(saleResult);
       const apexError = safeApexError(saleResult);

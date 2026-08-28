@@ -92,6 +92,7 @@ Deno.test(
 
 Deno.test("recognizes explicit no-transaction enquiry results", () => {
   assertEquals(isNoTransactionFound("Transaction not found"), true);
+  assertEquals(isNoTransactionFound("Transaction does not exist"), true);
   assertEquals(isNoTransactionFound("No matching transaction"), true);
   assertEquals(isNoTransactionFound("Connection timeout"), false);
 });

@@ -324,7 +324,7 @@ export function isSafePreDispatchFailure(message: string): boolean {
 
 /** AFS explicitly confirms that no terminal transaction exists for a reference. */
 export function isNoTransactionFound(message: string): boolean {
-  return /transaction\s+not\s+found|no\s+(?:active|pending|matching)\s+transaction|reference\s+(?:was\s+)?not\s+found|record\s+not\s+found/i.test(
+  return /transaction\s+(?:was\s+)?(?:not\s+found|does\s+not\s+exist)|no\s+(?:active|pending|matching)\s+transaction|reference\s+(?:was\s+)?not\s+found|record\s+not\s+found/i.test(
     String(message || ""),
   );
 }
