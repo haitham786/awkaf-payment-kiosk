@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
@@ -15,6 +14,7 @@ import {
   isNoTransactionFound,
   isSafePreDispatchFailure,
   isSuccessfulWebResponse,
+  normalizeApexSecureKey,
   panLastFour,
   redactApexRaw,
 } from "../_shared/apexEcr.ts";
@@ -89,7 +89,7 @@ function safeApexError(result: {
   );
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -173,7 +173,9 @@ serve(async (req) => {
         serviceUrl: String(hardware.service_url || "").trim(),
         tid: String(hardware.tid || "").trim(),
         mid: String(hardware.mid || "").trim(),
-        secureKey: String(secretRes.data?.apex_secure_key || "").trim(),
+        secureKey: normalizeApexSecureKey(
+          String(secretRes.data?.apex_secure_key || ""),
+        ) || "",
         currencyCode: String(hardware.currency_code || "512"),
         tellerUserName: "KIOSK",
         tellerFullName: "KIOSK",

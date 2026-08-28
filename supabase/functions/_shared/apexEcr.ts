@@ -75,6 +75,19 @@ export interface ApexEcrResult {
   elapsedMs?: number;
 }
 
+/**
+ * AFS Merchant Secure Keys are 32 hexadecimal characters. Operators sometimes
+ * paste a labelled line from an onboarding document instead of the token alone;
+ * accept that safe form, but reject ambiguous or malformed values.
+ */
+export function normalizeApexSecureKey(value: string): string | null {
+  const raw = String(value || "").trim();
+  if (/^[0-9a-f]{32}$/i.test(raw)) return raw;
+
+  const tokens = raw.match(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi) || [];
+  return tokens.length === 1 ? tokens[0] : null;
+}
+
 export function escapeXml(value: string): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
