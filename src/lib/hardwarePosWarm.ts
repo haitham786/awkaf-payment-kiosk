@@ -34,6 +34,7 @@ let loopTimer: number | null = null;
 
 let snapshot: ReadinessSnapshot = { status: "unknown", checkedAt: 0 };
 const listeners = new Set<(snapshot: ReadinessSnapshot) => void>();
+const ACTIVE_SESSION_KEY = "hardware_pos_session_active";
 
 function publish(status: TerminalReadiness) {
   snapshot = { status, checkedAt: Date.now() };
@@ -53,6 +54,7 @@ export function subscribeTerminalReadiness(listener: (snapshot: ReadinessSnapsho
 function canWarmHardwarePos(): { kioskId: string } | null {
   try {
     const kioskId = localStorage.getItem("kiosk_id");
+    if (sessionStorage.getItem(ACTIVE_SESSION_KEY) === "true") return null;
     if (!kioskId || getCachedPaymentMode(kioskId) !== "hardware_pos") return null;
     return { kioskId };
   } catch {
@@ -66,6 +68,12 @@ function canWarmHardwarePos(): { kioskId: string } | null {
  */
 export function setHardwarePosSessionBusy(busy: boolean) {
   sessionBusy = busy;
+  try {
+    if (busy) sessionStorage.setItem(ACTIVE_SESSION_KEY, "true");
+    else sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+  } catch {
+    // In-memory coordination still protects browsers where storage is blocked.
+  }
   if (busy) {
     publish("busy");
     if (loopTimer !== null) {

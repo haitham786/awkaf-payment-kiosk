@@ -119,11 +119,21 @@ function configBlock(config: ApexEcrConfig, ns: string): string {
   // Element order must match the WCF data contract (alphabetical within EcrConfig).
   return `
         <${ns}Config>
-          <${ns}EcrCurrencyCode>${escapeXml(config.currencyCode)}</${ns}EcrCurrencyCode>
-          <${ns}EcrTillerFullName>${escapeXml(config.tellerFullName || "KIOSK")}</${ns}EcrTillerFullName>
-          <${ns}EcrTillerUserName>${escapeXml(config.tellerUserName || "KIOSK")}</${ns}EcrTillerUserName>
-          <${ns}IntegratorName>${escapeXml(config.integratorName || "AWKAF-KIOSK")}</${ns}IntegratorName>
-          <${ns}MerchantSecureKey>${escapeXml(config.secureKey)}</${ns}MerchantSecureKey>
+          <${ns}EcrCurrencyCode>${
+    escapeXml(config.currencyCode)
+  }</${ns}EcrCurrencyCode>
+          <${ns}EcrTillerFullName>${
+    escapeXml(config.tellerFullName || "KIOSK")
+  }</${ns}EcrTillerFullName>
+          <${ns}EcrTillerUserName>${
+    escapeXml(config.tellerUserName || "KIOSK")
+  }</${ns}EcrTillerUserName>
+          <${ns}IntegratorName>${
+    escapeXml(config.integratorName || "AWKAF-KIOSK")
+  }</${ns}IntegratorName>
+          <${ns}MerchantSecureKey>${
+    escapeXml(config.secureKey)
+  }</${ns}MerchantSecureKey>
           <${ns}Mid>${escapeXml(config.mid)}</${ns}Mid>
           <${ns}Tenant>${escapeXml(config.tenant || "")}</${ns}Tenant>
           <${ns}Tid>${escapeXml(config.tid)}</${ns}Tid>
@@ -146,7 +156,9 @@ function printerBlock(
           <${ns}InvoiceNumber>${escapeXml(invoiceNumber)}</${ns}InvoiceNumber>
           <${ns}PrinterWidth>40</${ns}PrinterWidth>
           <${ns}ReceiptNote></${ns}ReceiptNote>
-          <${ns}ReferenceNumber>${escapeXml(referenceNumber)}</${ns}ReferenceNumber>
+          <${ns}ReferenceNumber>${
+    escapeXml(referenceNumber)
+  }</${ns}ReferenceNumber>
         </${ns}Printer>`;
 }
 
@@ -174,7 +186,9 @@ export function buildSaleEnvelope(
   request: ApexSaleRequest,
 ): string {
   const inner = `${configBlock(config, "ns:")}
-        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>${printerBlock("ns:", request.invoiceNumber, request.referenceNumber)}`;
+        <ns:EcrAmount>${escapeXml(request.amount)}</ns:EcrAmount>${
+    printerBlock("ns:", request.invoiceNumber, request.referenceNumber)
+  }`;
   return envelope(config, "Sale", inner);
 }
 
@@ -188,8 +202,12 @@ export function buildEnquiryByRefEnvelope(
 ): string {
   const inner = `${configBlock(config, "ns:")}
         <ns:OrigAuthCode>${escapeXml(origAuthCode)}</ns:OrigAuthCode>
-        <ns:OrigInvoiceNumber>${escapeXml(origInvoiceNumber)}</ns:OrigInvoiceNumber>
-        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>${printerBlock("ns:", origInvoiceNumber, referenceNumber)}`;
+        <ns:OrigInvoiceNumber>${
+    escapeXml(origInvoiceNumber)
+  }</ns:OrigInvoiceNumber>
+        <ns:OrigRrn>${escapeXml(origRrn)}</ns:OrigRrn>${
+    printerBlock("ns:", origInvoiceNumber, referenceNumber)
+  }`;
   return envelope(config, "EnquiryByRef", inner);
 }
 
@@ -226,8 +244,7 @@ export function parseApexResponse(xml: string): ApexEcrResult {
     posIssuerName: pickTag(xml, "PosIssuerName"),
     posCardEntryModeId: pickTag(xml, "PosCardEntryModeId"),
     posReceipt: pickTag(xml, "PosReceipt"),
-    approved:
-      webOk &&
+    approved: webOk &&
       isApprovedPosResponse(
         posRespStatus,
         pickTag(xml, "PosRespCode"),
@@ -266,16 +283,18 @@ export function isApprovedPosResponse(
   const status = String(posRespStatus || "")
     .trim()
     .toLowerCase();
-  if (["1", "true", "approved", "approve", "success"].includes(status))
+  if (["1", "true", "approved", "approve", "success"].includes(status)) {
     return true;
-  if (["0", "-1", "false", "declined", "decline"].includes(status))
+  }
+  if (["0", "-1", "false", "declined", "decline"].includes(status)) {
     return false;
+  }
 
   // Status missing/unknown: fall back to the issuer response.
   const code = String(posRespCode || "").trim();
   const approvedCode = code === "00" || code === "000";
-  const hasProof =
-    !!String(posAuthCode || "").trim() || !!String(posRRN || "").trim();
+  const hasProof = !!String(posAuthCode || "").trim() ||
+    !!String(posRRN || "").trim();
   const approvedText = /approved|accepted/i.test(String(posRespText || ""));
   return (approvedCode && hasProof) || (approvedCode && approvedText);
 }
@@ -304,9 +323,10 @@ export function redactApexRaw(xml: string): string {
  * new SALE was not accepted by Apex; cancel the last request, then submit once.
  */
 export function isAnotherTransactionInProgress(message: string): boolean {
-  return /another\s+transaction\s+(?:is\s+)?(?:under|in)\s+process(?:ing)?|waiting\s+for\s+pos\s+feedback/i.test(
-    String(message || ""),
-  );
+  return /another\s+transaction\s+(?:is\s+)?(?:under|in)\s+process(?:ing)?|waiting\s+for\s+pos\s+feedback/i
+    .test(
+      String(message || ""),
+    );
 }
 
 /**
@@ -317,16 +337,18 @@ export function isAnotherTransactionInProgress(message: string): boolean {
  */
 export function isSafePreDispatchFailure(message: string): boolean {
   const value = String(message || "");
-  return /pre-login\s+handshake|while\s+attempting\s+to\s+connect\s+to\s+this\s+server|database\s+(?:connection|login)\s+(?:timeout|failed)|sql\s+server\s+(?:is\s+)?(?:unavailable|not\s+accessible)/i.test(
-    value,
-  );
+  return /pre-login\s+handshake|while\s+attempting\s+to\s+connect\s+to\s+this\s+server|database\s+(?:connection|login)\s+(?:timeout|failed)|sql\s+server\s+(?:is\s+)?(?:unavailable|not\s+accessible)/i
+    .test(
+      value,
+    );
 }
 
 /** AFS explicitly confirms that no terminal transaction exists for a reference. */
 export function isNoTransactionFound(message: string): boolean {
-  return /transaction\s+not\s+found|no\s+(?:active|pending|matching)\s+transaction|reference\s+(?:was\s+)?not\s+found|record\s+not\s+found/i.test(
-    String(message || ""),
-  );
+  return /transaction\s+(?:was\s+)?(?:not\s+found|does\s+not\s+exist)|no\s+(?:active|pending|matching)\s+transaction|reference\s+(?:was\s+)?not\s+found|record\s+not\s+found/i
+    .test(
+      String(message || ""),
+    );
 }
 
 /** Last four digits of a masked PAN such as "470468******4250". */
@@ -341,10 +363,9 @@ export async function callApexEcr(
   soapAction: string,
   timeoutMsOverride?: number,
 ): Promise<ApexEcrResult> {
-  const timeoutMs =
-    timeoutMsOverride && timeoutMsOverride > 0
-      ? timeoutMsOverride
-      : Math.max(5, config.timeoutSeconds ?? 90) * 1000;
+  const timeoutMs = timeoutMsOverride && timeoutMsOverride > 0
+    ? timeoutMsOverride
+    : Math.max(5, config.timeoutSeconds ?? 90) * 1000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
@@ -362,18 +383,19 @@ export async function callApexEcr(
 
     const text = await response.text();
     const contentType = response.headers.get("content-type") || "";
-    const looksHtml =
-      /^\s*<(!doctype|html)/i.test(text) || contentType.includes("text/html");
+    const looksHtml = /^\s*<(!doctype|html)/i.test(text) ||
+      contentType.includes("text/html");
 
     const parsed = parseApexResponse(text);
     if (!response.ok || looksHtml || parsed.faultCode || parsed.faultMessage) {
       return {
         ...parsed,
         webResponseStatus: "99",
-        webResponseErrorDesc:
-          parsed.faultMessage ||
+        webResponseErrorDesc: parsed.faultMessage ||
           (!response.ok
-            ? `ApexECR HTTP ${response.status}${looksHtml ? " (HTML/WAF response)" : ""}`
+            ? `ApexECR HTTP ${response.status}${
+              looksHtml ? " (HTML/WAF response)" : ""
+            }`
             : "ApexECR returned an HTML page instead of SOAP (likely a firewall/WAF block or wrong service URL)"),
         approved: false,
         httpStatus: response.status,

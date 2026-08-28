@@ -4,6 +4,7 @@ import {
   assertStringIncludes,
 } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
+  type ApexEcrConfig,
   baisasToDecimalString,
   buildSaleEnvelope,
   isAnotherTransactionInProgress,
@@ -11,7 +12,6 @@ import {
   isSafePreDispatchFailure,
   isSuccessfulWebResponse,
   parseApexResponse,
-  type ApexEcrConfig,
 } from "../_shared/apexEcr.ts";
 
 const config: ApexEcrConfig = {
@@ -92,6 +92,7 @@ Deno.test(
 
 Deno.test("recognizes explicit no-transaction enquiry results", () => {
   assertEquals(isNoTransactionFound("Transaction not found"), true);
+  assertEquals(isNoTransactionFound("Transaction does not exist"), true);
   assertEquals(isNoTransactionFound("No matching transaction"), true);
   assertEquals(isNoTransactionFound("Connection timeout"), false);
 });
