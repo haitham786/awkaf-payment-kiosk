@@ -397,11 +397,17 @@ serve(async (req) => {
      */
     const cancelAtTerminal = async (): Promise<{ cancelled: boolean; error?: string }> => {
       let lastError: string | undefined;
-      const noteCancelDispatched = () =>
-        supabase.rpc("mark_apex_cancel_dispatched", {
-          _kiosk_id: kioskId,
-          _cooldown_ms: CANCEL_QUARANTINE_MS,
-        }).catch(() => undefined);
+      const noteCancelDispatched = async () => {
+        try {
+          await supabase.rpc("mark_apex_cancel_dispatched", {
+            _kiosk_id: kioskId,
+            _cooldown_ms: CANCEL_QUARANTINE_MS,
+          });
+        } catch {
+          // Best effort: the in-request quarantine below still applies.
+        }
+      };
+
 
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
