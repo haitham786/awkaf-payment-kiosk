@@ -614,15 +614,35 @@ serve(async (req) => {
         firstAttemptMs: saleResult.elapsedMs ?? null,
       });
       await new Promise((resolve) => setTimeout(resolve, 750));
-      saleResult = await callApexEcr(
-        config,
-        buildSaleEnvelope(config, {
-          amount: baisasToDecimalString(amount),
-          invoiceNumber,
-          referenceNumber: transactionId,
-        }),
-        APEX_SOAP_ACTIONS.sale,
-      );
+      try {
+        saleResult = await callApexEcr(
+          config,
+          buildSaleEnvelope(config, {
+            amount: baisasToDecimalString(amount),
+            invoiceNumber,
+            referenceNumber: transactionId,
+          }),
+          APEX_SOAP_ACTIONS.sale,
+        );
+      } catch (retryError) {
+        const retryMessage = retryError instanceof Error ? retryError.message : "Terminal retry failed.";
+        const responseBody = {
+          success: false,
+          approved: false,
+          timedOut: /abort/i.test(retryMessage),
+          outcomeUnknown: true,
+          failureType: "terminal_timeout",
+          error: "The payment outcome could not be confirmed. Please do not retry yet.",
+          correlationId,
+        };
+        await supabase.rpc("finish_apex_terminal_session", {
+          _kiosk_id: kioskId,
+          _transaction_id: transactionId,
+          _state: "unknown",
+          _result: responseBody,
+        });
+        return json(responseBody, 200, corsHeaders);
+      }
       console.log("ApexECR Sale retry response", {
         correlationId,
         tid: config.tid,
@@ -774,6 +794,29 @@ serve(async (req) => {
 
 
 
+    const terminalResponse = {
+      success: true,
+      approved: saleResult.approved,
+      invoiceNumber,
+      referenceNumber: null as string | null,
+      rrn: saleResult.posRRN,
+      authCode: saleResult.posAuthCode,
+      responseCode: saleResult.posRespCode,
+      responseText: saleResult.posRespText,
+      cardType: saleResult.posIssuerName,
+      cardLastFour: panLastFour(saleResult.posPan),
+    };
+
+    // The terminal outcome is authoritative and must be durable before any
+    // secondary reporting call. This prevents a charged Sale from remaining
+    // "active" if transaction recording is slow or the isolate is recycled.
+    await supabase.rpc("finish_apex_terminal_session", {
+      _kiosk_id: kioskId,
+      _transaction_id: transactionId,
+      _state: saleResult.approved ? "approved" : "declined",
+      _result: terminalResponse,
+    });
+
     // Record the transaction through the existing pipeline so reporting,
     // reference numbers and receipts behave exactly as they do today.
     // Admin connection tests take the identical terminal path but are never
@@ -785,40 +828,48 @@ serve(async (req) => {
     try {
       if (testMode) throw new Error("skip-recording");
 
-      const processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "x-internal-token": internalToken,
-        },
-        body: JSON.stringify({
-          transactionId,
-          kioskId,
-          amount,
-          category,
-          mobileNumber: null,
-          paymentType: "hardware_pos",
-          provider: "apex_ecr",
-          posResponse: {
-            success: saleResult.approved,
-            responseCode: saleResult.posRespCode || (saleResult.approved ? "00" : "05"),
-            rrn: saleResult.posRRN || null,
-            authCode: saleResult.posAuthCode || null,
-            tid: config.tid,
-            mid: config.mid,
-            cardType: saleResult.posIssuerName || null,
-            cardLastFour: panLastFour(saleResult.posPan),
-            invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
-            batchNumber: saleResult.posBatchNumber || null,
-            stan: saleResult.posStan || null,
-            posDate: saleResult.posDate || null,
-            posTime: saleResult.posTime || null,
-            respText: saleResult.posRespText || null,
-            cvmId: saleResult.posCVMId || null,
+      const processController = new AbortController();
+      const processTimer = setTimeout(() => processController.abort(), 8000);
+      let processRes: Response;
+      try {
+        processRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/process-payment`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            "x-internal-token": internalToken,
           },
-        }),
-      });
+          body: JSON.stringify({
+            transactionId,
+            kioskId,
+            amount,
+            category,
+            mobileNumber: null,
+            paymentType: "hardware_pos",
+            provider: "apex_ecr",
+            posResponse: {
+              success: saleResult.approved,
+              responseCode: saleResult.posRespCode || (saleResult.approved ? "00" : "05"),
+              rrn: saleResult.posRRN || null,
+              authCode: saleResult.posAuthCode || null,
+              tid: config.tid,
+              mid: config.mid,
+              cardType: saleResult.posIssuerName || null,
+              cardLastFour: panLastFour(saleResult.posPan),
+              invoiceNumber: saleResult.posInvoiceNumber || invoiceNumber,
+              batchNumber: saleResult.posBatchNumber || null,
+              stan: saleResult.posStan || null,
+              posDate: saleResult.posDate || null,
+              posTime: saleResult.posTime || null,
+              respText: saleResult.posRespText || null,
+              cvmId: saleResult.posCVMId || null,
+            },
+          }),
+          signal: processController.signal,
+        });
+      } finally {
+        clearTimeout(processTimer);
+      }
 
       const processBody = await processRes.json().catch(() => ({}));
       referenceNumber = processBody?.transaction?.reference_number ?? null;
@@ -827,18 +878,7 @@ serve(async (req) => {
     }
 
 
-    const responseBody = {
-        success: true,
-        approved: saleResult.approved,
-        invoiceNumber,
-        referenceNumber,
-        rrn: saleResult.posRRN,
-        authCode: saleResult.posAuthCode,
-        responseCode: saleResult.posRespCode,
-        responseText: saleResult.posRespText,
-        cardType: saleResult.posIssuerName,
-        cardLastFour: panLastFour(saleResult.posPan),
-      };
+    const responseBody = { ...terminalResponse, referenceNumber };
     await supabase.rpc("finish_apex_terminal_session", {
       _kiosk_id: kioskId,
       _transaction_id: transactionId,
