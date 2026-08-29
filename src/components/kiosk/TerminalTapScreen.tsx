@@ -159,7 +159,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
               </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-18 h-18 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
+              <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
                 <CreditCard className="w-9 h-9 text-white" />
               </div>
             </div>
