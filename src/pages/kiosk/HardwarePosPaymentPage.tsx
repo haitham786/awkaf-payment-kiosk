@@ -6,6 +6,7 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
+import { ConnectingPosScreen } from "@/components/kiosk/ConnectingPosScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
