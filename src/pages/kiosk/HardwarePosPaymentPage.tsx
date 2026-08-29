@@ -44,6 +44,7 @@ const HardwarePosPaymentPage = () => {
   const [retryAllowed, setRetryAllowed] = useState(true);
   const [timeoutSeconds, setTimeoutSeconds] = useState(90);
   const [declineMessage, setDeclineMessage] = useState("");
+  const [showConnecting, setShowConnecting] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
   );
