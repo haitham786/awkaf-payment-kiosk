@@ -516,9 +516,11 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Verify Thawani Lamsa SDK and Capacitor bridge are bundled in APK
+      - name: Verify Capacitor bridge (and Lamsa SDK when bundled) in APK
         if: success()
         shell: bash
+        env:
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           APK="release-apks/awkaf-kiosk-usb.apk"
@@ -526,13 +528,17 @@ jobs:
           rm -rf /tmp/apk-dex-check
           mkdir -p /tmp/apk-dex-check
           unzip -q "$APK" 'classes*.dex' -d /tmp/apk-dex-check
-          if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
-            exit 1
-          fi
-          if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
-            exit 1
+          if [ "${LAMSA_SDK_AVAILABLE:-false}" = "true" ]; then
+            if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
+              exit 1
+            fi
+            if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
+              exit 1
+            fi
+          else
+            echo "Lamsa SDK not bundled (reflection fallback) — skipping SDK dex checks"
           fi
           if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
             echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
