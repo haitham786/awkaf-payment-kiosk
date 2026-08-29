@@ -86,10 +86,10 @@ const HardwarePosPaymentPage = () => {
     fetchCategory();
   }, [category]);
 
-  // Show the "Connecting with POS Device" interstitial for 3 seconds so the
+  // Show the "Connecting with POS Device" interstitial for 2 seconds so the
   // donor sees feedback while the terminal wakes up and displays the amount.
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowConnecting(false), 3000);
+    const timer = window.setTimeout(() => setShowConnecting(false), 2000);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -210,12 +210,12 @@ const HardwarePosPaymentPage = () => {
   };
 
   useEffect(() => {
-    if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
-    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 10000);
+    if (stage !== "declined") return;
+    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 2000);
     return () => window.clearTimeout(timer);
-  }, [navigate, retryAllowed, stage]);
+  }, [navigate, stage]);
 
-  // Show the connecting interstitial for the first 3 seconds while the POS
+  // Show the connecting interstitial for the first 2 seconds while the POS
   // sale is in flight. If the terminal responds earlier, the page navigates
   // away; if an error/decline arrives earlier, it is shown immediately.
   if (
@@ -289,7 +289,7 @@ const HardwarePosPaymentPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-md mx-auto flex flex-col justify-center gap-3 pb-24">
+      <div className="w-full max-w-md mx-auto flex flex-col justify-center pb-16">
         <Card className="px-5 py-8 bg-white/50 backdrop-blur-sm shadow-sm text-center rounded-xl">
           <div className="space-y-5">
             <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full shadow-md flex items-center justify-center">
@@ -303,30 +303,6 @@ const HardwarePosPaymentPage = () => {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-4 px-1 pt-2 items-stretch">
-          <KioskButton
-            variant="secondary"
-            size="xl"
-            onClick={handleCancel}
-            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
-          >
-            <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold text-gray-900 tracking-normal">إلغاء</span>
-              <span className="text-xs font-normal text-gray-900 mt-1">Cancel</span>
-            </span>
-          </KioskButton>
-          <KioskButton
-            variant="secondary"
-            size="xl"
-            onClick={handleTryAgain}
-            className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
-          >
-            <span className="flex flex-col items-center leading-tight">
-              <span className="text-base font-bold text-gray-900 tracking-normal">المحاولة مرة أخرى</span>
-              <span className="text-xs font-normal text-gray-900 mt-1">Try Again</span>
-            </span>
-          </KioskButton>
-        </div>
       </div>
     </KioskLayout>
   );
