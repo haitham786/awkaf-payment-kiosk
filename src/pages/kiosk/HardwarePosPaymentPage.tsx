@@ -224,8 +224,8 @@ const HardwarePosPaymentPage = () => {
         category={category}
         stage={stage === "cancelling" ? "processing" : stage}
         onCancel={handleCancel}
-        onTimeout={handleTimeout}
-        timeoutSeconds={timeoutSeconds}
+        onTimeout={handleInactivityTimeout}
+        timeoutSeconds={10}
         cancelling={false}
       />
     );
