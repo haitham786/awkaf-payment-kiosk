@@ -58,7 +58,7 @@ serve(async (req) => {
     let transaction: any = null;
     const { data: txByRef } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
+      .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number, pos_rrn')
       .eq('reference_number', reference_number)
       .maybeSingle();
     if (txByRef) {
@@ -66,7 +66,7 @@ serve(async (req) => {
     } else if (transaction_id) {
       const { data: txById } = await supabaseAdmin
         .from('transactions')
-        .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number')
+        .select('id, reference_number, amount_baisas, status, whatsapp_status, category, mobile_number, pos_rrn')
         .eq('id', transaction_id)
         .maybeSingle();
       transaction = txById;
@@ -156,7 +156,7 @@ serve(async (req) => {
       categoryArabic,
       amount_baisas,
       reference: transaction.reference_number || reference_number,
-      pos_rrn: pos_rrn || null,
+      pos_rrn: transaction.pos_rrn || pos_rrn || null,
     });
 
     const form = new URLSearchParams({
@@ -175,7 +175,7 @@ serve(async (req) => {
         "2": formattedAmount,
         "3": `${dateStr} ${timeStr}`,
         "4": transaction.reference_number || reference_number,
-        "5": pos_rrn || '-',
+        "5": transaction.pos_rrn || pos_rrn || '-',
       };
       form.set('ContentSid', waSettings.template_sid);
       form.set('ContentVariables', JSON.stringify(contentVariables));

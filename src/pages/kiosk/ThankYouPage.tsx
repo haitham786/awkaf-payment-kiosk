@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
-import { Home, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
@@ -114,8 +114,6 @@ const ThankYouPage = () => {
         `&transactionId=${transactionId}`,
     );
   };
-
-  const handleReturnHome = () => { navigate('/kiosk'); };
 
   return (
     <KioskLayout>
