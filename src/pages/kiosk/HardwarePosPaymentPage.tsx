@@ -86,6 +86,13 @@ const HardwarePosPaymentPage = () => {
     fetchCategory();
   }, [category]);
 
+  // Show the "Connecting with POS Device" interstitial for 3 seconds so the
+  // donor sees feedback while the terminal wakes up and displays the amount.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowConnecting(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const startSale = useCallback(async () => {
     if (startedRef.current) return;
     startedRef.current = true;
