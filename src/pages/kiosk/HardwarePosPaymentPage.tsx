@@ -183,7 +183,9 @@ const HardwarePosPaymentPage = () => {
       cancelRequest,
       new Promise((resolve) => window.setTimeout(resolve, 6000)),
     ]);
-    navigate("/kiosk");
+    // Replace history so the donor lands on the categories page and can never
+    // step back into the stale payment request screen.
+    navigate("/kiosk", { replace: true });
   }, [cancelAtTerminal, navigate]);
 
 
@@ -205,7 +207,7 @@ const HardwarePosPaymentPage = () => {
 
   useEffect(() => {
     if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
-    const timer = window.setTimeout(() => navigate("/kiosk"), 10000);
+    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 10000);
     return () => window.clearTimeout(timer);
   }, [navigate, retryAllowed, stage]);
 
