@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -61,18 +60,16 @@ export const ConnectingPosScreen: React.FC = () => {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-6 py-8 flex flex-col items-center text-center">
-          <div className="relative w-24 h-24 mb-5 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
-            <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" aria-hidden="true" />
-          </div>
-
-          <h2 className="text-xl font-bold text-gray-900 leading-tight">
-            يجري الاتصال مع جهاز الدفع الإلكتروني
-          </h2>
-          <p className="text-base text-gray-600 mt-2">Connecting with POS Device</p>
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-3 text-center">
+        <div
+          className="h-16 w-16 rounded-full border-4 border-gray-900/20 border-t-gray-900 animate-spin"
+          role="status"
+          aria-label="Connecting with POS Device"
+        />
+        <h2 className="mt-5 whitespace-nowrap text-[15px] font-bold leading-tight text-gray-900">
+          يجري الاتصال مع جهاز الدفع الإلكتروني
+        </h2>
+        <p className="mt-2 text-sm text-gray-700">Connecting with POS Device</p>
       </div>
     </div>
   );

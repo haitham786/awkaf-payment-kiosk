@@ -262,12 +262,19 @@ const KioskHomepage = () => {
           )}
         </div>
 
-        <div className="shrink-0 pb-8 pt-1">
-          <div className="flex justify-center items-center gap-3 flex-wrap">
-            <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-5 w-auto object-contain" />
-            <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
-            <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-6 w-auto object-contain" />
-            <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-6 w-auto object-contain" />
+        <div className="shrink-0 pb-3 pt-2">
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="flex items-center justify-center gap-3">
+              <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 w-auto object-contain" />
+              <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-4 w-auto object-contain" />
+              <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-5 w-auto object-contain" />
+              <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-5 w-auto object-contain" />
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-3 w-auto object-contain" />
+              <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-3 w-auto object-contain" />
+              <img src="/images/payment-logos/googlepay.svg" alt="Google Pay" className="h-4 w-auto object-contain" />
+            </div>
           </div>
         </div>
       </div>

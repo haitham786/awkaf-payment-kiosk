@@ -4,6 +4,8 @@ import { CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
+import ahliIslamicAsset from "@/assets/ahli-islamic.png.asset.json";
+import afsAsset from "@/assets/afs.png.asset.json";
 
 interface TerminalTapScreenProps {
   amount: number;
@@ -116,7 +118,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-1 overflow-hidden">
         <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
@@ -179,6 +181,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2">
               <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 w-auto object-contain" />
               <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
+              <img src="/images/payment-logos/omannet.svg" alt="OmanNet" className="h-5 w-auto object-contain" />
               <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-6 w-auto object-contain" />
               <span className="flex items-center justify-center gap-3 whitespace-nowrap">
                 <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-4 w-auto object-contain" />
@@ -188,9 +191,21 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             </div>
           </div>
         </div>
+
+        <div className="mt-3 flex shrink-0 flex-col items-center" aria-label="Payment service partners">
+          <img
+            src={ahliIslamicAsset.url}
+            alt="Ahli Islamic"
+            className="h-10 w-auto max-w-[150px] object-contain"
+          />
+          <div className="mt-1 flex items-center justify-center gap-2" dir="ltr">
+            <span className="text-[10px] font-bold text-gray-700">Powered By</span>
+            <img src={afsAsset.url} alt="AFS" className="h-7 w-auto max-w-[58px] object-contain" />
+          </div>
+        </div>
       </div>
 
-      <div className="px-6 pb-8 -mt-2 flex justify-center">
+      <div className="px-6 pb-5 pt-3 flex justify-center">
         <button
           onClick={() => onCancel?.()}
           disabled={cancelling}
