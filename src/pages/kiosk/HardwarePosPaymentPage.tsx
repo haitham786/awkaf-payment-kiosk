@@ -6,6 +6,7 @@ import { KioskButton } from "@/components/ui/kiosk-button";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
+import { ConnectingPosScreen } from "@/components/kiosk/ConnectingPosScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
@@ -43,6 +44,7 @@ const HardwarePosPaymentPage = () => {
   const [retryAllowed, setRetryAllowed] = useState(true);
   const [timeoutSeconds, setTimeoutSeconds] = useState(90);
   const [declineMessage, setDeclineMessage] = useState("");
+  const [showConnecting, setShowConnecting] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
   );
@@ -83,6 +85,13 @@ const HardwarePosPaymentPage = () => {
     };
     fetchCategory();
   }, [category]);
+
+  // Show the "Connecting with POS Device" interstitial for 3 seconds so the
+  // donor sees feedback while the terminal wakes up and displays the amount.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowConnecting(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const startSale = useCallback(async () => {
     if (startedRef.current) return;
@@ -173,16 +182,11 @@ const HardwarePosPaymentPage = () => {
   const handleCancel = useCallback(async () => {
     if (cancellingRef.current) return;
     cancellingRef.current = true;
-    setStage("cancelling");
 
-    // Always push the cancellation to the terminal so the amount clears from
-    // its screen. The request keeps running in the background if it is slow —
-    // the donor is never held on the kiosk for more than a few seconds.
-    const cancelRequest = cancelAtTerminal();
-    await Promise.race([
-      cancelRequest,
-      new Promise((resolve) => window.setTimeout(resolve, 6000)),
-    ]);
+    // Send the cancellation to the terminal in the background, but take the
+    // donor home immediately. The "Cancelling at the terminal" overlay is
+    // intentionally removed so the kiosk feels responsive.
+    void cancelAtTerminal();
     // Replace history so the donor lands on the categories page and can never
     // step back into the stale payment request screen.
     navigate("/kiosk", { replace: true });
@@ -211,6 +215,16 @@ const HardwarePosPaymentPage = () => {
     return () => window.clearTimeout(timer);
   }, [navigate, retryAllowed, stage]);
 
+  // Show the connecting interstitial for the first 3 seconds while the POS
+  // sale is in flight. If the terminal responds earlier, the page navigates
+  // away; if an error/decline arrives earlier, it is shown immediately.
+  if (
+    showConnecting &&
+    (stage === "waiting" || stage === "processing" || stage === "cancelling")
+  ) {
+    return <ConnectingPosScreen />;
+  }
+
   if (stage === "waiting" || stage === "processing" || stage === "cancelling") {
     return (
       <TerminalTapScreen
@@ -220,7 +234,7 @@ const HardwarePosPaymentPage = () => {
         onCancel={handleCancel}
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
-        cancelling={stage === "cancelling"}
+        cancelling={false}
       />
     );
   }
