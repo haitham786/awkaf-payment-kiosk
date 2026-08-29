@@ -42,7 +42,6 @@ const HardwarePosPaymentPage = () => {
   const [stage, setStage] = useState<Stage>("waiting");
   const [errorMessage, setErrorMessage] = useState("");
   const [retryAllowed, setRetryAllowed] = useState(true);
-  const [timeoutSeconds, setTimeoutSeconds] = useState(90);
   const [declineMessage, setDeclineMessage] = useState("");
   const [showConnecting, setShowConnecting] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
@@ -55,16 +54,6 @@ const HardwarePosPaymentPage = () => {
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
-
-  useEffect(() => {
-    if (!kioskId) return;
-    void loadKioskRuntimeConfig(kioskId).then((config) => {
-      const configuredTimeout = config?.hardware_pos?.timeout_seconds;
-      if (typeof configuredTimeout === "number" && configuredTimeout >= 5) {
-        setTimeoutSeconds(configuredTimeout + 5);
-      }
-    }).catch((error) => console.error("Unable to load terminal timeout:", error));
-  }, [kioskId]);
 
   useEffect(() => {
     const fetchCategory = async () => {
