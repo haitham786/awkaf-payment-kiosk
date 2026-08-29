@@ -207,7 +207,7 @@ const HardwarePosPaymentPage = () => {
 
   useEffect(() => {
     if (stage !== "declined" && !(stage === "error" && retryAllowed)) return;
-    const timer = window.setTimeout(() => navigate("/kiosk"), 10000);
+    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 10000);
     return () => window.clearTimeout(timer);
   }, [navigate, retryAllowed, stage]);
 
