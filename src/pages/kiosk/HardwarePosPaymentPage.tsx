@@ -8,7 +8,6 @@ import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { ConnectingPosScreen } from "@/components/kiosk/ConnectingPosScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
 
@@ -42,7 +41,6 @@ const HardwarePosPaymentPage = () => {
   const [stage, setStage] = useState<Stage>("waiting");
   const [errorMessage, setErrorMessage] = useState("");
   const [retryAllowed, setRetryAllowed] = useState(true);
-  const [timeoutSeconds, setTimeoutSeconds] = useState(90);
   const [declineMessage, setDeclineMessage] = useState("");
   const [showConnecting, setShowConnecting] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
@@ -55,16 +53,6 @@ const HardwarePosPaymentPage = () => {
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
-
-  useEffect(() => {
-    if (!kioskId) return;
-    void loadKioskRuntimeConfig(kioskId).then((config) => {
-      const configuredTimeout = config?.hardware_pos?.timeout_seconds;
-      if (typeof configuredTimeout === "number" && configuredTimeout >= 5) {
-        setTimeoutSeconds(configuredTimeout + 5);
-      }
-    }).catch((error) => console.error("Unable to load terminal timeout:", error));
-  }, [kioskId]);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -193,11 +181,14 @@ const HardwarePosPaymentPage = () => {
   }, [cancelAtTerminal, navigate]);
 
 
-  const handleTimeout = () => {
-    setRetryAllowed(false);
-    setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
-    setStage("error");
-  };
+  // Donor inactivity: if no card is tapped within 10 seconds, cancel the
+  // terminal session in the background and return to the categories page.
+  const handleInactivityTimeout = useCallback(() => {
+    if (cancellingRef.current) return;
+    cancellingRef.current = true;
+    void cancelAtTerminal();
+    navigate("/kiosk", { replace: true });
+  }, [cancelAtTerminal, navigate]);
 
   const handleTryAgain = () => {
     if (!retryAllowed) return;
@@ -232,8 +223,8 @@ const HardwarePosPaymentPage = () => {
         category={category}
         stage={stage === "cancelling" ? "processing" : stage}
         onCancel={handleCancel}
-        onTimeout={handleTimeout}
-        timeoutSeconds={timeoutSeconds}
+        onTimeout={handleInactivityTimeout}
+        timeoutSeconds={10}
         cancelling={false}
       />
     );

@@ -118,7 +118,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-1 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
         <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
@@ -192,7 +192,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           </div>
         </div>
 
-        <div className="mt-3 flex shrink-0 flex-col items-center" aria-label="Payment service partners">
+        <div className="mt-2 flex shrink-0 flex-col items-center" aria-label="Payment service partners">
           <img
             src={ahliIslamicAsset.url}
             alt="Ahli Islamic"
