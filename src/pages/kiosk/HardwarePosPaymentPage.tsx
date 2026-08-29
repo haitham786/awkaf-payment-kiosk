@@ -182,16 +182,11 @@ const HardwarePosPaymentPage = () => {
   const handleCancel = useCallback(async () => {
     if (cancellingRef.current) return;
     cancellingRef.current = true;
-    setStage("cancelling");
 
-    // Always push the cancellation to the terminal so the amount clears from
-    // its screen. The request keeps running in the background if it is slow —
-    // the donor is never held on the kiosk for more than a few seconds.
-    const cancelRequest = cancelAtTerminal();
-    await Promise.race([
-      cancelRequest,
-      new Promise((resolve) => window.setTimeout(resolve, 6000)),
-    ]);
+    // Send the cancellation to the terminal in the background, but take the
+    // donor home immediately. The "Cancelling at the terminal" overlay is
+    // intentionally removed so the kiosk feels responsive.
+    void cancelAtTerminal();
     // Replace history so the donor lands on the categories page and can never
     // step back into the stale payment request screen.
     navigate("/kiosk", { replace: true });
