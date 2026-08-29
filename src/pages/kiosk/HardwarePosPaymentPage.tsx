@@ -182,11 +182,14 @@ const HardwarePosPaymentPage = () => {
   }, [cancelAtTerminal, navigate]);
 
 
-  const handleTimeout = () => {
-    setRetryAllowed(false);
-    setErrorMessage("انتهت مهلة الاتصال بجهاز الدفع. لا تحاول الدفع مرة أخرى حتى يتم التأكد من نتيجة العملية.\nThe terminal response timed out. Please verify the transaction outcome before retrying.");
-    setStage("error");
-  };
+  // Donor inactivity: if no card is tapped within 10 seconds, cancel the
+  // terminal session in the background and return to the categories page.
+  const handleInactivityTimeout = useCallback(() => {
+    if (cancellingRef.current) return;
+    cancellingRef.current = true;
+    void cancelAtTerminal();
+    navigate("/kiosk", { replace: true });
+  }, [cancelAtTerminal, navigate]);
 
   const handleTryAgain = () => {
     if (!retryAllowed) return;
