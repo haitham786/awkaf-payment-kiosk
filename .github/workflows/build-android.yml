@@ -7,8 +7,12 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  THAWANI_MAVEN_USER: ThawaniMobile
-  THAWANI_MAVEN_TOKEN: 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
+  # Thawani Lamsa SDK is optional. The Capacitor bridge (ThawaniLamsaPlugin) uses
+  # Java reflection, so the APK builds and runs without the SDK when the public
+  # Maven credentials are unavailable/rotated. Provide working credentials via
+  # repository secrets THAWANI_MAVEN_USER / THAWANI_MAVEN_TOKEN to include it.
+  THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER || 'ThawaniMobile' }}
+  THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
   LAMSA_SDK_VERSION: 0.0.31
 
 permissions:
@@ -115,15 +119,7 @@ jobs:
       # Thawani Lamsa SDK is distributed via GitHub Packages with PUBLIC credentials
       # published in their official integration docs: https://thawani.gitbook.io/lamsa
       # These are NOT private - Thawani publishes them so any developer can pull the SDK.
-      - name: Set Thawani Maven credentials (public, from Thawani docs)
-        shell: bash
-        run: |
-          set -euxo pipefail
-          test -n "${THAWANI_MAVEN_USER:-}"
-          test -n "${THAWANI_MAVEN_TOKEN:-}"
-          test -n "${LAMSA_SDK_VERSION:-}"
-
-      - name: Verify Thawani SDK package access
+      - name: Verify Thawani SDK package access (optional)
         shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
@@ -131,30 +127,35 @@ jobs:
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
         run: |
           set -euxo pipefail
-          # GitHub Packages returns 302 redirect to the actual blob URL on objects.githubusercontent.com.
-          # Use -L to follow redirects so we get the final 200 OK from the storage backend.
+          echo "LAMSA_SDK_AVAILABLE=false" >> "$GITHUB_ENV"
+          if [ -z "${THAWANI_MAVEN_TOKEN:-}" ]; then
+            echo "::warning::No THAWANI_MAVEN_TOKEN secret configured — building without the Lamsa SDK (reflection fallback)."
+            exit 0
+          fi
           STATUS_CODE="$(curl -sSL -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/${LAMSA_SDK_VERSION}/lamsa.sdk-${LAMSA_SDK_VERSION}.pom" || true)"
           echo "Thawani SDK ${LAMSA_SDK_VERSION} POM check: HTTP ${STATUS_CODE}"
-          # Accept 200 (direct hit) or 302 (redirect — package exists, follow chain may strip auth header)
-          if [ "$STATUS_CODE" != "200" ] && [ "$STATUS_CODE" != "302" ]; then
-            echo "::error::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} from GitHub Packages (HTTP ${STATUS_CODE})."
-            echo "::error::This usually means Thawani rotated their public credentials in the docs."
-            echo "::error::Check https://thawani.gitbook.io/lamsa for the latest username/token."
+          if [ "$STATUS_CODE" = "200" ] || [ "$STATUS_CODE" = "302" ]; then
+            echo "LAMSA_SDK_AVAILABLE=true" >> "$GITHUB_ENV"
+            echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible"
+          else
+            echo "::warning::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} (HTTP ${STATUS_CODE}). Building without it (reflection fallback)."
+            echo "::warning::Set valid THAWANI_MAVEN_USER / THAWANI_MAVEN_TOKEN repository secrets to re-enable the SDK."
             cat /tmp/thawani-sdk-check.txt || true
-            exit 1
           fi
-          echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible"
 
       - name: Ensure Maven repositories (JitPack + Thawani)
         shell: bash
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
+          export INCLUDE_THAWANI_REPO="${LAMSA_SDK_AVAILABLE:-false}"
           python3 - << 'PY'
           from pathlib import Path
-          import re
+          import os, re
+          include_thawani = os.environ.get("INCLUDE_THAWANI_REPO", "false") == "true"
           def patch_repositories_block(text, snippets):
               patched = text
               for snippet in snippets:
@@ -175,8 +176,8 @@ jobs:
           common_kts_snippets = [
               {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
           ]
-          thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}]
-          thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}]
+          thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}] if include_thawani else []
+          thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}] if include_thawani else []
           for f in ["android/settings.gradle"]:
               patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
           for f in ["android/settings.gradle.kts"]:
@@ -196,12 +197,16 @@ jobs:
         shell: bash
         env:
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
-          python3 - "$LAMSA_SDK_VERSION" << 'PY'
+          python3 - "$LAMSA_SDK_VERSION" "${LAMSA_SDK_AVAILABLE:-false}" << 'PY'
           import sys, re
           from pathlib import Path
           version = sys.argv[1]
+          include_sdk = sys.argv[2] == "true"
+          if not include_sdk:
+              print("Lamsa SDK not available — building with reflection fallback (no SDK dependency).")
           for vars_name in ["android/variables.gradle", "android/variables.gradle.kts"]:
               vp = Path(vars_name)
               if not vp.exists():
@@ -225,13 +230,14 @@ jobs:
               # Replace any existing Lamsa/Kotlin implementation lines, then add the current versions
               text = re.sub(r'\n\s*implementation\(?["\']om\.thawani:lamsa\.sdk:[^"\']+["\']\)?', '', text)
               text = re.sub(r'\n\s*implementation\(?["\']org\.jetbrains\.kotlin:kotlin-stdlib:[^"\']+["\']\)?', '', text)
-              text = re.sub(
-                  r"(dependencies\s*\{)",
-                  rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")',
-                  text
-              )
+              if include_sdk:
+                  text = re.sub(
+                      r"(dependencies\s*\{)",
+                      rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")',
+                      text
+                  )
               p.write_text(text, encoding="utf-8")
-              print(f"Patched {p} with minSdk 26 + dataBinding + Lamsa SDK {version}")
+              print(f"Patched {p} with minSdk 26 + dataBinding" + (f" + Lamsa SDK {version}" if include_sdk else " (no Lamsa SDK)"))
           proguard = Path("android/app/proguard-rules.pro")
           if proguard.exists():
               text = proguard.read_text(encoding="utf-8")
@@ -336,6 +342,8 @@ jobs:
 
       - name: Patch AndroidManifest.xml for USB + NFC
         shell: bash
+        env:
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           python3 - << 'PY'
@@ -361,10 +369,15 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
-              activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
-              xml = xml.replace('</application>', activity + '    </application>', 1)
-          xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
+          import os
+          include_sdk = os.environ.get("LAMSA_SDK_AVAILABLE", "false") == "true"
+          if include_sdk:
+              if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
+                  activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
+                  xml = xml.replace('</application>', activity + '    </application>', 1)
+              xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
+          else:
+              print("Lamsa SDK not bundled — skipping LamsaSDK manifest activity")
           p.write_text(xml, encoding="utf-8")
           print("AndroidManifest.xml patched (USB + NFC)")
           PY
@@ -503,9 +516,11 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Verify Thawani Lamsa SDK and Capacitor bridge are bundled in APK
+      - name: Verify Capacitor bridge (and Lamsa SDK when bundled) in APK
         if: success()
         shell: bash
+        env:
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           APK="release-apks/awkaf-kiosk-usb.apk"
@@ -513,13 +528,17 @@ jobs:
           rm -rf /tmp/apk-dex-check
           mkdir -p /tmp/apk-dex-check
           unzip -q "$APK" 'classes*.dex' -d /tmp/apk-dex-check
-          if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
-            exit 1
-          fi
-          if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
-            exit 1
+          if [ "${LAMSA_SDK_AVAILABLE:-false}" = "true" ]; then
+            if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
+              exit 1
+            fi
+            if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
+              echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
+              exit 1
+            fi
+          else
+            echo "Lamsa SDK not bundled (reflection fallback) — skipping SDK dex checks"
           fi
           if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
             echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
