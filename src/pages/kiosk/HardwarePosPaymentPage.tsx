@@ -183,7 +183,9 @@ const HardwarePosPaymentPage = () => {
       cancelRequest,
       new Promise((resolve) => window.setTimeout(resolve, 6000)),
     ]);
-    navigate("/kiosk");
+    // Replace history so the donor lands on the categories page and can never
+    // step back into the stale payment request screen.
+    navigate("/kiosk", { replace: true });
   }, [cancelAtTerminal, navigate]);
 
 
