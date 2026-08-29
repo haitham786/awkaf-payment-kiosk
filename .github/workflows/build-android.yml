@@ -197,12 +197,16 @@ jobs:
         shell: bash
         env:
           LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
-          python3 - "$LAMSA_SDK_VERSION" << 'PY'
+          python3 - "$LAMSA_SDK_VERSION" "${LAMSA_SDK_AVAILABLE:-false}" << 'PY'
           import sys, re
           from pathlib import Path
           version = sys.argv[1]
+          include_sdk = sys.argv[2] == "true"
+          if not include_sdk:
+              print("Lamsa SDK not available — building with reflection fallback (no SDK dependency).")
           for vars_name in ["android/variables.gradle", "android/variables.gradle.kts"]:
               vp = Path(vars_name)
               if not vp.exists():
