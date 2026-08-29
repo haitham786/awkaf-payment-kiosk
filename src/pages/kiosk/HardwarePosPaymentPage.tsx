@@ -215,6 +215,16 @@ const HardwarePosPaymentPage = () => {
     return () => window.clearTimeout(timer);
   }, [navigate, retryAllowed, stage]);
 
+  // Show the connecting interstitial for the first 3 seconds while the POS
+  // sale is in flight. If the terminal responds earlier, the page navigates
+  // away; if an error/decline arrives earlier, it is shown immediately.
+  if (
+    showConnecting &&
+    (stage === "waiting" || stage === "processing" || stage === "cancelling")
+  ) {
+    return <ConnectingPosScreen />;
+  }
+
   if (stage === "waiting" || stage === "processing" || stage === "cancelling") {
     return (
       <TerminalTapScreen
@@ -224,7 +234,7 @@ const HardwarePosPaymentPage = () => {
         onCancel={handleCancel}
         onTimeout={handleTimeout}
         timeoutSeconds={timeoutSeconds}
-        cancelling={stage === "cancelling"}
+        cancelling={false}
       />
     );
   }
