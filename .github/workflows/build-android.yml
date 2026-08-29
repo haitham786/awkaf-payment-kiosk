@@ -342,6 +342,8 @@ jobs:
 
       - name: Patch AndroidManifest.xml for USB + NFC
         shell: bash
+        env:
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           python3 - << 'PY'
