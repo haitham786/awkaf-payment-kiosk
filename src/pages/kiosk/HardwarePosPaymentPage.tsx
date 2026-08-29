@@ -228,35 +228,46 @@ const HardwarePosPaymentPage = () => {
   if (stage === "error") {
     return (
       <KioskLayout>
-        <div className="w-full max-w-xl mx-auto space-y-3">
-          <Card className="p-6 bg-red-50 shadow-lg border-2 border-red-300 text-center">
+        <div className="w-full max-w-xl mx-auto space-y-4">
+          <Card className="p-6 bg-white/50 backdrop-blur-xl shadow-lg border border-white/60 text-center rounded-xl">
             <div className="space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="w-10 h-10 text-red-600" />
+              <div className="w-20 h-20 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="w-10 h-10 text-destructive" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-red-700">خطأ في جهاز الدفع</h2>
-                <p className="text-sm text-red-500">Payment Terminal Error</p>
-                <p className="text-xs text-gray-600 mt-2 whitespace-pre-line">{errorMessage}</p>
-              </div>
-              <div className="flex gap-2 justify-center pt-2">
-                {retryAllowed && (
-                  <KioskButton variant="confirm" size="sm" onClick={handleTryAgain}>
-                    <span className="flex flex-col items-center">
-                      <span>حاول مرة أخرى</span>
-                      <span className="text-[0.6rem] opacity-80">Try Again</span>
-                    </span>
-                  </KioskButton>
-                )}
-                <KioskButton variant="secondary" size="sm" onClick={handleCancel}>
-                  <span className="flex flex-col items-center">
-                    <span>إلغاء</span>
-                    <span className="text-[0.6rem] opacity-80">Cancel</span>
-                  </span>
-                </KioskButton>
+                <h2 className="text-xl font-bold text-destructive">خطأ في جهاز الدفع</h2>
+                <p className="text-sm text-destructive/70">Payment Terminal Error</p>
+                <p className="text-xs text-muted-foreground mt-2 whitespace-pre-line">{errorMessage}</p>
               </div>
             </div>
           </Card>
+
+          <div className={`grid gap-4 px-1 ${retryAllowed ? "grid-cols-2" : "grid-cols-1"}`}>
+            <KioskButton
+              variant="secondary"
+              size="xl"
+              onClick={handleCancel}
+              className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
+            >
+              <span className="flex flex-col items-center leading-tight">
+                <span className="text-base font-bold text-gray-900">إلغاء</span>
+                <span className="text-xs font-normal text-gray-900 mt-1">Cancel</span>
+              </span>
+            </KioskButton>
+            {retryAllowed && (
+              <KioskButton
+                variant="secondary"
+                size="xl"
+                onClick={handleTryAgain}
+                className="h-auto min-h-[82px] px-8 py-5 bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 rounded-xl shadow-sm flex items-center justify-center"
+              >
+                <span className="flex flex-col items-center leading-tight">
+                  <span className="text-base font-bold text-gray-900">حاول مرة أخرى</span>
+                  <span className="text-xs font-normal text-gray-900 mt-1">Try Again</span>
+                </span>
+              </KioskButton>
+            )}
+          </div>
         </div>
       </KioskLayout>
     );

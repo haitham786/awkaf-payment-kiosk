@@ -117,7 +117,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
-        <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-5 flex flex-col items-center">
+        <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
             <div className="w-12 h-12 mb-1 flex items-center justify-center">
@@ -130,24 +130,24 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           </div>
 
           {/* Amount */}
-          <div className="mt-3 flex items-baseline justify-center gap-2">
+          <div className="mt-2 flex items-baseline justify-center gap-2">
             <CurrencyLogo className="h-6" />
             <span className="text-gray-900 text-3xl font-bold tracking-tight">{formatAmount(amount)}</span>
           </div>
 
           {/* Tap animation */}
-          <div className="relative w-36 h-36 my-3">
+          <div className="relative w-32 h-32 my-1">
             {stage === "waiting" && (
               <>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div
-                    className="w-32 h-32 rounded-full border-2 border-emerald-400/40 animate-ping"
+                    className="w-28 h-28 rounded-full border-2 border-emerald-400/40 animate-ping"
                     style={{ animationDuration: "2s" }}
                   />
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div
-                    className="w-24 h-24 rounded-full border-2 border-emerald-400/50 animate-ping"
+                    className="w-20 h-20 rounded-full border-2 border-emerald-400/50 animate-ping"
                     style={{ animationDuration: "2s", animationDelay: "0.5s" }}
                   />
                 </div>
@@ -155,44 +155,42 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             )}
             {stage === "processing" && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-32 h-32 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
+                <div className="w-28 h-28 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
               </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
-                <CreditCard className="w-10 h-10 text-white" />
+              <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
+                <CreditCard className="w-9 h-9 text-white" />
               </div>
             </div>
           </div>
 
           {/* Instruction */}
           <div className="text-center leading-tight">
-            <h2 className="text-gray-900 text-xl font-bold">الرجاء تمرير البطاقة على جهاز الدفع</h2>
+            <h2 className="text-gray-900 text-base font-bold whitespace-nowrap">يرجى وضع بطاقة البنك على جهاز الدفع</h2>
             <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
-            <p className="text-gray-500 text-xs mt-2">
-              {cancelling
-                ? "جاري إلغاء العملية على جهاز الدفع… / Cancelling at the terminal…"
-                : stage === "processing"
-                  ? "بانتظار البطاقة… / Waiting for card…"
-                  : "جاري التحضير… / Preparing…"}
-            </p>
+            {cancelling && (
+              <p className="text-gray-500 text-xs mt-1">جاري إلغاء العملية على جهاز الدفع… / Cancelling at the terminal…</p>
+            )}
           </div>
 
           {/* Accepted payment methods */}
-          <div className="mt-4 pt-4 w-full border-t border-white/70">
-            <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-3">
-              <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-6 w-auto object-contain" />
-              <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-7 w-auto object-contain" />
-              <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-8 w-auto object-contain" />
-              <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-6 w-auto object-contain" />
-              <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-6 w-auto object-contain" />
-              <img src="/images/payment-logos/googlepay.svg" alt="Google Pay" className="h-7 w-auto object-contain" />
+          <div className="mt-2 pt-2 w-full border-t border-white/70">
+            <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2">
+              <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 w-auto object-contain" />
+              <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
+              <img src="/images/payment-logos/mal.svg" alt="Mal" className="h-6 w-auto object-contain" />
+              <span className="flex items-center justify-center gap-3 whitespace-nowrap">
+                <img src="/images/payment-logos/applepay.svg" alt="Apple Pay" className="h-4 w-auto object-contain" />
+                <img src="/images/payment-logos/samsungpay.svg" alt="Samsung Pay" className="h-4 w-auto object-contain" />
+                <img src="/images/payment-logos/googlepay.svg" alt="Google Pay" className="h-5 w-auto object-contain" />
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="px-6 pb-5 flex justify-center">
+      <div className="px-6 pb-8 -mt-2 flex justify-center">
         <button
           onClick={() => onCancel?.()}
           disabled={cancelling}
