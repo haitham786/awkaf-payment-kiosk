@@ -8,7 +8,6 @@ import { AlertTriangle, X } from "lucide-react";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { ConnectingPosScreen } from "@/components/kiosk/ConnectingPosScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 
 type Stage = "waiting" | "processing" | "cancelling" | "declined" | "error";
 
