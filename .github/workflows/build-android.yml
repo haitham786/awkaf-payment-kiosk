@@ -148,8 +148,10 @@ jobs:
         env:
           THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
           THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
+          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
+          export INCLUDE_THAWANI_REPO="${LAMSA_SDK_AVAILABLE:-false}"
           python3 - << 'PY'
           from pathlib import Path
           import re
