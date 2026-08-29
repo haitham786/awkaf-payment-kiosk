@@ -154,7 +154,8 @@ jobs:
           export INCLUDE_THAWANI_REPO="${LAMSA_SDK_AVAILABLE:-false}"
           python3 - << 'PY'
           from pathlib import Path
-          import re
+          import os, re
+          include_thawani = os.environ.get("INCLUDE_THAWANI_REPO", "false") == "true"
           def patch_repositories_block(text, snippets):
               patched = text
               for snippet in snippets:
