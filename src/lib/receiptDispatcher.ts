@@ -5,6 +5,7 @@ export interface DispatchPayload {
   mobile_number: string; // 968XXXXXXXX
   category: string;
   reference_number: string;
+  pos_rrn?: string;
   transaction_id?: string;
   amount_baisas: number;
 }

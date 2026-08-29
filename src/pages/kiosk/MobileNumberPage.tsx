@@ -16,6 +16,7 @@ const MobileNumberPage = () => {
   const category = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
   const referenceNumber = searchParams.get('ref') || '';
+  const posReference = searchParams.get('posRef') || '';
   const transactionId = searchParams.get('transactionId') || '';
   const [mobileNumber, setMobileNumber] = useState("");
   const [sending, setSending] = useState(false);
@@ -64,6 +65,7 @@ const MobileNumberPage = () => {
         mobile_number: `968${mobileNumber}`,
         category,
         reference_number: referenceNumber || transactionId,
+        pos_rrn: posReference || undefined,
         transaction_id: transactionId || undefined,
         amount_baisas: amount,
       });

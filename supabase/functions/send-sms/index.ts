@@ -119,7 +119,7 @@ serve(async (req) => {
 
     const { data: txByRef, error: refError } = await supabaseAdmin
       .from('transactions')
-      .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number')
+      .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number, pos_rrn')
       .eq('reference_number', reference_number)
       .maybeSingle();
 
@@ -128,7 +128,7 @@ serve(async (req) => {
     } else if (transaction_id) {
       const { data: txById, error: idError } = await supabaseAdmin
         .from('transactions')
-        .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number')
+        .select('id, reference_number, amount_baisas, status, sms_status, category, mobile_number, pos_rrn')
         .eq('id', transaction_id)
         .maybeSingle();
       transaction = txById;
@@ -203,7 +203,7 @@ serve(async (req) => {
       categoryArabic,
       amount_baisas,
       reference: smsReference,
-      pos_rrn: pos_rrn || null,
+      pos_rrn: transaction.pos_rrn || pos_rrn || null,
     });
 
     console.log('SMS prepared for:', cleanMobile.slice(-4));

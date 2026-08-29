@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
-import { Home, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
@@ -19,8 +19,9 @@ const ThankYouPage = () => {
   const transactionId = searchParams.get('transactionId') || '';
   const paymentMethod = searchParams.get('paymentMethod') || '';
   const gatewayMode = searchParams.get('gatewayMode') || undefined;
+  const posReference = searchParams.get('posRef') || '';
   const [referenceNumber, setReferenceNumber] = useState(searchParams.get('ref') || '');
-  const [_countdown, setCountdown] = useState(10);
+  const [_countdown, setCountdown] = useState(15);
   const [verifying, setVerifying] = useState(false);
   const [categoryData, setCategoryData] = useState<{title: string; title_en: string | null; icon_url: string | null} | null>(() => readCachedCategory(category));
   const [isReady, setIsReady] = useState(() => !!readCachedCategory(category));
@@ -106,13 +107,16 @@ const ThankYouPage = () => {
   };
 
   const handleSMSReceipt = () => {
-    navigate(`/kiosk/mobile-number?category=${category}&amount=${amount}&ref=${referenceNumber}&transactionId=${transactionId}`);
+    navigate(
+      `/kiosk/mobile-number?category=${category}&amount=${amount}` +
+        `&ref=${encodeURIComponent(referenceNumber)}` +
+        `&posRef=${encodeURIComponent(posReference)}` +
+        `&transactionId=${transactionId}`,
+    );
   };
 
-  const handleReturnHome = () => { navigate('/kiosk'); };
-
   return (
-    <KioskLayout showHomeButton={false}>
+    <KioskLayout>
       <div className="w-full max-w-3xl mx-auto flex flex-col items-center justify-center min-h-[70vh]">
         {verifying ? (
           <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-md">
@@ -174,17 +178,6 @@ const ThankYouPage = () => {
               </div>
             </div>
 
-            <div className="mt-8">
-              <KioskButton
-                variant="ghost"
-                size="lg"
-                soundEffect="navigation"
-                onClick={handleReturnHome}
-                className="bg-transparent hover:bg-white/10 backdrop-blur-sm shadow-none border-0 p-3"
-              >
-                <Home className="w-8 h-8 text-white drop-shadow-lg" />
-              </KioskButton>
-            </div>
           </>
         )}
       </div>

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import ahliIslamicAsset from "@/assets/ahli-islamic.png.asset.json";
-import afsAsset from "@/assets/afs.png.asset.json";
+import afsAsset from "@/assets/afs-logo.svg.asset.json";
 
 interface TerminalTapScreenProps {
   amount: number;
@@ -118,7 +118,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 pt-8 overflow-hidden">
         <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
@@ -195,12 +195,13 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         <div className="mt-2 flex shrink-0 flex-col items-center" aria-label="Payment service partners">
           <img
             src={ahliIslamicAsset.url}
-            alt="Ahli Islamic"
+            alt=""
+            aria-hidden="true"
             className="h-10 w-auto max-w-[150px] object-contain"
           />
           <div className="mt-1 flex items-center justify-center gap-2" dir="ltr">
             <span className="text-[10px] font-bold text-gray-700">Powered By</span>
-            <img src={afsAsset.url} alt="AFS" className="h-7 w-auto max-w-[58px] object-contain" />
+            <img src={afsAsset.url} alt="" aria-hidden="true" className="h-7 w-auto max-w-[58px] object-contain" />
           </div>
         </div>
       </div>

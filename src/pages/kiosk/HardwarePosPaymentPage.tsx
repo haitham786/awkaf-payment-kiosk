@@ -24,6 +24,7 @@ interface ApexResponse {
   error?: string;
   referenceNumber?: string | null;
   rrn?: string | null;
+  invoiceNumber?: string | null;
   responseText?: string | null;
   responseCode?: string | null;
   timedOut?: boolean;
@@ -105,20 +106,28 @@ const HardwarePosPaymentPage = () => {
       const { data, error } = await supabase.functions.invoke("apex-ecr-payment", {
         body: { action: "sale", kioskId, transactionId, amount, category },
       });
-      if (cancellingRef.current) return;
       if (error) throw error;
 
       const result = (data || {}) as ApexResponse;
 
       if (result.approved) {
         localStorage.removeItem(SESSION_FLAG);
-        const ref = result.referenceNumber || result.rrn || transactionId;
+        const ref = result.referenceNumber || transactionId;
+        const posTransactionNumber = result.rrn || result.invoiceNumber || "";
         navigate(
-          `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${ref}` +
+          `/kiosk/thank-you?category=${category}&amount=${amount}&ref=${encodeURIComponent(ref)}` +
+            `&posRef=${encodeURIComponent(posTransactionNumber)}` +
             `&transactionId=${transactionId}&paymentMethod=hardware_pos&catRef=${categoryReference}`,
+          { replace: true },
         );
         return;
       }
+
+      // A cancellation or inactivity timeout may race with the final terminal
+      // response. Never replace the categories page with a decline/error after
+      // cancellation, but always honor an approval above so a charged donor can
+      // reach the receipt flow.
+      if (cancellingRef.current) return;
 
       if (result.success === false && result.error) {
         const arabic = result.failureType === "afs_network_block"
