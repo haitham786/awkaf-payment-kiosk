@@ -367,10 +367,15 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
-              activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
-              xml = xml.replace('</application>', activity + '    </application>', 1)
-          xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
+          import os
+          include_sdk = os.environ.get("LAMSA_SDK_AVAILABLE", "false") == "true"
+          if include_sdk:
+              if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
+                  activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
+                  xml = xml.replace('</application>', activity + '    </application>', 1)
+              xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
+          else:
+              print("Lamsa SDK not bundled — skipping LamsaSDK manifest activity")
           p.write_text(xml, encoding="utf-8")
           print("AndroidManifest.xml patched (USB + NFC)")
           PY
