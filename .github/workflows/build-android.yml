@@ -7,8 +7,12 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  THAWANI_MAVEN_USER: ThawaniMobile
-  THAWANI_MAVEN_TOKEN: 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
+  # Thawani Lamsa SDK is optional. The Capacitor bridge (ThawaniLamsaPlugin) uses
+  # Java reflection, so the APK builds and runs without the SDK when the public
+  # Maven credentials are unavailable/rotated. Provide working credentials via
+  # repository secrets THAWANI_MAVEN_USER / THAWANI_MAVEN_TOKEN to include it.
+  THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER || 'ThawaniMobile' }}
+  THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
   LAMSA_SDK_VERSION: 0.0.31
 
 permissions:
