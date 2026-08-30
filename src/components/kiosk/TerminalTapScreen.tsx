@@ -4,8 +4,7 @@ import { CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import ahliIslamicAsset from "@/assets/ahli-islamic.png.asset.json";
-import afsAsset from "@/assets/afs-logo.svg.asset.json";
+import paymentPartnersAsset from "@/assets/afs-partners.svg.asset.json";
 
 interface TerminalTapScreenProps {
   amount: number;
@@ -192,17 +191,12 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           </div>
         </div>
 
-        <div className="mt-2 flex shrink-0 flex-col items-center" aria-label="Payment service partners">
+        <div className="mt-2 flex shrink-0 items-center justify-center" aria-label="Payment service partners">
           <img
-            src={ahliIslamicAsset.url}
-            alt=""
-            aria-hidden="true"
-            className="h-10 w-auto max-w-[150px] object-contain"
+            src={paymentPartnersAsset.url}
+            alt="Ahli Islamic and AFS"
+            className="h-20 w-auto max-w-[250px] object-contain"
           />
-          <div className="mt-1 flex items-center justify-center gap-2" dir="ltr">
-            <span className="text-[10px] font-bold text-gray-700">Powered By</span>
-            <img src={afsAsset.url} alt="" aria-hidden="true" className="h-7 w-auto max-w-[58px] object-contain" />
-          </div>
         </div>
       </div>
 

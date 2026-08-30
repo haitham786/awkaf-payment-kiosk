@@ -226,11 +226,11 @@ const KioskSetupPanel = () => {
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="kiosk-name" className="text-gray-900 text-sm">Kiosk Name</Label>
-                  <Input id="kiosk-name" value={kioskForm.name} onChange={(e) => setKioskForm({ ...kioskForm, name: e.target.value })} placeholder="e.g., Muscat Mall Kiosk" className="bg-white text-gray-900 border-gray-300 h-9" />
+                  <Input id="kiosk-name" value={kioskForm.name} onChange={(e) => setKioskForm({ ...kioskForm, name: e.target.value })} placeholder="e.g., Muscat Mall Kiosk" className="bg-white text-gray-900 border-gray-300 h-9 focus-visible:ring-0 focus-visible:ring-offset-0" />
                 </div>
                 <div>
                   <Label htmlFor="location" className="text-gray-900 text-sm">Location</Label>
-                  <Input id="location" value={kioskForm.location} onChange={(e) => setKioskForm({ ...kioskForm, location: e.target.value })} placeholder="e.g., Ground Floor" className="bg-white text-gray-900 border-gray-300 h-9" />
+                  <Input id="location" value={kioskForm.location} onChange={(e) => setKioskForm({ ...kioskForm, location: e.target.value })} placeholder="e.g., Ground Floor" className="bg-white text-gray-900 border-gray-300 h-9 focus-visible:ring-0 focus-visible:ring-offset-0" />
                 </div>
                 {kioskData && (
                   <div className="space-y-1 text-xs text-gray-600 p-2 bg-gray-50 rounded">

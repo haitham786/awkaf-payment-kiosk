@@ -479,7 +479,7 @@ const KiosksManagement = () => {
   const getPaymentModeLabel = (kiosk: any) => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
-    if (paymentMode === 'hardware_pos') return 'Hardware POS Terminal (ApexECR)';
+    if (paymentMode === 'hardware_pos') return 'Ahli Islamic POS Terminal';
     if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
@@ -620,8 +620,7 @@ const KiosksManagement = () => {
                     <Label htmlFor="hardware_pos" className="flex items-center gap-2 cursor-pointer flex-1">
                       <CreditCard className="w-4 h-4" />
                       <div>
-                        <p className="font-medium">Hardware POS Terminal (ApexECR / AFS)</p>
-                        <p className="text-xs text-muted-foreground">External EFTPOS terminal over the internet</p>
+                        <p className="font-medium">Ahli Islamic POS Terminal</p>
                       </div>
                     </Label>
                   </div>
@@ -730,7 +729,7 @@ const KiosksManagement = () => {
                 <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
                   <h4 className="font-medium text-sm flex items-center gap-2">
                     <CreditCard className="w-4 h-4" />
-                    Hardware POS Terminal (ApexECR) Configuration
+                    Ahli Islamic POS Terminal Configuration
                   </h4>
 
                   <div>
