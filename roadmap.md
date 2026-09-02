@@ -7,4 +7,4 @@
 - [x] Validate the focused changes
 - [x] Prevent OM-A880 progress/status responses from prematurely opening payment failure
 - [x] Preserve approved transaction recording, receipt flow, and genuine decline handling
-- [ ] Validate the focused native and kiosk flow changes
+- [x] Validate the focused native and kiosk flow changes
