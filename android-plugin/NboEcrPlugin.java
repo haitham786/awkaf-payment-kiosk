@@ -407,6 +407,8 @@ public class NboEcrPlugin extends Plugin {
     }
 
     private static class Session {
+        private static final int FRAME_SEND_ATTEMPTS = 3;
+        private static final int HANDSHAKE_TIMEOUT_MS = 2500;
         private final UsbDeviceConnection connection;
         private final UsbInterface iface;
         private final UsbEndpoint in;
@@ -424,7 +426,7 @@ public class NboEcrPlugin extends Plugin {
             connection.bulkTransfer(out, new byte[]{value}, 1, 2000);
         }
 
-        /** STX + payload + ETX + LRC (XOR over payload and ETX). */
+        /** STX + payload + ETX + LRC, followed by the mandatory POS ACK. */
         void writeFrame(String payload) throws Exception {
             byte[] body = payload.getBytes(StandardCharsets.US_ASCII);
             byte lrc = 0;
@@ -437,8 +439,50 @@ public class NboEcrPlugin extends Plugin {
             frame[body.length + 1] = ETX;
             frame[body.length + 2] = lrc;
 
-            int written = connection.bulkTransfer(out, frame, frame.length, 5000);
-            if (written != frame.length) throw new IllegalStateException("Incomplete write to the payment terminal");
+            for (int attempt = 1; attempt <= FRAME_SEND_ATTEMPTS; attempt++) {
+                int written = connection.bulkTransfer(out, frame, frame.length, 5000);
+                if (written != frame.length) {
+                    if (attempt == FRAME_SEND_ATTEMPTS) {
+                        throw new IllegalStateException("Incomplete write to the payment terminal");
+                    }
+                    continue;
+                }
+
+                byte handshake = readHandshake(HANDSHAKE_TIMEOUT_MS);
+                if (handshake == ACK) return;
+
+                String reason = handshake == NAK ? "rejected the command (NAK)" : "did not acknowledge the command";
+                Log.w(TAG, "POS " + reason + "; send attempt " + attempt + " of " + FRAME_SEND_ATTEMPTS);
+                if (attempt == FRAME_SEND_ATTEMPTS) {
+                    throw new IllegalStateException("Payment terminal " + reason);
+                }
+            }
+        }
+
+        /**
+         * Waits for the ACK/NAK that belongs to the frame just written. Any
+         * response-frame bytes arriving in the same USB packet are preserved.
+         */
+        private byte readHandshake(int timeoutMs) {
+            byte[] chunk = new byte[1024];
+            long deadline = System.currentTimeMillis() + timeoutMs;
+            while (System.currentTimeMillis() < deadline) {
+                int remaining = (int) Math.max(1L, deadline - System.currentTimeMillis());
+                int read = connection.bulkTransfer(in, chunk, chunk.length, Math.min(200, remaining));
+                if (read <= 0) continue;
+
+                byte handshake = 0;
+                for (int i = 0; i < read; i++) {
+                    byte value = chunk[i];
+                    if (handshake == 0 && (value == ACK || value == NAK)) {
+                        handshake = value;
+                    } else {
+                        buffer.write(value);
+                    }
+                }
+                if (handshake != 0) return handshake;
+            }
+            return 0;
         }
 
         /** Reads one complete STX..ETX frame, or null if none arrived in time. */
