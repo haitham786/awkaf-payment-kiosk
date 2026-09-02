@@ -44,10 +44,12 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME:-}"
 
       - name: Install Java 21 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
+          cache-dependency-path: package-lock.json
 
       - name: Verify Java
         shell: bash
@@ -315,9 +317,31 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Building Awkaf Donation Platform APK with NBO OM-A880 USB support"
-          ./gradlew assembleRelease \
-            -Pandroid.injected.testOnly=false \
-            --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
+          # Maven Central occasionally rate-limits GitHub's shared runners with
+          # HTTP 429. Reuse the Gradle cache and retry only the same safe build;
+          # do not alter or bypass any NBO native integration dependencies.
+          build_succeeded=false
+          for attempt in 1 2 3; do
+            echo "Gradle build attempt ${attempt}/3"
+            if ./gradlew assembleRelease \
+              -Pandroid.injected.testOnly=false \
+              --stacktrace --info --no-daemon --max-workers=2 \
+              2>&1 | tee ../android-gradle.log; then
+              build_succeeded=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 45))
+              echo "Gradle dependency service was unavailable; retrying in ${delay}s"
+              sleep "$delay"
+            fi
+          done
+
+          if [ "$build_succeeded" != "true" ]; then
+            echo "::error::Android release build failed after 3 attempts"
+            exit 1
+          fi
 
       - name: Sign release APK externally
         if: success()
