@@ -142,13 +142,16 @@ const NboPosPaymentPage = () => {
       if (cancellingRef.current) return;
 
       if (!result.completed) {
-        // Nothing was charged — this is a connection/driver failure.
+        // Nothing was charged — this is a connection/driver failure. Clear any
+        // amount left on the terminal screen before showing the error.
+        void NboEcr.cancel().catch(() => undefined);
         setErrorMessage(
           `تعذر الاتصال بجهاز الدفع الإلكتروني عبر كابل USB.\n${result.error || "Unable to reach the POS terminal."}`,
         );
         setStage("error");
         return;
       }
+
 
       // The terminal refused the card (insufficient funds, expired card, ...).
       // Record the failed attempt so no receipt/billing is generated.
@@ -160,9 +163,11 @@ const NboPosPaymentPage = () => {
       setStage("declined");
     } catch (err) {
       if (cancellingRef.current) return;
+      void NboEcr.cancel().catch(() => undefined);
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
+
   }, [amount, category, categoryReference, kioskId, navigate, recordTransaction, transactionId]);
 
   useEffect(() => {
@@ -187,10 +192,14 @@ const NboPosPaymentPage = () => {
   // Declined payments auto-return to the categories page; the donor restarts
   // the donation from the beginning instead of retrying the same session.
   useEffect(() => {
-    if (stage !== "declined") return;
-    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 2000);
+    if (stage !== "declined" && stage !== "error") return;
+    const timer = window.setTimeout(
+      () => navigate("/kiosk", { replace: true }),
+      stage === "declined" ? 2000 : 5000,
+    );
     return () => window.clearTimeout(timer);
   }, [navigate, stage]);
+
 
   if (stage === "processing") {
     return (

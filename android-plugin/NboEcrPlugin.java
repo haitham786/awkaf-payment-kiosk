@@ -451,12 +451,23 @@ public class NboEcrPlugin extends Plugin {
                 byte handshake = readHandshake(HANDSHAKE_TIMEOUT_MS);
                 if (handshake == ACK) return;
 
-                String reason = handshake == NAK ? "rejected the command (NAK)" : "did not acknowledge the command";
-                Log.w(TAG, "POS " + reason + "; send attempt " + attempt + " of " + FRAME_SEND_ATTEMPTS);
-                if (attempt == FRAME_SEND_ATTEMPTS) {
-                    throw new IllegalStateException("Payment terminal " + reason);
+                if (handshake == NAK) {
+                    // The terminal explicitly rejected the frame — resend it.
+                    Log.w(TAG, "POS returned NAK; send attempt " + attempt + " of " + FRAME_SEND_ATTEMPTS);
+                    if (attempt == FRAME_SEND_ATTEMPTS) {
+                        throw new IllegalStateException("Payment terminal rejected the command (NAK)");
+                    }
+                    continue;
                 }
+
+                // No handshake byte arrived. Several OM-A880 firmware builds
+                // answer with the transaction frame directly instead of an ACK,
+                // so a missing ACK must NOT abort the sale — the amount is
+                // already on the terminal. Continue and wait for the response.
+                Log.w(TAG, "POS did not send an ACK; continuing to wait for the transaction response");
+                return;
             }
+
         }
 
         /**
