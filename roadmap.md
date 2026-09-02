@@ -5,3 +5,6 @@
 - [x] Remove the NBO-only connecting interstitial and dispatch from cached local settings
 - [x] Verify the terminal ACK/NAK after each command and retry bounded transmission failures
 - [x] Validate the focused changes
+- [ ] Prevent OM-A880 progress/status responses from prematurely opening payment failure
+- [ ] Preserve approved transaction recording, receipt flow, and genuine decline handling
+- [ ] Validate the focused native and kiosk flow changes
