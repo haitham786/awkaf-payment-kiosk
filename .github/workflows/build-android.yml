@@ -387,11 +387,9 @@ jobs:
             echo "✓ APK signature is valid"
           fi
 
-      - name: Verify Capacitor bridge (and Lamsa SDK when bundled) in APK
+      - name: Verify NBO Capacitor bridge in APK
         if: success()
         shell: bash
-        env:
-          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           APK="release-apks/awkaf-kiosk-usb.apk"
@@ -399,28 +397,15 @@ jobs:
           rm -rf /tmp/apk-dex-check
           mkdir -p /tmp/apk-dex-check
           unzip -q "$APK" 'classes*.dex' -d /tmp/apk-dex-check
-          if [ "${LAMSA_SDK_AVAILABLE:-false}" = "true" ]; then
-            if ! grep -aR "om/thawani/lamsa/sdk/LamsaSDK" /tmp/apk-dex-check >/dev/null; then
-              echo "::error::Thawani Lamsa SDK class is missing from the APK dex files."
-              exit 1
-            fi
-            if ! grep -aR "om/thawani/lamsa/sdk/models/InitOptionsModel" /tmp/apk-dex-check >/dev/null; then
-              echo "::error::Thawani InitOptionsModel class is missing from the APK dex files."
-              exit 1
-            fi
-          else
-            echo "Lamsa SDK not bundled (reflection fallback) — skipping SDK dex checks"
-          fi
-          if ! grep -aR "app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin" /tmp/apk-dex-check >/dev/null; then
-            echo "::error::Capacitor bridge class ThawaniLamsaPlugin is missing from the APK dex files."
-            echo "::error::This means MainActivity registration or plugin compilation failed."
+          if ! grep -aR "app/lovable/awkafpaymentkiosk/NboEcrPlugin" /tmp/apk-dex-check >/dev/null; then
+            echo "::error::Capacitor bridge class NboEcrPlugin is missing from the APK dex files."
             exit 1
           fi
           if ! grep -aR "app/lovable/awkafpaymentkiosk/MainActivity" /tmp/apk-dex-check >/dev/null; then
             echo "::error::MainActivity class is missing from the APK dex files."
             exit 1
           fi
-          echo "✓ Thawani Lamsa SDK + Capacitor bridge classes are bundled in the APK"
+          echo "✓ NBO Capacitor bridge classes are bundled in the APK"
 
       - name: Add installation instructions beside APK
         if: success()
@@ -466,4 +451,4 @@ jobs:
           gh release delete "$TAG" -y || true
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
-            --notes "Download the APK from this Release asset directly on the Android device. Do not install the GitHub Actions artifact ZIP; if you downloaded the artifact, unzip it first and install awkaf-kiosk-usb.apk from inside. Awkaf Payment Kiosk APK - Soft POS (Thawani Lamsa SDK) + Payment Gateway + NFC + Bilingual UI"
+            --notes "Download the APK from this Release asset directly on the Android device. Do not install the GitHub Actions artifact ZIP; if you downloaded the artifact, unzip it first and install awkaf-kiosk-usb.apk from inside. Awkaf Donation Platform APK - NBO OM-A880 USB POS + bilingual kiosk UI"
