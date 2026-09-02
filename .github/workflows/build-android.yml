@@ -1,4 +1,4 @@
-name: Build Android APK with USB Support
+name: Awkaf Donation Platform
 
 on:
   push:
@@ -7,13 +7,6 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  # Thawani Lamsa SDK is optional. The Capacitor bridge (ThawaniLamsaPlugin) uses
-  # Java reflection, so the APK builds and runs without the SDK when the public
-  # Maven credentials are unavailable/rotated. Provide working credentials via
-  # repository secrets THAWANI_MAVEN_USER / THAWANI_MAVEN_TOKEN to include it.
-  THAWANI_MAVEN_USER: ${{ secrets.THAWANI_MAVEN_USER || 'ThawaniMobile' }}
-  THAWANI_MAVEN_TOKEN: ${{ secrets.THAWANI_MAVEN_TOKEN }}
-  LAMSA_SDK_VERSION: 0.0.31
 
 permissions:
   contents: write
@@ -116,137 +109,15 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # Thawani Lamsa SDK is distributed via GitHub Packages with PUBLIC credentials
-      # published in their official integration docs: https://thawani.gitbook.io/lamsa
-      # These are NOT private - Thawani publishes them so any developer can pull the SDK.
-      - name: Verify Thawani SDK package access (optional)
-        shell: bash
-        env:
-          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
-          LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
+      - name: Configure Android minimum SDK
         run: |
-          set -euxo pipefail
-          echo "LAMSA_SDK_AVAILABLE=false" >> "$GITHUB_ENV"
-          if [ -z "${THAWANI_MAVEN_TOKEN:-}" ]; then
-            echo "::warning::No THAWANI_MAVEN_TOKEN secret configured — building without the Lamsa SDK (reflection fallback)."
-            exit 0
-          fi
-          STATUS_CODE="$(curl -sSL -o /tmp/thawani-sdk-check.txt -w '%{http_code}' -u "${THAWANI_MAVEN_USER}:${THAWANI_MAVEN_TOKEN}" "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK/om/thawani/lamsa.sdk/${LAMSA_SDK_VERSION}/lamsa.sdk-${LAMSA_SDK_VERSION}.pom" || true)"
-          echo "Thawani SDK ${LAMSA_SDK_VERSION} POM check: HTTP ${STATUS_CODE}"
-          if [ "$STATUS_CODE" = "200" ] || [ "$STATUS_CODE" = "302" ]; then
-            echo "LAMSA_SDK_AVAILABLE=true" >> "$GITHUB_ENV"
-            echo "✓ Thawani SDK ${LAMSA_SDK_VERSION} is accessible"
-          else
-            echo "::warning::Cannot access Thawani Lamsa SDK ${LAMSA_SDK_VERSION} (HTTP ${STATUS_CODE}). Building without it (reflection fallback)."
-            echo "::warning::Set valid THAWANI_MAVEN_USER / THAWANI_MAVEN_TOKEN repository secrets to re-enable the SDK."
-            cat /tmp/thawani-sdk-check.txt || true
-          fi
-
-      - name: Ensure Maven repositories (JitPack + Thawani)
-        shell: bash
-        env:
-          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
-          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
-        run: |
-          set -euxo pipefail
-          export INCLUDE_THAWANI_REPO="${LAMSA_SDK_AVAILABLE:-false}"
           python3 - << 'PY'
           from pathlib import Path
-          import os, re
-          include_thawani = os.environ.get("INCLUDE_THAWANI_REPO", "false") == "true"
-          def patch_repositories_block(text, snippets):
-              patched = text
-              for snippet in snippets:
-                  if snippet["check"] not in patched:
-                      patched = re.sub(r"(repositories\s*\{\s*\n)", r"\1        " + snippet["code"] + "\n", patched)
-              return patched
-          def patch_file(path, snippets):
-              if not path.exists():
-                  return
-              original = path.read_text(encoding="utf-8")
-              patched = patch_repositories_block(original, snippets)
-              if patched != original:
-                  path.write_text(patched, encoding="utf-8")
-                  print(f"Patched {path}")
-          common_groovy_snippets = [
-              {"check": "jitpack.io", "code": 'maven { url "https://jitpack.io" }'},
-          ]
-          common_kts_snippets = [
-              {"check": "jitpack.io", "code": 'maven { url = uri("https://jitpack.io") }'},
-          ]
-          thawani_groovy_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url "https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK"\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup "om.thawani"\n            }\n        }'}] if include_thawani else []
-          thawani_kts_snippets = [{"check": "maven.pkg.github.com/ThawaniMobile", "code": 'maven {\n            url = uri("https://maven.pkg.github.com/ThawaniMobile/Lamsa-SDK")\n            credentials {\n                username = System.getenv("THAWANI_MAVEN_USER") ?: ""\n                password = System.getenv("THAWANI_MAVEN_TOKEN") ?: ""\n            }\n            content {\n                includeGroup("om.thawani")\n            }\n        }'}] if include_thawani else []
-          for f in ["android/settings.gradle"]:
-              patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
-          for f in ["android/settings.gradle.kts"]:
-              patch_file(Path(f), common_kts_snippets + thawani_kts_snippets)
-          for f in ["android/build.gradle"]:
-              patch_file(Path(f), common_groovy_snippets)
-          for f in ["android/build.gradle.kts"]:
-              patch_file(Path(f), common_kts_snippets)
-          for f in ["android/app/build.gradle"]:
-              patch_file(Path(f), common_groovy_snippets + thawani_groovy_snippets)
-          for f in ["android/app/build.gradle.kts"]:
-              patch_file(Path(f), common_kts_snippets + thawani_kts_snippets)
-          print("Maven repositories configured")
-          PY
-
-      - name: Add dataBinding, minSdk 26, and Lamsa SDK dependency
-        shell: bash
-        env:
-          LAMSA_SDK_VERSION: ${{ env.LAMSA_SDK_VERSION }}
-          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
-        run: |
-          set -euxo pipefail
-          python3 - "$LAMSA_SDK_VERSION" "${LAMSA_SDK_AVAILABLE:-false}" << 'PY'
-          import sys, re
-          from pathlib import Path
-          version = sys.argv[1]
-          include_sdk = sys.argv[2] == "true"
-          if not include_sdk:
-              print("Lamsa SDK not available — building with reflection fallback (no SDK dependency).")
-          for vars_name in ["android/variables.gradle", "android/variables.gradle.kts"]:
-              vp = Path(vars_name)
-              if not vp.exists():
-                  continue
-              text = vp.read_text(encoding="utf-8")
-              text = re.sub(r'(minSdkVersion\s*=\s*)\d+', r'\g<1>26', text)
-              vp.write_text(text, encoding="utf-8")
-              print(f"Patched {vp} with minSdkVersion 26 for Lamsa SDK")
-          for gradle_name in ["android/app/build.gradle", "android/app/build.gradle.kts"]:
-              p = Path(gradle_name)
-              if not p.exists():
-                  continue
-              text = p.read_text(encoding="utf-8")
-              text = re.sub(r'(minSdkVersion\s+)\d+', r'\g<1>26', text)
-              text = re.sub(r'(minSdk\s*=\s*)\d+', r'\g<1>26', text)
-              if "dataBinding" not in text:
-                  if "buildFeatures" in text:
-                      text = re.sub(r"(buildFeatures\s*\{)", r"\1\n        dataBinding true", text)
-                  else:
-                      text = re.sub(r"(android\s*\{)", r"\1\n    buildFeatures {\n        dataBinding true\n    }", text)
-              # Replace any existing Lamsa/Kotlin implementation lines, then add the current versions
-              text = re.sub(r'\n\s*implementation\(?["\']om\.thawani:lamsa\.sdk:[^"\']+["\']\)?', '', text)
-              text = re.sub(r'\n\s*implementation\(?["\']org\.jetbrains\.kotlin:kotlin-stdlib:[^"\']+["\']\)?', '', text)
-              if include_sdk:
-                  text = re.sub(
-                      r"(dependencies\s*\{)",
-                      rf'\1\n    implementation("om.thawani:lamsa.sdk:{version}")\n    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")',
-                      text
-                  )
-              p.write_text(text, encoding="utf-8")
-              print(f"Patched {p} with minSdk 26 + dataBinding" + (f" + Lamsa SDK {version}" if include_sdk else " (no Lamsa SDK)"))
-          proguard = Path("android/app/proguard-rules.pro")
-          if proguard.exists():
-              text = proguard.read_text(encoding="utf-8")
-          else:
-              text = ""
-          keep = "-keep class om.thawani.lamsa.sdk.** { *; }\n-keep class acrNfcReader.** { *; }\n-keep class com.module.creditCardNfcReader.** { *; }\n"
-          if "om.thawani.lamsa.sdk" not in text:
-              proguard.write_text(text.rstrip() + "\n" + keep, encoding="utf-8")
-              print("Added Lamsa SDK keep rules")
+          import re
+          for name in ["android/variables.gradle", "android/variables.gradle.kts"]:
+              path = Path(name)
+              if path.exists():
+                  path.write_text(re.sub(r'(minSdkVersion\s*=\s*)\d+', r'\g<1>26', path.read_text()))
           PY
 
       - name: Copy Thawani Lamsa plugin (real SDK bridge)
