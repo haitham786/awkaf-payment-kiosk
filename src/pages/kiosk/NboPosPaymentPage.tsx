@@ -142,13 +142,16 @@ const NboPosPaymentPage = () => {
       if (cancellingRef.current) return;
 
       if (!result.completed) {
-        // Nothing was charged — this is a connection/driver failure.
+        // Nothing was charged — this is a connection/driver failure. Clear any
+        // amount left on the terminal screen before showing the error.
+        void NboEcr.cancel().catch(() => undefined);
         setErrorMessage(
           `تعذر الاتصال بجهاز الدفع الإلكتروني عبر كابل USB.\n${result.error || "Unable to reach the POS terminal."}`,
         );
         setStage("error");
         return;
       }
+
 
       // The terminal refused the card (insufficient funds, expired card, ...).
       // Record the failed attempt so no receipt/billing is generated.
