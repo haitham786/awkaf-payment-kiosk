@@ -10,7 +10,7 @@
 - [x] Validate the focused native and kiosk flow changes
 
 - [x] Rebrand NBO payment request screen and remove kiosk-side Cancel control
-- [ ] Restrict Edit Kiosk to NBO POS and Testing configurations
+- [x] Restrict Edit Kiosk to NBO POS and Testing configurations
 - [x] Restyle kiosk settings Logout control
 - [ ] Rename Android workflow and generate launcher icon from Awkaf logo
 - [ ] Validate UI, workflow syntax, and NBO integration preservation

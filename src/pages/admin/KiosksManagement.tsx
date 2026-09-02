@@ -183,11 +183,11 @@ const KiosksManagement = () => {
           if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
         }
 
-        const { data: createdKiosk, error } = await supabase.from('kiosks').insert([{
+        const { error } = await supabase.from('kiosks').insert([{
           name: formData.name, reference_number: referenceNumber,
           location: formData.location, status: formData.status,
           configuration: publicConfig
-        } as any]).select('id').single();
+        } as any]);
         if (error) throw error;
         toast.success("Kiosk added successfully");
       }
@@ -632,34 +632,12 @@ const KiosksManagement = () => {
                         </p>
                       </div>
                       {/* Payment Mode */}
-                      <div className="mt-2 flex items-center gap-2">
-                        {kiosk.configuration?.payment_mode === 'payment_gateway' ? (
-                          <Globe className="w-3 h-3 text-blue-600" />
-                        ) : (
-                          <Smartphone className="w-3 h-3 text-emerald-600" />
-                        )}
+                       <div className="mt-2 flex items-center gap-2">
+                         {kiosk.configuration?.payment_mode === 'test_payment'
+                           ? <FlaskConical className="w-3 h-3 text-amber-600" />
+                           : <Usb className="w-3 h-3 text-emerald-600" />}
                         <p className="text-xs text-muted-foreground">{getPaymentModeLabel(kiosk)}</p>
                       </div>
-                      {/* Paired terminal */}
-                      {kiosk.configuration?.payment_mode === 'hardware_pos' && (() => {
-                        const tid = String(kiosk.configuration?.hardware_pos?.tid || '').trim();
-                        const conflict = findTerminalConflict(tid, kiosk.id);
-                        return (
-                          <div className="mt-2 text-xs">
-                            <span className="text-muted-foreground">Paired terminal: </span>
-                            {tid ? (
-                              <span className={conflict ? 'text-destructive font-medium' : 'font-medium'}>
-                                TID {tid}
-                                {kiosk.configuration?.hardware_pos?.mid ? ` · MID ${kiosk.configuration.hardware_pos.mid}` : ''}
-                                {kiosk.configuration?.hardware_pos?.environment ? ` · ${kiosk.configuration.hardware_pos.environment.toUpperCase()}` : ''}
-                                {conflict ? ` — also used by "${conflict.name}"` : ''}
-                              </span>
-                            ) : (
-                              <span className="text-destructive font-medium">Not configured</span>
-                            )}
-                          </div>
-                        );
-                      })()}
 
                       {/* Sound */}
                       <div className="flex items-center gap-2 mt-2">
