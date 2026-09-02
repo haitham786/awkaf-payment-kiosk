@@ -648,7 +648,7 @@ const KiosksManagement = () => {
                           onClick={async () => {
                             const currentSoundEnabled = kiosk.configuration?.sound_enabled !== false;
                             const publicConfig = sanitizeConfiguration({ ...kiosk.configuration, sound_enabled: !currentSoundEnabled });
-                            await supabase.from('kiosks').update({ configuration: publicConfig }).eq('id', kiosk.id);
+                            await supabase.from('kiosks').update({ configuration: publicConfig as any }).eq('id', kiosk.id);
                             toast.success(`Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`);
                             loadKiosks();
                           }}
