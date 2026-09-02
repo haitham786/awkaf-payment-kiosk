@@ -45,4 +45,14 @@ export class NboEcrPluginWeb extends WebPlugin implements NboEcrPluginInterface 
     this.cancelled = true;
     return { cancelled: true };
   }
+
+  async getStatus() {
+    // No USB in the browser: report the terminal as unreachable (Offline).
+    return {
+      responded: false,
+      deviceAttached: false,
+      error: "USB serial is only available in the Android kiosk app",
+    };
+  }
 }
+
