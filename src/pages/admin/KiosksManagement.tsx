@@ -879,6 +879,78 @@ const KiosksManagement = () => {
                 </div>
               )}
 
+              {/* NBO OM-A880 (USB) Configuration */}
+              {formData.configuration.payment_mode === 'nbo_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Usb className="w-4 h-4" />
+                    NBO POS Terminal (OM-A880) Configuration
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    The terminal is connected to this kiosk with a USB-OTG cable and must be switched to
+                    Interface (ECR) mode from the merchant menu. No credentials are stored here — the
+                    terminal holds its own MID/TID from NBO.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="nbo_baud">Baud Rate</Label>
+                      <Input
+                        id="nbo_baud"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.baud_rate ?? 115200}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, baud_rate: Number(e.target.value) } } })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">115200 for the OM-A880.</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="nbo_timeout">Response Timeout (seconds)</Label>
+                      <Input
+                        id="nbo_timeout"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.timeout_seconds ?? 90}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, timeout_seconds: Number(e.target.value) } } })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="nbo_vid">USB Vendor ID (decimal, 0 = any)</Label>
+                      <Input
+                        id="nbo_vid"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.vendor_id ?? 0}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, vendor_id: Number(e.target.value) } } })}
+                        placeholder="1478"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="nbo_pid">USB Product ID (decimal, 0 = any)</Label>
+                      <Input
+                        id="nbo_pid"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.product_id ?? 0}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, product_id: Number(e.target.value) } } })}
+                        placeholder="36923"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nbo_label">Terminal Label (optional)</Label>
+                    <Input
+                      id="nbo_label"
+                      value={formData.configuration.nbo_pos?.terminal_label || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, terminal_label: e.target.value } } })}
+                      placeholder="e.g. Main hall OM-A880"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Only for identification in reports. Pairing is physical: each kiosk drives the terminal on its own USB cable.
+                    </p>
+                  </div>
+                </div>
+              )}
 
 
               {formData.configuration.payment_mode === 'test_payment' && (
