@@ -33,6 +33,17 @@ export interface KioskRuntimeConfig {
   receipt_channel?: ReceiptChannel;
 }
 
+const NBO_CONFIG_LS_KEY = (kioskId: string) => `kiosk:nbo_pos:${kioskId}`;
+
+export function getCachedNboPosConfig(kioskId: string): NonNullable<KioskRuntimeConfig["nbo_pos"]> | null {
+  try {
+    const raw = localStorage.getItem(NBO_CONFIG_LS_KEY(kioskId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Simple in-memory cache to prevent redundant Edge Function calls
 let cachedConfig: { config: KioskRuntimeConfig; timestamp: number } | null = null;
 const CACHE_TTL = 30000; // 30 seconds
@@ -101,6 +112,13 @@ export async function loadKioskRuntimeConfig(
 
     // Persist the (non-secret) payment mode so the next donation can route instantly.
     if (config?.payment_mode) persistPaymentMode(kioskId, config.payment_mode);
+    if (config?.nbo_pos) {
+      try {
+        localStorage.setItem(NBO_CONFIG_LS_KEY(kioskId), JSON.stringify(config.nbo_pos));
+      } catch {
+        /* ignore unavailable storage */
+      }
+    }
 
     // Only cache if we didn't request secrets (to keep cache clean/safe)
     if (config && !options.includeSoftPosSecret) {
