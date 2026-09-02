@@ -166,6 +166,86 @@ public class NboEcrPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Health probe (spec §4): sends GetStatus (CommandType 114) while idle and
+     * reports the printer / reader condition. Never runs during a payment.
+     */
+    @PluginMethod
+    public void getStatus(final PluginCall call) {
+        final int baudRate = call.getInt("baudRate", 115200);
+        final int vendorId = call.getInt("vendorId", 0);
+        final int productId = call.getInt("productId", 0);
+        final int timeoutSeconds = call.getInt("timeoutSeconds", 8);
+
+        UsbManager manager = (UsbManager) getContext().getSystemService(Context.USB_SERVICE);
+        boolean attached = manager != null && !manager.getDeviceList().isEmpty();
+
+        if (busy) {
+            // A transaction owns the port: report the transport as healthy and
+            // skip the probe entirely so the payment path is never disturbed.
+            JSObject ret = new JSObject();
+            ret.put("responded", true);
+            ret.put("deviceAttached", attached);
+            ret.put("lastTransactionErrorCode", lastTransactionErrorCode);
+            call.resolve(ret);
+            return;
+        }
+
+        if (!attached) {
+            JSObject ret = new JSObject();
+            ret.put("responded", false);
+            ret.put("deviceAttached", false);
+            ret.put("error", "OM-A880 terminal not detected on USB");
+            call.resolve(ret);
+            return;
+        }
+
+        new Thread(() -> {
+            JSObject ret = new JSObject();
+            ret.put("deviceAttached", true);
+            ret.put("lastTransactionErrorCode", lastTransactionErrorCode);
+            Session session = null;
+            try {
+                session = openSession(vendorId, productId, baudRate);
+                if (session == null) {
+                    ret.put("responded", false);
+                    ret.put("error", "OM-A880 terminal not detected on USB");
+                    call.resolve(ret);
+                    return;
+                }
+                session.writeFrame("<EFTData><CommandType>" + CMD_GET_STATUS + "</CommandType></EFTData>");
+
+                long deadline = System.currentTimeMillis() + (long) timeoutSeconds * 1000L;
+                String frame = null;
+                while (System.currentTimeMillis() < deadline) {
+                    frame = session.readFrame(1000);
+                    if (frame == null) continue;
+                    session.writeByte(ACK);
+                    break;
+                }
+
+                if (frame == null) {
+                    ret.put("responded", false);
+                    ret.put("error", "No reply to GetStatus");
+                } else {
+                    ret.put("responded", true);
+                    ret.put("printerStatus", tag(frame, "PrinterStatus"));
+                    ret.put("readerStatus", tag(frame, "ReaderStatus"));
+                    ret.put("errorCode", tag(frame, "ErrorCode"));
+                    ret.put("raw", frame);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "getStatus failed", e);
+                ret.put("responded", false);
+                ret.put("error", e.getMessage());
+            } finally {
+                if (session != null) session.close();
+            }
+            call.resolve(ret);
+        }).start();
+    }
+
+
     @PluginMethod
     public void purchase(final PluginCall call) {
         final int amountBaisas = call.getInt("amountBaisas", 0);
