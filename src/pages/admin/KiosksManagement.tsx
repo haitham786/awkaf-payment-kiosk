@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos' | 'nbo_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
@@ -34,6 +34,13 @@ interface KioskConfiguration {
     environment: 'uat' | 'production';
     timeout_seconds: number;
   };
+  nbo_pos?: {
+    baud_rate: number;
+    vendor_id: number;
+    product_id: number;
+    timeout_seconds: number;
+    terminal_label: string;
+  };
   test_payment?: {
     auto_approve?: boolean;
   };
@@ -49,6 +56,16 @@ const emptyHardwarePos = () => ({
   currency_code: '512',
   environment: 'uat' as 'uat' | 'production',
   timeout_seconds: 90,
+});
+
+// NBO OM-A880 is wired to the kiosk with a USB-OTG cable, so the settings are
+// local link settings (no credentials travel over the internet).
+const emptyNboPos = () => ({
+  baud_rate: 115200,
+  vendor_id: 0,
+  product_id: 0,
+  timeout_seconds: 90,
+  terminal_label: '',
 });
 
 const KiosksManagement = () => {
@@ -68,6 +85,7 @@ const KiosksManagement = () => {
       soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
       payment_gateway: { mode: 'test' as 'test' | 'live' },
       hardware_pos: emptyHardwarePos(),
+      nbo_pos: emptyNboPos(),
       sound_enabled: true,
       receipt_channel: 'sms' as ReceiptChannel,
     } as KioskConfiguration
@@ -348,6 +366,7 @@ const KiosksManagement = () => {
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
         hardware_pos: { ...emptyHardwarePos(), ...(config.hardware_pos || {}) },
+        nbo_pos: { ...emptyNboPos(), ...(config.nbo_pos || {}) },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
         receipt_channel: (config.receipt_channel as ReceiptChannel) || 'sms',
@@ -377,6 +396,7 @@ const KiosksManagement = () => {
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
         hardware_pos: emptyHardwarePos(),
+        nbo_pos: emptyNboPos(),
         test_payment: { auto_approve: true },
         sound_enabled: true,
         receipt_channel: 'sms',
@@ -480,6 +500,7 @@ const KiosksManagement = () => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
     if (paymentMode === 'hardware_pos') return 'Ahli Islamic POS Terminal';
+    if (paymentMode === 'nbo_pos') return 'NBO POS Terminal (OM-A880, USB)';
     if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
@@ -621,6 +642,17 @@ const KiosksManagement = () => {
                       <CreditCard className="w-4 h-4" />
                       <div>
                         <p className="font-medium">Ahli Islamic POS Terminal</p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="nbo_pos" id="nbo_pos" />
+                    <Label htmlFor="nbo_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <Usb className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">National Bank of Oman (NBO) POS Terminal</p>
+                        <p className="text-xs text-muted-foreground">OM-A880 connected by USB cable</p>
                       </div>
                     </Label>
                   </div>
@@ -847,6 +879,78 @@ const KiosksManagement = () => {
                 </div>
               )}
 
+              {/* NBO OM-A880 (USB) Configuration */}
+              {formData.configuration.payment_mode === 'nbo_pos' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Usb className="w-4 h-4" />
+                    NBO POS Terminal (OM-A880) Configuration
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    The terminal is connected to this kiosk with a USB-OTG cable and must be switched to
+                    Interface (ECR) mode from the merchant menu. No credentials are stored here — the
+                    terminal holds its own MID/TID from NBO.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="nbo_baud">Baud Rate</Label>
+                      <Input
+                        id="nbo_baud"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.baud_rate ?? 115200}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, baud_rate: Number(e.target.value) } } })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">115200 for the OM-A880.</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="nbo_timeout">Response Timeout (seconds)</Label>
+                      <Input
+                        id="nbo_timeout"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.timeout_seconds ?? 90}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, timeout_seconds: Number(e.target.value) } } })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="nbo_vid">USB Vendor ID (decimal, 0 = any)</Label>
+                      <Input
+                        id="nbo_vid"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.vendor_id ?? 0}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, vendor_id: Number(e.target.value) } } })}
+                        placeholder="1478"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="nbo_pid">USB Product ID (decimal, 0 = any)</Label>
+                      <Input
+                        id="nbo_pid"
+                        type="number"
+                        value={formData.configuration.nbo_pos?.product_id ?? 0}
+                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, product_id: Number(e.target.value) } } })}
+                        placeholder="36923"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nbo_label">Terminal Label (optional)</Label>
+                    <Input
+                      id="nbo_label"
+                      value={formData.configuration.nbo_pos?.terminal_label || ''}
+                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, nbo_pos: { ...emptyNboPos(), ...formData.configuration.nbo_pos!, terminal_label: e.target.value } } })}
+                      placeholder="e.g. Main hall OM-A880"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Only for identification in reports. Pairing is physical: each kiosk drives the terminal on its own USB cable.
+                    </p>
+                  </div>
+                </div>
+              )}
 
 
               {formData.configuration.payment_mode === 'test_payment' && (

@@ -334,7 +334,9 @@ serve(async (req) => {
         ? 'test_payment'
         : paymentType === 'hardware_pos'
           ? 'hardware_pos'
-          : cardType || 'card';
+          : paymentType === 'nbo_pos'
+            ? 'nbo_pos'
+            : cardType || 'card';
 
     console.log('POS Response Data:', { posRRN, posAuthCode, posTID, posMID, posResponseCode, isSuccess, verifiedSuccess });
 

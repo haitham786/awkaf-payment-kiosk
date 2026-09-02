@@ -259,6 +259,10 @@ jobs:
             cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
             echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
           fi
+          if [ -f "android-plugin/NboEcrPlugin.java" ]; then
+            cp "android-plugin/NboEcrPlugin.java" "$PLUGIN_DIR/"
+            echo "Copied NboEcrPlugin.java (NBO OM-A880 USB ECR bridge)"
+          fi
 
       - name: Register plugin in MainActivity (deterministic rewrite)
         shell: bash
@@ -272,11 +276,13 @@ jobs:
               "package app.lovable.awkafpaymentkiosk;\n\n"
               "import android.os.Bundle;\n"
               "import com.getcapacitor.BridgeActivity;\n"
-              "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n\n"
+              "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n"
+              "import app.lovable.awkafpaymentkiosk.NboEcrPlugin;\n\n"
               "public class MainActivity extends BridgeActivity {\n"
               "    @Override\n"
               "    public void onCreate(Bundle savedInstanceState) {\n"
               "        registerPlugin(ThawaniLamsaPlugin.class);\n"
+              "        registerPlugin(NboEcrPlugin.class);\n"
               "        super.onCreate(savedInstanceState);\n"
               "    }\n"
               "}\n"
@@ -319,6 +325,11 @@ jobs:
           PLUGIN="android/app/src/main/java/app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin.java"
           test -f "$PLUGIN" || { echo "::error::ThawaniLamsaPlugin.java was not copied to $PLUGIN"; exit 1; }
           echo "✓ ThawaniLamsaPlugin.java is present in the source tree"
+
+          grep -q "registerPlugin(NboEcrPlugin.class);" "$MAIN" || { echo "::error::NboEcrPlugin is not registered"; exit 1; }
+          NBO="android/app/src/main/java/app/lovable/awkafpaymentkiosk/NboEcrPlugin.java"
+          test -f "$NBO" || { echo "::error::NboEcrPlugin.java was not copied to $NBO"; exit 1; }
+          echo "✓ NboEcrPlugin.java is present and registered"
 
       - name: Create USB device filter XML
         run: |
