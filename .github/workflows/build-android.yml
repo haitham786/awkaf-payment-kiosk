@@ -120,16 +120,12 @@ jobs:
                   path.write_text(re.sub(r'(minSdkVersion\s*=\s*)\d+', r'\g<1>26', path.read_text()))
           PY
 
-      - name: Copy Thawani Lamsa plugin (real SDK bridge)
+      - name: Copy NBO OM-A880 USB plugin
         shell: bash
         run: |
           set -euxo pipefail
           PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
           mkdir -p "$PLUGIN_DIR"
-          if [ -f "android-plugin/ThawaniLamsaPlugin.java" ]; then
-            cp "android-plugin/ThawaniLamsaPlugin.java" "$PLUGIN_DIR/"
-            echo "Copied ThawaniLamsaPlugin.java (real SDK bridge)"
-          fi
           if [ -f "android-plugin/NboEcrPlugin.java" ]; then
             cp "android-plugin/NboEcrPlugin.java" "$PLUGIN_DIR/"
             echo "Copied NboEcrPlugin.java (NBO OM-A880 USB ECR bridge)"
@@ -147,12 +143,10 @@ jobs:
               "package app.lovable.awkafpaymentkiosk;\n\n"
               "import android.os.Bundle;\n"
               "import com.getcapacitor.BridgeActivity;\n"
-              "import app.lovable.awkafpaymentkiosk.ThawaniLamsaPlugin;\n"
               "import app.lovable.awkafpaymentkiosk.NboEcrPlugin;\n\n"
               "public class MainActivity extends BridgeActivity {\n"
               "    @Override\n"
               "    public void onCreate(Bundle savedInstanceState) {\n"
-              "        registerPlugin(ThawaniLamsaPlugin.class);\n"
               "        registerPlugin(NboEcrPlugin.class);\n"
               "        super.onCreate(savedInstanceState);\n"
               "    }\n"
@@ -179,7 +173,7 @@ jobs:
                   print(f"Removed duplicate MainActivity.java: {p}")
           PY
 
-      - name: Assert MainActivity registers ThawaniLamsa plugin
+      - name: Assert MainActivity registers NBO plugin
         shell: bash
         run: |
           set -euxo pipefail
@@ -190,13 +184,6 @@ jobs:
           echo "==============================="
           grep -q "extends BridgeActivity" "$MAIN" || { echo "::error::MainActivity does not extend BridgeActivity"; exit 1; }
           grep -q "import android.os.Bundle;" "$MAIN" || { echo "::error::Missing Bundle import"; exit 1; }
-          grep -q "registerPlugin(ThawaniLamsaPlugin.class);" "$MAIN" || { echo "::error::ThawaniLamsaPlugin is not registered"; exit 1; }
-          echo "✓ MainActivity correctly registers ThawaniLamsaPlugin"
-
-          PLUGIN="android/app/src/main/java/app/lovable/awkafpaymentkiosk/ThawaniLamsaPlugin.java"
-          test -f "$PLUGIN" || { echo "::error::ThawaniLamsaPlugin.java was not copied to $PLUGIN"; exit 1; }
-          echo "✓ ThawaniLamsaPlugin.java is present in the source tree"
-
           grep -q "registerPlugin(NboEcrPlugin.class);" "$MAIN" || { echo "::error::NboEcrPlugin is not registered"; exit 1; }
           NBO="android/app/src/main/java/app/lovable/awkafpaymentkiosk/NboEcrPlugin.java"
           test -f "$NBO" || { echo "::error::NboEcrPlugin.java was not copied to $NBO"; exit 1; }
@@ -222,10 +209,8 @@ jobs:
           </resources>
           EOF
 
-      - name: Patch AndroidManifest.xml for USB + NFC
+      - name: Patch AndroidManifest.xml for USB
         shell: bash
-        env:
-          LAMSA_SDK_AVAILABLE: ${{ env.LAMSA_SDK_AVAILABLE }}
         run: |
           set -euxo pipefail
           python3 - << 'PY'
@@ -236,7 +221,7 @@ jobs:
               raise SystemExit("AndroidManifest.xml not found")
           xml = p.read_text(encoding="utf-8")
           if "android.hardware.usb.host" not in xml:
-              xml = xml.replace("<application", '<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <uses-feature android:name="android.hardware.nfc" android:required="false" />\n    <uses-permission android:name="android.permission.NFC" />\n    <application', 1)
+              xml = xml.replace("<application", '<uses-feature android:name="android.hardware.usb.host" android:required="false" />\n    <application', 1)
           if "android.hardware.usb.action.USB_DEVICE_ATTACHED" not in xml:
               inject = '\n                <intent-filter>\n                    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />\n                </intent-filter>\n                <meta-data\n                    android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"\n                    android:resource="@xml/device_filter" />\n        '
               pattern_main = r'(<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>)(.*?)(</activity>)'
@@ -251,18 +236,25 @@ jobs:
               if m:
                   head, body, tail = m.group(1), m.group(2), m.group(3)
                   xml = xml[:m.start(0)] + head + body + inject + tail + xml[m.end(0):]
-          import os
-          include_sdk = os.environ.get("LAMSA_SDK_AVAILABLE", "false") == "true"
-          if include_sdk:
-              if 'android:name="om.thawani.lamsa.sdk.LamsaSDK"' not in xml:
-                  activity = '\n        <activity\n            android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"\n            android:theme="@style/Theme.LamsaSDK" />\n'
-                  xml = xml.replace('</application>', activity + '    </application>', 1)
-              xml = xml.replace('android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:parentActivityName=".MainActivity"', 'android:name="om.thawani.lamsa.sdk.LamsaSDK"\n            android:exported="true"\n            android:parentActivityName=".MainActivity"')
-          else:
-              print("Lamsa SDK not bundled — skipping LamsaSDK manifest activity")
           p.write_text(xml, encoding="utf-8")
-          print("AndroidManifest.xml patched (USB + NFC)")
+          print("AndroidManifest.xml patched (USB)")
           PY
+
+      - name: Generate Awkaf Android launcher icons
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ICON_URL="https://awkaf-payment-kiosk.lovable.app/__l5e/assets-v1/b0d68f68-b595-40a3-8e0e-8c99636ea7dd/awkaflogo.png"
+          curl --fail --location --retry 3 "$ICON_URL" --output /tmp/awkaf-app-icon.png
+          npm exec --yes sharp-cli -- -i /tmp/awkaf-app-icon.png -o /tmp/awkaf-icon-square.png resize 432 432 --fit contain --background '#ffffff00'
+          for spec in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            density="${spec%%:*}"
+            size="${spec##*:}"
+            target="android/app/src/main/res/mipmap-${density}"
+            mkdir -p "$target"
+            npm exec --yes sharp-cli -- -i /tmp/awkaf-icon-square.png -o "$target/ic_launcher.png" resize "$size" "$size"
+            cp "$target/ic_launcher.png" "$target/ic_launcher_round.png"
+          done
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
@@ -316,12 +308,9 @@ jobs:
         working-directory: android
         shell: bash
         timeout-minutes: 20
-        env:
-          THAWANI_MAVEN_USER: ${{ env.THAWANI_MAVEN_USER }}
-          THAWANI_MAVEN_TOKEN: ${{ env.THAWANI_MAVEN_TOKEN }}
         run: |
           set -euxo pipefail
-          echo "Building APK with Thawani Lamsa SDK ${LAMSA_SDK_VERSION:-bundled}"
+          echo "Building Awkaf Donation Platform APK with NBO OM-A880 USB support"
           ./gradlew assembleRelease \
             -Pandroid.injected.testOnly=false \
             --stacktrace --info --no-daemon 2>&1 | tee ../android-gradle.log
