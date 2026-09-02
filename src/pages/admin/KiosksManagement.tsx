@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
+import { effectiveState } from "@/lib/posHealth";
+
 
 type PaymentMode = 'test_payment' | 'nbo_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
