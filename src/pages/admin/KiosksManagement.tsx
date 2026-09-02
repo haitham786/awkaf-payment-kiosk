@@ -7,33 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical, Usb } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos' | 'nbo_pos';
+type PaymentMode = 'test_payment' | 'nbo_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
   payment_mode: PaymentMode;
-  soft_pos?: {
-    auth_key: string;
-    is_production: boolean;
-    mode: SoftPosMode;
-  };
-  payment_gateway?: {
-    mode: 'test' | 'live';
-  };
-  hardware_pos?: {
-    tid: string;
-    mid: string;
-    service_url: string;
-    secure_key: string;
-    currency_code: string;
-    environment: 'uat' | 'production';
-    timeout_seconds: number;
-  };
   nbo_pos?: {
     baud_rate: number;
     vendor_id: number;
@@ -48,15 +30,6 @@ interface KioskConfiguration {
   receipt_channel?: ReceiptChannel;
 }
 
-const emptyHardwarePos = () => ({
-  tid: '',
-  mid: '',
-  service_url: '',
-  secure_key: '',
-  currency_code: '512',
-  environment: 'uat' as 'uat' | 'production',
-  timeout_seconds: 90,
-});
 
 // NBO OM-A880 is wired to the kiosk with a USB-OTG cable, so the settings are
 // local link settings (no credentials travel over the internet).
@@ -81,10 +54,7 @@ const KiosksManagement = () => {
     location: '',
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'pending_approval',
     configuration: {
-      payment_mode: 'soft_pos' as PaymentMode,
-      soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
-      payment_gateway: { mode: 'test' as 'test' | 'live' },
-      hardware_pos: emptyHardwarePos(),
+      payment_mode: 'nbo_pos' as PaymentMode,
       nbo_pos: emptyNboPos(),
       sound_enabled: true,
       receipt_channel: 'sms' as ReceiptChannel,
@@ -95,49 +65,15 @@ const KiosksManagement = () => {
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [verifyingTerminal, setVerifyingTerminal] = useState(false);
-  const [terminalDiagnostic, setTerminalDiagnostic] = useState<string | null>(null);
 
 
-  const separateKioskSecret = (configuration: KioskConfiguration) => {
-    const { soft_pos, hardware_pos, ...restConfig } = configuration;
-    const authKey = soft_pos?.auth_key?.trim() || '';
-    const apexSecureKey = hardware_pos?.secure_key?.trim() || '';
-
-    return {
-      publicConfig: {
-        ...restConfig,
-        soft_pos: soft_pos
-          ? {
-              is_production: soft_pos.is_production,
-              mode: soft_pos.mode,
-            }
-          : undefined,
-        hardware_pos: hardware_pos
-          ? {
-              tid: hardware_pos.tid?.trim() || '',
-              mid: hardware_pos.mid?.trim() || '',
-              service_url: hardware_pos.service_url?.trim() || '',
-              currency_code: hardware_pos.currency_code?.trim() || '512',
-              environment: hardware_pos.environment || 'uat',
-              timeout_seconds: Number(hardware_pos.timeout_seconds) > 0 ? Number(hardware_pos.timeout_seconds) : 90,
-            }
-          : undefined,
-      },
-      authKey,
-      apexSecureKey,
-    };
-  };
-
-  const saveKioskSecret = async (kioskId: string, authKey: string, apexSecureKey = '') => {
-    const { error } = await supabase
-      .from('kiosk_secrets')
-      .upsert(
-        { kiosk_id: kioskId, soft_pos_auth_key: authKey, apex_secure_key: apexSecureKey },
-        { onConflict: 'kiosk_id' },
-      );
-    if (error) throw error;
-  };
+  const sanitizeConfiguration = (configuration: KioskConfiguration): KioskConfiguration => ({
+    payment_mode: configuration.payment_mode === 'test_payment' ? 'test_payment' : 'nbo_pos',
+    nbo_pos: { ...emptyNboPos(), ...(configuration.nbo_pos || {}) },
+    test_payment: configuration.test_payment || { auto_approve: true },
+    sound_enabled: configuration.sound_enabled !== false,
+    receipt_channel: configuration.receipt_channel || 'sms',
+  });
 
   useEffect(() => {
     checkAuth();
@@ -162,34 +98,7 @@ const KiosksManagement = () => {
     try {
       const { data, error } = await supabase.from('kiosks').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      const kioskIds = (data || []).map((kiosk) => kiosk.id);
-      const { data: secrets, error: secretsError } = kioskIds.length > 0
-        ? await supabase.from('kiosk_secrets').select('kiosk_id, soft_pos_auth_key, apex_secure_key').in('kiosk_id', kioskIds)
-        : { data: [], error: null };
-      if (secretsError) throw secretsError;
-      const secretsByKiosk = new Map((secrets || []).map((secret) => [secret.kiosk_id, secret]));
-      const mergedKiosks = (data || []).map((kiosk) => {
-        const config = kiosk.configuration && typeof kiosk.configuration === 'object' ? kiosk.configuration as Record<string, any> : {};
-        const softPos = config.soft_pos && typeof config.soft_pos === 'object' ? config.soft_pos as Record<string, any> : {};
-        const hardwarePos = config.hardware_pos && typeof config.hardware_pos === 'object' ? config.hardware_pos as Record<string, any> : {};
-        const secret = secretsByKiosk.get(kiosk.id) as { soft_pos_auth_key?: string; apex_secure_key?: string } | undefined;
-        return {
-          ...kiosk,
-          configuration: {
-            ...config,
-            soft_pos: {
-              ...softPos,
-              auth_key: secret?.soft_pos_auth_key || '',
-            },
-            hardware_pos: {
-              ...emptyHardwarePos(),
-              ...hardwarePos,
-              secure_key: secret?.apex_secure_key || '',
-            },
-          },
-        };
-      });
-      setKiosks(mergedKiosks);
+      setKiosks(data || []);
     } catch (error: any) {
       toast.error(`Error loading kiosks: ${error.message}`);
     } finally {
@@ -224,77 +133,13 @@ const KiosksManagement = () => {
     return trimmedReference.length > 0 ? trimmedReference : null;
   };
 
-  const findTerminalConflict = (tid: string, excludeId: string | null) => {
-    const target = tid.trim();
-    if (!target) return null;
-    return (
-      kiosks.find((kiosk) => {
-        if (excludeId && kiosk.id === excludeId) return false;
-        const config = kiosk.configuration || {};
-        if (config.payment_mode !== 'hardware_pos') return false;
-        return String(config.hardware_pos?.tid || '').trim() === target;
-      }) || null
-    );
-  };
-
-  const handleVerifyTerminal = async () => {
-    const hardware = formData.configuration.hardware_pos;
-    if (!editingId) {
-      toast.error('Save the kiosk first, then verify its terminal.');
-      return;
-    }
-    if (!hardware?.tid?.trim() || !hardware?.mid?.trim()) {
-      toast.error('Enter both MID and TID before verifying.');
-      return;
-    }
-    setVerifyingTerminal(true);
-    setTerminalDiagnostic(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('apex-ecr-payment', {
-        body: { action: 'diagnose', kioskId: editingId },
-      });
-      if (error) throw error;
-      if (data?.success) {
-        const message = `AFS service and SOAP routing responded. Reference: ${data.correlationId}`;
-        setTerminalDiagnostic(message);
-        toast.success(message);
-      } else {
-        const soapProbe = Array.isArray(data?.probes) ? data.probes.find((probe: any) => probe?.probe === 'soap') : null;
-        const detail = soapProbe?.webResponseErrorDesc || soapProbe?.faultMessage || data?.error;
-        const message = `${detail || 'AFS did not accept the SOAP request.'}${data?.correlationId ? ` Reference: ${data.correlationId}` : ''}`;
-        setTerminalDiagnostic(message);
-        toast.error(message);
-      }
-    } catch (error: any) {
-      toast.error(`Terminal verification failed: ${error.message}`);
-    } finally {
-      setVerifyingTerminal(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     try {
       const referenceNumber = normalizeReferenceNumber(formData.reference_number);
-      const { publicConfig, authKey, apexSecureKey } = separateKioskSecret(formData.configuration);
-
-      if (formData.configuration.payment_mode === 'hardware_pos') {
-        const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
-        if (!tid) {
-          setValidationError('A Terminal ID (TID) is required so this kiosk is paired with its own POS terminal.');
-          toast.error('Terminal ID (TID) is required for Hardware POS kiosks.');
-          return;
-        }
-        const conflict = findTerminalConflict(tid, editingId);
-        if (conflict) {
-          const message = `Terminal ID ${tid} is already paired with "${conflict.name}". Each kiosk must use its own terminal.`;
-          setValidationError(message);
-          toast.error(message);
-          return;
-        }
-      }
+      const publicConfig = sanitizeConfiguration(formData.configuration);
 
 
       if (editingId) {
@@ -325,7 +170,6 @@ const KiosksManagement = () => {
 
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
-        await saveKioskSecret(editingId, authKey, apexSecureKey);
         toast.success("Kiosk updated successfully");
       } else {
         if (referenceNumber) {
@@ -345,7 +189,6 @@ const KiosksManagement = () => {
           configuration: publicConfig
         } as any]).select('id').single();
         if (error) throw error;
-        if (createdKiosk?.id) await saveKioskSecret(createdKiosk.id, authKey, apexSecureKey);
         toast.success("Kiosk added successfully");
       }
       resetForm();
@@ -362,10 +205,7 @@ const KiosksManagement = () => {
       name: kiosk.name, reference_number: kiosk.reference_number || '',
       location: kiosk.location, status: kiosk.status,
       configuration: {
-        payment_mode: config.payment_mode || 'soft_pos',
-        soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
-        payment_gateway: config.payment_gateway || { mode: 'test' },
-        hardware_pos: { ...emptyHardwarePos(), ...(config.hardware_pos || {}) },
+        payment_mode: config.payment_mode === 'test_payment' ? 'test_payment' : 'nbo_pos',
         nbo_pos: { ...emptyNboPos(), ...(config.nbo_pos || {}) },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
@@ -392,10 +232,7 @@ const KiosksManagement = () => {
     setFormData({
       name: '', reference_number: '', location: '', status: 'active',
       configuration: {
-        payment_mode: 'soft_pos',
-        soft_pos: { auth_key: '', is_production: false, mode: 'test' },
-        payment_gateway: { mode: 'test' },
-        hardware_pos: emptyHardwarePos(),
+        payment_mode: 'nbo_pos',
         nbo_pos: emptyNboPos(),
         test_payment: { auto_approve: true },
         sound_enabled: true,
@@ -496,14 +333,10 @@ const KiosksManagement = () => {
     }
   };
 
-  const getPaymentModeLabel = (kiosk: any) => {
-    const paymentMode = kiosk.configuration?.payment_mode;
-    if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
-    if (paymentMode === 'hardware_pos') return 'Ahli Islamic POS Terminal';
-    if (paymentMode === 'nbo_pos') return 'NBO POS Terminal (OM-A880, USB)';
-    if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
-    return 'Soft POS (Thawani Lamsa)';
-  };
+  const getPaymentModeLabel = (kiosk: any) =>
+    kiosk.configuration?.payment_mode === 'test_payment'
+      ? 'Testing Mode (Simulated Success)'
+      : 'National Bank of Oman (NBO) POS Terminal';
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -617,42 +450,11 @@ const KiosksManagement = () => {
                   className="space-y-3"
                 >
                   <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="soft_pos" id="soft_pos" />
-                    <Label htmlFor="soft_pos" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <Smartphone className="w-4 h-4" />
-                      <div>
-                        <p className="font-medium">Soft POS (Thawani Lamsa)</p>
-                      </div>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="payment_gateway" id="payment_gateway" />
-                    <Label htmlFor="payment_gateway" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <Globe className="w-4 h-4" />
-                      <div>
-                        <p className="font-medium">Payment Gateway (Thawani Checkout)</p>
-                      </div>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="hardware_pos" id="hardware_pos" />
-                    <Label htmlFor="hardware_pos" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <CreditCard className="w-4 h-4" />
-                      <div>
-                        <p className="font-medium">Ahli Islamic POS Terminal</p>
-                      </div>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
                     <RadioGroupItem value="nbo_pos" id="nbo_pos" />
                     <Label htmlFor="nbo_pos" className="flex items-center gap-2 cursor-pointer flex-1">
                       <Usb className="w-4 h-4" />
                       <div>
                         <p className="font-medium">National Bank of Oman (NBO) POS Terminal</p>
-                        <p className="text-xs text-muted-foreground">OM-A880 connected by USB cable</p>
                       </div>
                     </Label>
                   </div>
@@ -668,216 +470,6 @@ const KiosksManagement = () => {
                   </div>
                 </RadioGroup>
               </div>
-
-              {/* Soft POS (Thawani Lamsa) Configuration */}
-              {formData.configuration.payment_mode === 'soft_pos' && (
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
-                    <Smartphone className="w-4 h-4" />
-                    Thawani Lamsa Soft POS Configuration
-                  </h4>
-
-                  <div>
-                    <Label htmlFor="auth_key">Auth Key (Touchpoint Key)</Label>
-                    <Input id="auth_key" type="password"
-                      value={formData.configuration.soft_pos?.auth_key || ''}
-                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, soft_pos: { ...formData.configuration.soft_pos!, auth_key: e.target.value } } })}
-                      placeholder="Enter any value for trial, real key for live"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Trial: any value is accepted so you can verify NFC card detection. A real touchpoint key from merchant.thawani.om is required for live card charging.
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label>Soft POS Mode</Label>
-                    <RadioGroup
-                      value={formData.configuration.soft_pos?.mode || 'test'}
-                      onValueChange={(value: SoftPosMode) => setFormData({ ...formData, configuration: { ...formData.configuration, soft_pos: { ...formData.configuration.soft_pos!, mode: value } } })}
-                      className="flex gap-4 mt-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="test" id="mode_test" />
-                        <Label htmlFor="mode_test" className="cursor-pointer">Test Mode</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="live" id="mode_live" />
-                        <Label htmlFor="mode_live" className="cursor-pointer">Live Mode</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div>
-                    <Label>Environment</Label>
-                    <RadioGroup
-                      value={formData.configuration.soft_pos?.is_production ? 'production' : 'staging'}
-                      onValueChange={(value: string) => setFormData({ ...formData, configuration: { ...formData.configuration, soft_pos: { ...formData.configuration.soft_pos!, is_production: value === 'production' } } })}
-                      className="flex gap-4 mt-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="staging" id="env_staging" />
-                        <Label htmlFor="env_staging" className="cursor-pointer">Staging</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="production" id="env_production" />
-                        <Label htmlFor="env_production" className="cursor-pointer">Production</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </div>
-              )}
-
-              {/* Payment Gateway Configuration */}
-              {formData.configuration.payment_mode === 'payment_gateway' && (
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Thawani Payment Gateway Configuration
-                  </h4>
-
-                  <div>
-                    <Label>Gateway Mode</Label>
-                    <RadioGroup
-                      value={formData.configuration.payment_gateway?.mode || 'test'}
-                      onValueChange={(value: 'test' | 'live') => setFormData({ ...formData, configuration: { ...formData.configuration, payment_gateway: { mode: value } } })}
-                      className="flex gap-4 mt-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="test" id="gw_test" />
-                        <Label htmlFor="gw_test" className="cursor-pointer">Test Mode (UAT)</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="live" id="gw_live" />
-                        <Label htmlFor="gw_live" className="cursor-pointer">Live Mode</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                </div>
-              )}
-
-              {/* Hardware POS (ApexECR) Configuration */}
-              {formData.configuration.payment_mode === 'hardware_pos' && (
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Ahli Islamic POS Terminal Configuration
-                  </h4>
-
-                  <div>
-                    <Label htmlFor="apex_service_url">ApexECR Service URL</Label>
-                    <Input
-                      id="apex_service_url"
-                      value={formData.configuration.hardware_pos?.service_url || ''}
-                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, service_url: e.target.value } } })}
-                      placeholder="https://.../ApexEcrService.svc"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">HTTPS endpoint supplied by AFS / Ahli Bank.</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="apex_mid">Merchant ID (MID)</Label>
-                      <Input
-                        id="apex_mid"
-                        value={formData.configuration.hardware_pos?.mid || ''}
-                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, mid: e.target.value } } })}
-                        placeholder="MID"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="apex_tid">Terminal ID (TID)</Label>
-                      <Input
-                        id="apex_tid"
-                        value={formData.configuration.hardware_pos?.tid || ''}
-                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, tid: e.target.value } } })}
-                        placeholder="TID"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="apex_secure_key">Merchant Secure Key</Label>
-                    <Input
-                      id="apex_secure_key"
-                      type="password"
-                      value={formData.configuration.hardware_pos?.secure_key || ''}
-                      onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, secure_key: e.target.value } } })}
-                      placeholder="Stored privately, never sent to the kiosk"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="apex_currency">Currency Code (ISO numeric)</Label>
-                      <Input
-                        id="apex_currency"
-                        value={formData.configuration.hardware_pos?.currency_code || '512'}
-                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, currency_code: e.target.value } } })}
-                        placeholder="512"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">OMR = 512</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="apex_timeout">Card Tap Timeout (seconds)</Label>
-                      <Input
-                        id="apex_timeout"
-                        type="number"
-                        min={15}
-                        max={300}
-                        value={formData.configuration.hardware_pos?.timeout_seconds ?? 90}
-                        onChange={(e) => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, timeout_seconds: Number(e.target.value) } } })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Environment</Label>
-                    <RadioGroup
-                      value={formData.configuration.hardware_pos?.environment || 'uat'}
-                      onValueChange={(value: 'uat' | 'production') => setFormData({ ...formData, configuration: { ...formData.configuration, hardware_pos: { ...emptyHardwarePos(), ...formData.configuration.hardware_pos!, environment: value } } })}
-                      className="flex gap-4 mt-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="uat" id="apex_uat" />
-                        <Label htmlFor="apex_uat" className="cursor-pointer">UAT</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="production" id="apex_prod" />
-                        <Label htmlFor="apex_prod" className="cursor-pointer">Production</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="border-t pt-3 space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      This kiosk is paired 1:1 with the terminal registered under this TID. A terminal ID can
-                      only be assigned to one kiosk, so a sale can never reach another kiosk's terminal.
-                    </p>
-                    {(() => {
-                      const tid = formData.configuration.hardware_pos?.tid?.trim() || '';
-                      const conflict = findTerminalConflict(tid, editingId);
-                      return conflict ? (
-                        <p className="text-xs font-medium text-destructive">
-                          Terminal ID {tid} is already paired with "{conflict.name}".
-                        </p>
-                      ) : null;
-                    })()}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleVerifyTerminal}
-                      disabled={verifyingTerminal}
-                    >
-                      {verifyingTerminal ? 'Checking AFS connection…' : 'Test AFS Connection'}
-                    </Button>
-                    {terminalDiagnostic && (
-                      <p className="text-xs text-muted-foreground break-words">{terminalDiagnostic}</p>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* NBO OM-A880 (USB) Configuration */}
               {formData.configuration.payment_mode === 'nbo_pos' && (
@@ -1077,7 +669,7 @@ const KiosksManagement = () => {
                           variant={kiosk.configuration?.sound_enabled !== false ? "default" : "outline"}
                           onClick={async () => {
                             const currentSoundEnabled = kiosk.configuration?.sound_enabled !== false;
-                            const { publicConfig } = separateKioskSecret({ ...kiosk.configuration, sound_enabled: !currentSoundEnabled });
+                            const publicConfig = sanitizeConfiguration({ ...kiosk.configuration, sound_enabled: !currentSoundEnabled });
                             await supabase.from('kiosks').update({ configuration: publicConfig }).eq('id', kiosk.id);
                             toast.success(`Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`);
                             loadKiosks();
