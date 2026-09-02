@@ -207,10 +207,8 @@ const NboPosPaymentPage = () => {
         amount={amount}
         category={category}
         stage="waiting"
-        onCancel={handleCancel}
         onTimeout={handleCancel}
         timeoutSeconds={90}
-        cancelling={false}
       />
     );
   }

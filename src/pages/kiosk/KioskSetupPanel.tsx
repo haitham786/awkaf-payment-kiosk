@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2, Info, Globe } from "lucide-react";
+import { ArrowLeft, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2, Info, Globe, LogOut } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
@@ -210,7 +210,10 @@ const KioskSetupPanel = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />Back to Kiosk
           </Button>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Kiosk Setup Panel</h1>
-          <Button variant="outline" onClick={() => { supabase.auth.signOut(); setIsAuthenticated(false); }} className="h-9">Logout</Button>
+          <Button variant="ghost" onClick={() => { supabase.auth.signOut(); setIsAuthenticated(false); }} className="h-9 gap-2 text-gray-900 hover:bg-gray-100">
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            Logout
+          </Button>
         </div>
 
         <Tabs defaultValue="general" className="w-full">

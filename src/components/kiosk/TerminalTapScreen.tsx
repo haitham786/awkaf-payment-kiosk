@@ -4,31 +4,26 @@ import { CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import paymentPartnersAsset from "@/assets/afs-partners.svg.asset.json";
+import nboLogoAsset from "@/assets/nbo-logo.svg.asset.json";
 
 interface TerminalTapScreenProps {
   amount: number;
   category?: string;
   stage: "waiting" | "processing";
-  onCancel?: () => void;
   onTimeout?: () => void;
   timeoutSeconds?: number;
-  /** True while the cancellation is being pushed to the terminal. */
-  cancelling?: boolean;
 }
 
 /**
  * Full-screen prompt shown while an external hardware EFTPOS terminal
- * (Ahli Bank / AFS via ApexECR) waits for the donor to tap their card.
+ * waits for the donor to tap their card.
  */
 export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
   amount,
   category,
   stage,
-  onCancel,
   onTimeout,
   timeoutSeconds = 90,
-  cancelling = false,
 }) => {
   const navigate = useNavigate();
   const [backgroundImage, setBackgroundImage] = useState<string>(
@@ -118,7 +113,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pt-8 overflow-hidden">
-        <div className="w-full max-w-md rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
+        <div className="w-full max-w-sm rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
             <div className="w-12 h-12 mb-1 flex items-center justify-center">
@@ -170,9 +165,6 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           <div className="text-center leading-tight">
             <h2 className="text-gray-900 text-base font-bold whitespace-nowrap">يرجى وضع بطاقة البنك على جهاز الدفع</h2>
             <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
-            {cancelling && (
-              <p className="text-gray-500 text-xs mt-1">جاري إلغاء العملية على جهاز الدفع… / Cancelling at the terminal…</p>
-            )}
           </div>
 
           {/* Accepted payment methods */}
@@ -191,24 +183,13 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           </div>
         </div>
 
-        <div className="mt-2 flex shrink-0 items-center justify-center" aria-label="Payment service partners">
+        <div className="mt-4 flex shrink-0 items-center justify-center" aria-label="National Bank of Oman">
           <img
-            src={paymentPartnersAsset.url}
-            alt="Ahli Islamic and AFS"
-            className="h-20 w-auto max-w-[250px] object-contain"
+            src={nboLogoAsset.url}
+            alt="National Bank of Oman"
+            className="h-16 w-auto max-w-[210px] object-contain"
           />
         </div>
-      </div>
-
-      <div className="px-6 pb-5 pt-3 flex justify-center">
-        <button
-          onClick={() => onCancel?.()}
-          disabled={cancelling}
-          className="px-8 py-3 rounded-xl bg-white/50 hover:bg-white/70 backdrop-blur-sm shadow-sm flex flex-col items-center leading-tight disabled:opacity-60"
-        >
-          <span className="text-base font-bold text-gray-900">{cancelling ? "جاري الإلغاء…" : "إلغاء"}</span>
-          <span className="text-xs text-gray-900">{cancelling ? "Cancelling…" : "Cancel"}</span>
-        </button>
       </div>
     </div>
   );
