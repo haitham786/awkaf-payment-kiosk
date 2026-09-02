@@ -39,7 +39,11 @@ const KioskSetupPanel = () => {
   
   const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos'>('soft_pos');
 
+  const storedKioskId = typeof window !== 'undefined' ? localStorage.getItem('kiosk_id') : null;
+  const { snapshot: posHealth, checking: posHealthChecking, refresh: refreshPosHealth } = useNboPosHealth(storedKioskId, isAuthenticated);
+
   useEffect(() => { checkAuth(); }, []);
+
 
   const loadKioskConfig = async () => {
     const kioskId = localStorage.getItem('kiosk_id');
