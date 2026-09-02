@@ -126,10 +126,12 @@ jobs:
           set -euxo pipefail
           PLUGIN_DIR="android/app/src/main/java/app/lovable/awkafpaymentkiosk"
           mkdir -p "$PLUGIN_DIR"
-          if [ -f "android-plugin/NboEcrPlugin.java" ]; then
-            cp "android-plugin/NboEcrPlugin.java" "$PLUGIN_DIR/"
-            echo "Copied NboEcrPlugin.java (NBO OM-A880 USB ECR bridge)"
-          fi
+          test -f "android-plugin/NboEcrPlugin.java" || {
+            echo "::error::android-plugin/NboEcrPlugin.java is missing"
+            exit 1
+          }
+          cp "android-plugin/NboEcrPlugin.java" "$PLUGIN_DIR/"
+          echo "Copied NboEcrPlugin.java (NBO OM-A880 USB ECR bridge)"
 
       - name: Register plugin in MainActivity (deterministic rewrite)
         shell: bash
@@ -244,17 +246,17 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          ICON_URL="https://awkaf-payment-kiosk.lovable.app/__l5e/assets-v1/b0d68f68-b595-40a3-8e0e-8c99636ea7dd/awkaflogo.png"
-          curl --fail --location --retry 3 "$ICON_URL" --output /tmp/awkaf-app-icon.png
-          npm exec --yes sharp-cli -- -i /tmp/awkaf-app-icon.png -o /tmp/awkaf-icon-square.png resize 432 432 --fit contain --background '#ffffff00'
-          for spec in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-            density="${spec%%:*}"
-            size="${spec##*:}"
-            target="android/app/src/main/res/mipmap-${density}"
+          for source in android-assets/mipmap-*; do
+            test -d "$source" || {
+              echo "::error::Bundled Android launcher icons are missing"
+              exit 1
+            }
+            target="android/app/src/main/res/$(basename "$source")"
             mkdir -p "$target"
-            npm exec --yes sharp-cli -- -i /tmp/awkaf-icon-square.png -o "$target/ic_launcher.png" resize "$size" "$size"
-            cp "$target/ic_launcher.png" "$target/ic_launcher_round.png"
+            cp "$source/ic_launcher.png" "$target/ic_launcher.png"
+            cp "$source/ic_launcher_round.png" "$target/ic_launcher_round.png"
           done
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
@@ -448,7 +450,11 @@ jobs:
             sudo apt-get install -y gh
           fi
           TAG="v${GITHUB_RUN_NUMBER}"
-          gh release delete "$TAG" -y || true
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --cleanup-tag -y
+          elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git push origin ":refs/tags/$TAG"
+          fi
           gh release create "$TAG" release-apks/awkaf-kiosk-usb.apk \
             --title "Release $TAG" \
             --notes "Download the APK from this Release asset directly on the Android device. Do not install the GitHub Actions artifact ZIP; if you downloaded the artifact, unzip it first and install awkaf-kiosk-usb.apk from inside. Awkaf Donation Platform APK - NBO OM-A880 USB POS + bilingual kiosk UI"
