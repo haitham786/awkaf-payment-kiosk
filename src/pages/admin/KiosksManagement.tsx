@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, Smartphone, CreditCard, Globe, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -642,6 +642,17 @@ const KiosksManagement = () => {
                       <CreditCard className="w-4 h-4" />
                       <div>
                         <p className="font-medium">Ahli Islamic POS Terminal</p>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="nbo_pos" id="nbo_pos" />
+                    <Label htmlFor="nbo_pos" className="flex items-center gap-2 cursor-pointer flex-1">
+                      <Usb className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">National Bank of Oman (NBO) POS Terminal</p>
+                        <p className="text-xs text-muted-foreground">OM-A880 connected by USB cable</p>
                       </div>
                     </Label>
                   </div>
