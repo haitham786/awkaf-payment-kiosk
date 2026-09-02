@@ -657,7 +657,26 @@ const KiosksManagement = () => {
                           {kiosk.configuration?.sound_enabled !== false ? '🔊 Enabled' : '🔇 Muted'}
                         </Button>
                       </div>
+
+                      {/* OM-A880 POS health & status */}
+                      <div className="mt-3 max-w-md">
+                        <PosHealthIndicator
+                          state={effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at)}
+                          message={
+                            posStatus[kiosk.id]
+                              ? effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at) === 'offline'
+                                ? 'Terminal not reachable — reseat USB cable / charge / power on'
+                                : posStatus[kiosk.id]?.message
+                              : 'No health beat received from this kiosk yet'
+                          }
+                          paperOk={posStatus[kiosk.id]?.paper_ok}
+                          batteryOk={posStatus[kiosk.id]?.battery_ok}
+                          terminalLabel={posStatus[kiosk.id]?.terminal_label || kiosk.configuration?.nbo_pos?.terminal_label}
+                          updatedAt={posStatus[kiosk.id]?.updated_at}
+                        />
+                      </div>
                     </div>
+
                     <div className="flex gap-2">
                       {kiosk.status === 'pending_approval' && (
                         <Button size="sm" variant="default"
