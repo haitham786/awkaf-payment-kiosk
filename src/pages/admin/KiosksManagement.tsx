@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
+import { effectiveState } from "@/lib/posHealth";
+
 
 type PaymentMode = 'test_payment' | 'nbo_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
@@ -65,6 +68,7 @@ const KiosksManagement = () => {
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [posStatus, setPosStatus] = useState<Record<string, any>>({});
 
 
   const sanitizeConfiguration = (configuration: KioskConfiguration): KioskConfiguration => ({
@@ -80,14 +84,31 @@ const KiosksManagement = () => {
     loadKiosks();
     loadBackgroundImage();
     loadLogoImage();
+    loadPosStatus();
 
     const channel = supabase
       .channel('kiosks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kiosks' }, () => { loadKiosks(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Refresh the terminal health rows so the offline rule (>3 min stale) applies live.
+    const healthPoll = window.setInterval(() => { loadPosStatus(); }, 20000);
+
+    return () => { supabase.removeChannel(channel); window.clearInterval(healthPoll); };
   }, []);
+
+  const loadPosStatus = async () => {
+    try {
+      const { data, error } = await supabase.from('kiosk_pos_status').select('*');
+      if (error) throw error;
+      const map: Record<string, any> = {};
+      (data || []).forEach((row: any) => { map[row.kiosk_id] = row; });
+      setPosStatus(map);
+    } catch (error) {
+      console.error('Error loading POS health:', error);
+    }
+  };
+
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -657,7 +678,26 @@ const KiosksManagement = () => {
                           {kiosk.configuration?.sound_enabled !== false ? '🔊 Enabled' : '🔇 Muted'}
                         </Button>
                       </div>
+
+                      {/* OM-A880 POS health & status */}
+                      <div className="mt-3 max-w-md">
+                        <PosHealthIndicator
+                          state={effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at)}
+                          message={
+                            posStatus[kiosk.id]
+                              ? effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at) === 'offline'
+                                ? 'Terminal not reachable — reseat USB cable / charge / power on'
+                                : posStatus[kiosk.id]?.message
+                              : 'No health beat received from this kiosk yet'
+                          }
+                          paperOk={posStatus[kiosk.id]?.paper_ok}
+                          batteryOk={posStatus[kiosk.id]?.battery_ok}
+                          terminalLabel={posStatus[kiosk.id]?.terminal_label || kiosk.configuration?.nbo_pos?.terminal_label}
+                          updatedAt={posStatus[kiosk.id]?.updated_at}
+                        />
+                      </div>
                     </div>
+
                     <div className="flex gap-2">
                       {kiosk.status === 'pending_approval' && (
                         <Button size="sm" variant="default"

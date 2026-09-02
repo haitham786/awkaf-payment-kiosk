@@ -11,6 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { useNboPosHealth } from "@/hooks/useNboPosHealth";
+import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
+
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
@@ -36,7 +39,11 @@ const KioskSetupPanel = () => {
   
   const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos'>('soft_pos');
 
+  const storedKioskId = typeof window !== 'undefined' ? localStorage.getItem('kiosk_id') : null;
+  const { snapshot: posHealth, checking: posHealthChecking, refresh: refreshPosHealth } = useNboPosHealth(storedKioskId, isAuthenticated);
+
   useEffect(() => { checkAuth(); }, []);
+
 
   const loadKioskConfig = async () => {
     const kioskId = localStorage.getItem('kiosk_id');
@@ -358,6 +365,27 @@ const KioskSetupPanel = () => {
 
           <TabsContent value="status" className="space-y-3">
             <Card className="p-4 bg-white border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-900">POS Health &amp; Status</h2>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => refreshPosHealth()} disabled={posHealthChecking}>
+                  {posHealthChecking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                  Refresh
+                </Button>
+              </div>
+              <PosHealthIndicator
+                state={posHealth.state}
+                message={posHealth.message}
+                paperOk={posHealth.paperOk}
+                batteryOk={posHealth.batteryOk}
+                terminalLabel={posHealth.terminalLabel}
+                updatedAt={posHealth.checkedAt}
+              />
+              <p className="mt-2 text-[11px] text-gray-500">
+                Checks USB transport, terminal heartbeat (GetStatus 114) and housekeeping (paper / battery) every 20 seconds while idle.
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-white border-gray-200">
               <h2 className="text-lg font-bold mb-3 text-gray-900">Connection Status</h2>
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -379,6 +407,7 @@ const KioskSetupPanel = () => {
               </div>
             </Card>
           </TabsContent>
+
         </Tabs>
       </div>
     </div>
