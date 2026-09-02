@@ -163,9 +163,11 @@ const NboPosPaymentPage = () => {
       setStage("declined");
     } catch (err) {
       if (cancellingRef.current) return;
+      void NboEcr.cancel().catch(() => undefined);
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
     }
+
   }, [amount, category, categoryReference, kioskId, navigate, recordTransaction, transactionId]);
 
   useEffect(() => {
