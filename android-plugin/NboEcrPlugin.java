@@ -390,6 +390,8 @@ public class NboEcrPlugin extends Plugin {
         ret.put("tid", tag(xml, "TID"));
         ret.put("mid", tag(xml, "MID"));
         ret.put("errorCode", errorCode);
+        lastTransactionErrorCode = errorCode;
+
         ret.put("raw", xml);
         return ret;
     }
