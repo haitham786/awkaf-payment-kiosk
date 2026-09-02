@@ -13,4 +13,4 @@
 - [x] Restrict Edit Kiosk to NBO POS and Testing configurations
 - [x] Restyle kiosk settings Logout control
 - [x] Rename Android workflow and generate launcher icon from Awkaf logo
-- [ ] Validate UI, workflow syntax, and NBO integration preservation
+- [x] Validate UI, workflow syntax, and NBO integration preservation
