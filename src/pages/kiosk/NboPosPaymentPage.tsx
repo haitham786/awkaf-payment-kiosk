@@ -192,10 +192,14 @@ const NboPosPaymentPage = () => {
   // Declined payments auto-return to the categories page; the donor restarts
   // the donation from the beginning instead of retrying the same session.
   useEffect(() => {
-    if (stage !== "declined") return;
-    const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 2000);
+    if (stage !== "declined" && stage !== "error") return;
+    const timer = window.setTimeout(
+      () => navigate("/kiosk", { replace: true }),
+      stage === "declined" ? 2000 : 5000,
+    );
     return () => window.clearTimeout(timer);
   }, [navigate, stage]);
+
 
   if (stage === "processing") {
     return (
