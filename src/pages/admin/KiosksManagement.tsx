@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type SoftPosMode = 'test' | 'live';
-type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos';
+type PaymentMode = 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos' | 'nbo_pos';
 type ReceiptChannel = 'sms' | 'whatsapp' | 'both';
 
 interface KioskConfiguration {
@@ -34,6 +34,13 @@ interface KioskConfiguration {
     environment: 'uat' | 'production';
     timeout_seconds: number;
   };
+  nbo_pos?: {
+    baud_rate: number;
+    vendor_id: number;
+    product_id: number;
+    timeout_seconds: number;
+    terminal_label: string;
+  };
   test_payment?: {
     auto_approve?: boolean;
   };
@@ -49,6 +56,16 @@ const emptyHardwarePos = () => ({
   currency_code: '512',
   environment: 'uat' as 'uat' | 'production',
   timeout_seconds: 90,
+});
+
+// NBO OM-A880 is wired to the kiosk with a USB-OTG cable, so the settings are
+// local link settings (no credentials travel over the internet).
+const emptyNboPos = () => ({
+  baud_rate: 115200,
+  vendor_id: 0,
+  product_id: 0,
+  timeout_seconds: 90,
+  terminal_label: '',
 });
 
 const KiosksManagement = () => {
