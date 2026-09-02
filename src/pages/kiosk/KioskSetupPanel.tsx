@@ -11,6 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
 import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { useNboPosHealth } from "@/hooks/useNboPosHealth";
+import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
+
 
 const KioskSetupPanel = () => {
   const navigate = useNavigate();
