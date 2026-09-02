@@ -189,6 +189,16 @@ public class NboEcrPlugin extends Plugin {
                     continue;
                 }
 
+                // Some OM-A880 firmware echoes the purchase request (CommandType
+                // 100 + Amount/MREFValue) as soon as it accepts the amount. That
+                // frame means the terminal is waiting for the card; it is NOT a
+                // declined transaction. Only finish once the response contains
+                // an actual bank/terminal outcome.
+                if (!isFinalPurchaseResponse(frame)) {
+                    Log.d(TAG, "Ignoring purchase acknowledgement without a final outcome");
+                    continue;
+                }
+
                 return parseFinalResponse(frame);
             }
 
@@ -203,6 +213,20 @@ public class NboEcrPlugin extends Plugin {
         if (commandType == null || !commandType.matches("\\d{3}")) return false;
         int code = Integer.parseInt(commandType);
         return code >= 1 && code <= 30;
+    }
+
+    private boolean isFinalPurchaseResponse(String xml) {
+        String responseCode = firstNonEmpty(tag(xml, "ResponseCode"), tag(xml, "RespCode"), tag(xml, "HostRspCode"));
+        String txnStatus = tag(xml, "TxnStatus");
+        String errorCode = tag(xml, "ErrorCode");
+
+        // A host response or transaction status is conclusive. E000 means only
+        // "No Error" and may accompany an early acknowledgement, so it cannot
+        // complete the purchase by itself. Any other terminal error is final.
+        if (responseCode != null || firstNonEmpty(txnStatus) != null) return true;
+        return errorCode != null
+                && errorCode.trim().length() > 0
+                && !"E000".equalsIgnoreCase(errorCode.trim());
     }
 
     private JSObject parseFinalResponse(String xml) {
