@@ -170,6 +170,59 @@ export type Database = {
         }
         Relationships: []
       }
+      kiosk_pos_status: {
+        Row: {
+          battery_ok: boolean | null
+          error_code: string | null
+          kiosk_id: string
+          message: string | null
+          paper_ok: boolean | null
+          printer_status: string | null
+          reader_status: string | null
+          responded: boolean
+          state: string
+          terminal_label: string | null
+          transport_connected: boolean
+          updated_at: string
+        }
+        Insert: {
+          battery_ok?: boolean | null
+          error_code?: string | null
+          kiosk_id: string
+          message?: string | null
+          paper_ok?: boolean | null
+          printer_status?: string | null
+          reader_status?: string | null
+          responded?: boolean
+          state?: string
+          terminal_label?: string | null
+          transport_connected?: boolean
+          updated_at?: string
+        }
+        Update: {
+          battery_ok?: boolean | null
+          error_code?: string | null
+          kiosk_id?: string
+          message?: string | null
+          paper_ok?: boolean | null
+          printer_status?: string | null
+          reader_status?: string | null
+          responded?: boolean
+          state?: string
+          terminal_label?: string | null
+          transport_connected?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiosk_pos_status_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kiosk_secrets: {
         Row: {
           access_token: string
