@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "test_payment" | "hardware_pos";
+export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "test_payment" | "hardware_pos" | "nbo_pos";
 export type ReceiptChannel = "sms" | "whatsapp" | "both";
 
 export interface KioskRuntimeConfig {
@@ -20,6 +20,14 @@ export interface KioskRuntimeConfig {
     currency_code?: string;
     environment?: "uat" | "production";
     timeout_seconds?: number;
+  };
+  /** National Bank of Oman OM-A880 terminal over USB (local ECR link). */
+  nbo_pos?: {
+    baud_rate?: number;
+    vendor_id?: number;
+    product_id?: number;
+    timeout_seconds?: number;
+    terminal_label?: string;
   };
   sound_enabled?: boolean;
   receipt_channel?: ReceiptChannel;
@@ -47,7 +55,7 @@ function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
 export function getCachedPaymentMode(kioskId: string): KioskPaymentMode | null {
   try {
     const v = localStorage.getItem(PAYMENT_MODE_LS_KEY(kioskId));
-    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment" || v === "hardware_pos") return v;
+    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment" || v === "hardware_pos" || v === "nbo_pos") return v;
     return null;
   } catch {
     return null;

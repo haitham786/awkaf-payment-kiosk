@@ -8,6 +8,7 @@ const routeFor = (mode: KioskPaymentMode | null | undefined, category: string, a
   if (mode === 'test_payment') return `/kiosk/test-payment?category=${category}&amount=${amount}`;
   if (mode === 'payment_gateway') return `/kiosk/thawani-gateway?category=${category}&amount=${amount}`;
   if (mode === 'hardware_pos') return `/kiosk/hardware-pos?category=${category}&amount=${amount}`;
+  if (mode === 'nbo_pos') return `/kiosk/nbo-pos?category=${category}&amount=${amount}`;
   // Default to Soft POS (Thawani Lamsa) — the primary payment path.
   return `/kiosk/nfc-payment?category=${category}&amount=${amount}`;
 };

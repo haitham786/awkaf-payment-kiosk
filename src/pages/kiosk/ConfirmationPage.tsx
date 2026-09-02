@@ -61,6 +61,10 @@ const ConfirmationPage = () => {
         navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
         return;
       }
+      if (mode === 'nbo_pos') {
+        navigate(`/kiosk/nbo-pos?category=${category}&amount=${amount}`);
+        return;
+      }
       if (mode === 'soft_pos') {
         navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
         return;
