@@ -85,6 +85,7 @@ const KiosksManagement = () => {
       soft_pos: { auth_key: '', is_production: false, mode: 'test' as SoftPosMode },
       payment_gateway: { mode: 'test' as 'test' | 'live' },
       hardware_pos: emptyHardwarePos(),
+      nbo_pos: emptyNboPos(),
       sound_enabled: true,
       receipt_channel: 'sms' as ReceiptChannel,
     } as KioskConfiguration
@@ -365,6 +366,7 @@ const KiosksManagement = () => {
         soft_pos: config.soft_pos || { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: config.payment_gateway || { mode: 'test' },
         hardware_pos: { ...emptyHardwarePos(), ...(config.hardware_pos || {}) },
+        nbo_pos: { ...emptyNboPos(), ...(config.nbo_pos || {}) },
         test_payment: config.test_payment || { auto_approve: true },
         sound_enabled: config.sound_enabled !== false,
         receipt_channel: (config.receipt_channel as ReceiptChannel) || 'sms',
@@ -394,6 +396,7 @@ const KiosksManagement = () => {
         soft_pos: { auth_key: '', is_production: false, mode: 'test' },
         payment_gateway: { mode: 'test' },
         hardware_pos: emptyHardwarePos(),
+        nbo_pos: emptyNboPos(),
         test_payment: { auto_approve: true },
         sound_enabled: true,
         receipt_channel: 'sms',
@@ -497,6 +500,7 @@ const KiosksManagement = () => {
     const paymentMode = kiosk.configuration?.payment_mode;
     if (paymentMode === 'payment_gateway') return 'Payment Gateway (Thawani)';
     if (paymentMode === 'hardware_pos') return 'Ahli Islamic POS Terminal';
+    if (paymentMode === 'nbo_pos') return 'NBO POS Terminal (OM-A880, USB)';
     if (paymentMode === 'test_payment') return 'Testing Mode (Simulated Success)';
     return 'Soft POS (Thawani Lamsa)';
   };
