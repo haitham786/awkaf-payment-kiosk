@@ -51,13 +51,41 @@ export interface NboPurchaseResult {
   errorCode?: string | null;
 }
 
+export interface NboStatusResult {
+  /** True when the terminal answered the GetStatus (114) command in time. */
+  responded: boolean;
+  /** True when a terminal is attached on USB. */
+  deviceAttached?: boolean;
+  printerStatus?: string | null;
+  readerStatus?: string | null;
+  errorCode?: string | null;
+  /** Last error code observed on a transaction (condition layer). */
+  lastTransactionErrorCode?: string | null;
+  raw?: string | null;
+  error?: string | null;
+}
+
+export interface NboStatusOptions {
+  baudRate?: number;
+  vendorId?: number;
+  productId?: number;
+  timeoutSeconds?: number;
+}
+
 export interface NboEcrPluginInterface {
   isAvailable(): Promise<{ available: boolean; deviceAttached: boolean; error?: string }>;
   listDevices(): Promise<{ devices: Array<{ vendorId: number; productId: number; name: string }> }>;
   purchase(options: NboPurchaseOptions): Promise<NboPurchaseResult>;
   /** Aborts the in-flight purchase and clears the amount on the terminal. */
   cancel(): Promise<{ cancelled: boolean; error?: string }>;
+  /** Health probe (CommandType 114). Never call during an active transaction. */
+  getStatus(options?: NboStatusOptions): Promise<NboStatusResult>;
+  addListener(
+    eventName: "posConnection",
+    listener: (event: { attached: boolean; vendorId?: number; productId?: number }) => void,
+  ): Promise<{ remove: () => Promise<void> }>;
 }
+
 
 const NboEcr = registerPlugin<NboEcrPluginInterface>("NboEcr", {
   web: () => import("./nboEcrPluginWeb").then((m) => new m.NboEcrPluginWeb()),
