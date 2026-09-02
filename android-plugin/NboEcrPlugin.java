@@ -56,9 +56,58 @@ public class NboEcrPlugin extends Plugin {
     /** Command identifiers from the specification. */
     private static final String CMD_PURCHASE = "100";
     private static final String CMD_VOID_PURCHASE = "102";
+    private static final String CMD_GET_STATUS = "114";
 
     private final AtomicBoolean cancelRequested = new AtomicBoolean(false);
     private volatile boolean busy = false;
+    /** Last error code seen on a transaction (condition layer of the health model). */
+    private volatile String lastTransactionErrorCode = null;
+    private BroadcastReceiver usbConnectionReceiver = null;
+
+    // ------------------------------------------------- connection events
+
+    @Override
+    public void load() {
+        try {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+            filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+            usbConnectionReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    boolean attached = UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction());
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    JSObject event = new JSObject();
+                    event.put("attached", attached);
+                    if (device != null) {
+                        event.put("vendorId", device.getVendorId());
+                        event.put("productId", device.getProductId());
+                    }
+                    notifyListeners("posConnection", event);
+                }
+            };
+            if (Build.VERSION.SDK_INT >= 33) {
+                getContext().registerReceiver(usbConnectionReceiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                getContext().registerReceiver(usbConnectionReceiver, filter);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not register USB connection receiver", e);
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (usbConnectionReceiver != null) {
+            try {
+                getContext().unregisterReceiver(usbConnectionReceiver);
+            } catch (Exception ignored) {
+                /* already unregistered */
+            }
+            usbConnectionReceiver = null;
+        }
+    }
+
 
     // ---------------------------------------------------------------- API
 
