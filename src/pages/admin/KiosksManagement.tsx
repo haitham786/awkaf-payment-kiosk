@@ -68,6 +68,7 @@ const KiosksManagement = () => {
   const [logoImage, setLogoImage] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [posStatus, setPosStatus] = useState<Record<string, any>>({});
 
 
   const sanitizeConfiguration = (configuration: KioskConfiguration): KioskConfiguration => ({
@@ -83,14 +84,31 @@ const KiosksManagement = () => {
     loadKiosks();
     loadBackgroundImage();
     loadLogoImage();
+    loadPosStatus();
 
     const channel = supabase
       .channel('kiosks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kiosks' }, () => { loadKiosks(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Refresh the terminal health rows so the offline rule (>3 min stale) applies live.
+    const healthPoll = window.setInterval(() => { loadPosStatus(); }, 20000);
+
+    return () => { supabase.removeChannel(channel); window.clearInterval(healthPoll); };
   }, []);
+
+  const loadPosStatus = async () => {
+    try {
+      const { data, error } = await supabase.from('kiosk_pos_status').select('*');
+      if (error) throw error;
+      const map: Record<string, any> = {};
+      (data || []).forEach((row: any) => { map[row.kiosk_id] = row; });
+      setPosStatus(map);
+    } catch (error) {
+      console.error('Error loading POS health:', error);
+    }
+  };
+
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
