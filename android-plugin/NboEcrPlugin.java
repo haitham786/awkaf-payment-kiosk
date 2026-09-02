@@ -22,6 +22,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,8 +54,8 @@ public class NboEcrPlugin extends Plugin {
     private static final byte NAK = 0x15;
 
     /** Command identifiers from the specification. */
-    private static final String CMD_PURCHASE = "1";
-    private static final String CMD_CANCEL = "9";
+    private static final String CMD_PURCHASE = "100";
+    private static final String CMD_VOID_PURCHASE = "102";
 
     private final AtomicBoolean cancelRequested = new AtomicBoolean(false);
     private volatile boolean busy = false;
@@ -184,7 +185,7 @@ public class NboEcrPlugin extends Plugin {
                 // Intermediate messages carry a progress code only; keep waiting
                 // for the final response that contains the transaction outcome.
                 if (isIntermediate(frame)) {
-                    Log.d(TAG, "intermediate: " + tag(frame, "IntermediateMessage"));
+                    Log.d(TAG, "intermediate: " + tag(frame, "CommandType"));
                     continue;
                 }
 
@@ -198,7 +199,10 @@ public class NboEcrPlugin extends Plugin {
     }
 
     private boolean isIntermediate(String xml) {
-        return xml.contains("<IntermediateMessage") || xml.contains("<IntermediateResponse");
+        String commandType = tag(xml, "CommandType");
+        if (commandType == null || !commandType.matches("\\d{3}")) return false;
+        int code = Integer.parseInt(commandType);
+        return code >= 1 && code <= 30;
     }
 
     private JSObject parseFinalResponse(String xml) {
@@ -207,14 +211,16 @@ public class NboEcrPlugin extends Plugin {
         String responseText = firstNonEmpty(tag(xml, "ResponseDesc"), tag(xml, "HostDesc"), tag(xml, "ErrorMessage"));
         String errorCode = tag(xml, "ErrorCode");
 
-        boolean approved = "00".equals(responseCode)
+        boolean approved = "00".equalsIgnoreCase(responseCode)
                 || "000".equals(responseCode)
+                || "APPROVED".equalsIgnoreCase(responseCode)
                 || (responseText != null && responseText.toUpperCase().contains("APPROVED"))
                 || "1".equals(txnStatus)
+                || "OK".equalsIgnoreCase(txnStatus)
                 || "APPROVED".equalsIgnoreCase(txnStatus);
 
-        // Any explicit error code from the terminal overrules a lenient match.
-        if (errorCode != null && errorCode.length() > 0) {
+        // E000 explicitly means "No Error" in the NBO specification.
+        if (errorCode != null && errorCode.length() > 0 && !"E000".equalsIgnoreCase(errorCode)) {
             approved = false;
         }
 
@@ -226,8 +232,8 @@ public class NboEcrPlugin extends Plugin {
         ret.put("rrn", tag(xml, "RRN"));
         ret.put("authCode", tag(xml, "AuthCode"));
         ret.put("invoiceNumber", firstNonEmpty(tag(xml, "InvoiceNo"), tag(xml, "InvoiceNumber")));
-        ret.put("cardType", firstNonEmpty(tag(xml, "CardType"), tag(xml, "ApplicationLabel")));
-        ret.put("cardLastFour", lastFour(tag(xml, "CardNo")));
+        ret.put("cardType", firstNonEmpty(tag(xml, "CardSchemeName"), tag(xml, "ApplicationLabel")));
+        ret.put("cardLastFour", lastFour(firstNonEmpty(tag(xml, "MaskCardNumber"), tag(xml, "CardNo"))));
         ret.put("tid", tag(xml, "TID"));
         ret.put("mid", tag(xml, "MID"));
         ret.put("errorCode", errorCode);
@@ -246,22 +252,21 @@ public class NboEcrPlugin extends Plugin {
     }
 
     private String buildPurchaseXml(int amountBaisas, String ecrRef) {
-        // Amount is expressed in minor units (baisas), zero padded to 12 digits.
-        String amount = String.format("%012d", amountBaisas);
-        return "<Transaction>"
-                + "<Command>" + CMD_PURCHASE + "</Command>"
+        // Amount is a variable-length integer in minor units, up to 12 digits.
+        String amount = Integer.toString(amountBaisas);
+        return "<EFTData>"
+                + "<CommandType>" + CMD_PURCHASE + "</CommandType>"
                 + "<Amount>" + amount + "</Amount>"
-                + "<ECRRefNo>" + ecrRef + "</ECRRefNo>"
-                + "<TransactionType>PURCHASE</TransactionType>"
-                + "</Transaction>";
+                + "<MREFValue>" + ecrRef + "</MREFValue>"
+                + "</EFTData>";
     }
 
     private String buildCancelXml(String ecrRef) {
-        return "<Transaction>"
-                + "<Command>" + CMD_CANCEL + "</Command>"
-                + "<ECRRefNo>" + ecrRef + "</ECRRefNo>"
-                + "<TransactionType>CANCEL</TransactionType>"
-                + "</Transaction>";
+        return "<EFTData>"
+                + "<CommandType>" + CMD_VOID_PURCHASE + "</CommandType>"
+                + "<Amount>0</Amount>"
+                + "<InvoiceNo>" + ecrRef + "</InvoiceNo>"
+                + "</EFTData>";
     }
 
     private static String shortRef(String transactionId) {
@@ -402,6 +407,8 @@ public class NboEcrPlugin extends Plugin {
     }
 
     private static class Session {
+        private static final int FRAME_SEND_ATTEMPTS = 3;
+        private static final int HANDSHAKE_TIMEOUT_MS = 2500;
         private final UsbDeviceConnection connection;
         private final UsbInterface iface;
         private final UsbEndpoint in;
@@ -419,9 +426,9 @@ public class NboEcrPlugin extends Plugin {
             connection.bulkTransfer(out, new byte[]{value}, 1, 2000);
         }
 
-        /** STX + payload + ETX + LRC (XOR over payload and ETX). */
+        /** STX + payload + ETX + LRC, followed by the mandatory POS ACK. */
         void writeFrame(String payload) throws Exception {
-            byte[] body = payload.getBytes("UTF-8");
+            byte[] body = payload.getBytes(StandardCharsets.US_ASCII);
             byte lrc = 0;
             for (byte b : body) lrc ^= b;
             lrc ^= ETX;
@@ -432,8 +439,50 @@ public class NboEcrPlugin extends Plugin {
             frame[body.length + 1] = ETX;
             frame[body.length + 2] = lrc;
 
-            int written = connection.bulkTransfer(out, frame, frame.length, 5000);
-            if (written < 0) throw new IllegalStateException("Failed to write to the payment terminal");
+            for (int attempt = 1; attempt <= FRAME_SEND_ATTEMPTS; attempt++) {
+                int written = connection.bulkTransfer(out, frame, frame.length, 5000);
+                if (written != frame.length) {
+                    if (attempt == FRAME_SEND_ATTEMPTS) {
+                        throw new IllegalStateException("Incomplete write to the payment terminal");
+                    }
+                    continue;
+                }
+
+                byte handshake = readHandshake(HANDSHAKE_TIMEOUT_MS);
+                if (handshake == ACK) return;
+
+                String reason = handshake == NAK ? "rejected the command (NAK)" : "did not acknowledge the command";
+                Log.w(TAG, "POS " + reason + "; send attempt " + attempt + " of " + FRAME_SEND_ATTEMPTS);
+                if (attempt == FRAME_SEND_ATTEMPTS) {
+                    throw new IllegalStateException("Payment terminal " + reason);
+                }
+            }
+        }
+
+        /**
+         * Waits for the ACK/NAK that belongs to the frame just written. Any
+         * response-frame bytes arriving in the same USB packet are preserved.
+         */
+        private byte readHandshake(int timeoutMs) {
+            byte[] chunk = new byte[1024];
+            long deadline = System.currentTimeMillis() + timeoutMs;
+            while (System.currentTimeMillis() < deadline) {
+                int remaining = (int) Math.max(1L, deadline - System.currentTimeMillis());
+                int read = connection.bulkTransfer(in, chunk, chunk.length, Math.min(200, remaining));
+                if (read <= 0) continue;
+
+                byte handshake = 0;
+                for (int i = 0; i < read; i++) {
+                    byte value = chunk[i];
+                    if (handshake == 0 && (value == ACK || value == NAK)) {
+                        handshake = value;
+                    } else {
+                        buffer.write(value);
+                    }
+                }
+                if (handshake != 0) return handshake;
+            }
+            return 0;
         }
 
         /** Reads one complete STX..ETX frame, or null if none arrived in time. */
@@ -470,15 +519,31 @@ public class NboEcrPlugin extends Plugin {
             }
             if (end < 0) return null;
 
-            String payload = new String(data, start + 1, end - start - 1, "UTF-8");
+            if (data.length <= end + 1) return null;
+
+            byte expectedLrc = 0;
+            for (int i = start + 1; i <= end; i++) expectedLrc ^= data[i];
+            byte receivedLrc = data[end + 1];
+            if (expectedLrc != receivedLrc) {
+                writeByte(NAK);
+                discardThrough(data, end + 2);
+                Log.w(TAG, "Discarded response frame with invalid LRC");
+                return null;
+            }
+
+            String payload = new String(data, start + 1, end - start - 1, StandardCharsets.US_ASCII);
 
             // Drop the consumed bytes (frame + LRC) from the buffer.
-            int consumed = Math.min(data.length, end + 2);
+            discardThrough(data, end + 2);
+            return payload;
+        }
+
+        private void discardThrough(byte[] data, int consumedCount) throws Exception {
+            int consumed = Math.min(data.length, consumedCount);
             byte[] rest = new byte[data.length - consumed];
             System.arraycopy(data, consumed, rest, 0, rest.length);
             buffer.reset();
             buffer.write(rest);
-            return payload;
         }
 
         void close() {

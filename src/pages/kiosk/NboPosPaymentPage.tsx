@@ -5,9 +5,8 @@ import { Card } from "@/components/ui/card";
 import { AlertTriangle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
-import { ConnectingPosScreen } from "@/components/kiosk/ConnectingPosScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
+import { getCachedNboPosConfig, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import NboEcr, { type NboPurchaseResult } from "@/services/nboEcrPlugin";
 
 type Stage = "processing" | "declined" | "error";
@@ -28,7 +27,6 @@ const NboPosPaymentPage = () => {
   const [stage, setStage] = useState<Stage>("processing");
   const [errorMessage, setErrorMessage] = useState("");
   const [declineMessage, setDeclineMessage] = useState("");
-  const [showConnecting, setShowConnecting] = useState(true);
   const [categoryReference, setCategoryReference] = useState<string>(
     () => readCachedCategory(category)?.category_reference || "",
   );
@@ -36,11 +34,6 @@ const NboPosPaymentPage = () => {
   const transactionId = useMemo(() => crypto.randomUUID(), []);
   const startedRef = useRef(false);
   const cancellingRef = useRef(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setShowConnecting(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -111,21 +104,18 @@ const NboPosPaymentPage = () => {
       return;
     }
 
-    let nbo: { baud_rate?: number; vendor_id?: number; product_id?: number; timeout_seconds?: number } = {};
-    try {
-      const config = await loadKioskRuntimeConfig(kioskId);
-      nbo = config?.nbo_pos || {};
-    } catch {
-      /* fall back to defaults — the terminal settings are local anyway */
-    }
+    // USB dispatch must not wait for a backend round trip. Use the locally
+    // persisted admin configuration and refresh it for the next transaction.
+    const nbo = getCachedNboPosConfig(kioskId) || {};
+    void loadKioskRuntimeConfig(kioskId, { forceRefresh: true }).catch(() => undefined);
 
     try {
       const result = await NboEcr.purchase({
         amountBaisas: Math.round(amount),
         transactionId,
         baudRate: nbo.baud_rate || 115200,
-        vendorId: nbo.vendor_id || 0,
-        productId: nbo.product_id || 0,
+        vendorId: nbo.vendor_id || 1478,
+        productId: nbo.product_id || 36923,
         timeoutSeconds: nbo.timeout_seconds || 90,
       });
 
@@ -201,10 +191,6 @@ const NboPosPaymentPage = () => {
     const timer = window.setTimeout(() => navigate("/kiosk", { replace: true }), 2000);
     return () => window.clearTimeout(timer);
   }, [navigate, stage]);
-
-  if (showConnecting && stage === "processing") {
-    return <ConnectingPosScreen />;
-  }
 
   if (stage === "processing") {
     return (
