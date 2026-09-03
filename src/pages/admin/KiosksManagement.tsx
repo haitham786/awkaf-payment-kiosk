@@ -409,10 +409,12 @@ const KiosksManagement = () => {
           )}
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Form */}
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">{editingId ? 'Edit Kiosk' : 'Add New Kiosk'}</h2>
+        {/* Edit Kiosk popup (new kiosks register themselves from the kiosk setup panel) */}
+        <Dialog open={!!editingId} onOpenChange={(open) => { if (!open) resetForm(); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Kiosk</DialogTitle>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Kiosk Name</Label>
