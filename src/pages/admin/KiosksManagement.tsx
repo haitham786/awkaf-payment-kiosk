@@ -686,22 +686,23 @@ const KiosksManagement = () => {
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-bold">{kiosk.name}</h3>
                         {kiosk.status === 'pending_approval' && (
-                          <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">Needs Approval</span>
+                          <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">Pending</span>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{kiosk.location}</p>
                       <div className="flex gap-4 mt-2">
                         <p className="text-xs text-muted-foreground">Ref: {kiosk.reference_number || 'N/A'}</p>
-                        <p className="text-xs">
-                          <span className={`px-2 py-1 rounded ${
-                            kiosk.status === 'active' ? 'bg-success/20 text-success' :
-                            kiosk.status === 'pending_approval' ? 'bg-destructive/20 text-destructive' :
-                            kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
-                            'bg-warning/20 text-warning'
-                          }`}>
-                            {kiosk.status.replace('_', ' ')}
-                          </span>
-                        </p>
+                        {kiosk.status !== 'pending_approval' && (
+                          <p className="text-xs">
+                            <span className={`px-2 py-1 rounded ${
+                              kiosk.status === 'active' ? 'bg-success/20 text-success' :
+                              kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
+                              'bg-warning/20 text-warning'
+                            }`}>
+                              {kiosk.status.replace('_', ' ')}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       {/* Payment Mode */}
                        <div className="mt-2 flex items-center gap-2">
