@@ -50,6 +50,7 @@ const KiosksManagement = () => {
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
