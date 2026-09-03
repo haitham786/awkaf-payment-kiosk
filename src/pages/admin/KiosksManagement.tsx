@@ -354,60 +354,65 @@ const KiosksManagement = () => {
             <Button variant="outline" size="icon" onClick={() => navigate('/admin')}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-3xl font-bold">Kiosk Management</h1>
+            <h1 className="text-3xl font-bold">Manage Kiosk</h1>
           </div>
           <ThemeToggle />
         </div>
 
-        {/* Logo Management */}
-        <Card className="mb-6">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Organization Logo</h2>
-            <p className="text-sm text-muted-foreground mb-4">Upload your organization's logo (PNG or SVG format only)</p>
-            {logoImage ? (
-              <div className="space-y-4">
-                <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                  <img src={logoImage} alt="Organization Logo" className="max-w-full max-h-full object-contain p-2" />
+        {/* Logo & Background uploads - side by side */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* Logo Management */}
+          <Card>
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Organization Logo</h2>
+              <p className="text-sm text-muted-foreground mb-4">PNG or SVG only</p>
+              {logoImage ? (
+                <div className="space-y-4">
+                  <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                    <img src={logoImage} alt="Organization Logo" className="max-w-full max-h-full object-contain p-2" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>Change Logo</Button>
+                    <Button variant="destructive" onClick={handleRemoveLogo} disabled={uploadingLogo}>Remove Logo</Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>Change Logo</Button>
-                  <Button variant="destructive" onClick={handleRemoveLogo} disabled={uploadingLogo}>Remove Logo</Button>
-                </div>
-              </div>
-            ) : (
-              <Button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
-                {uploadingLogo ? "Uploading..." : "Upload Logo"}
-              </Button>
-            )}
-            <input ref={logoInputRef} type="file" accept="image/png,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
-          </div>
-        </Card>
+              ) : (
+                <Button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
+                  {uploadingLogo ? "Uploading..." : "Upload Logo"}
+                </Button>
+              )}
+              <input ref={logoInputRef} type="file" accept="image/png,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
+            </div>
+          </Card>
 
-        {/* Background Image */}
-        <Card className="mb-8 p-6">
-          <h2 className="text-xl font-bold mb-4">Kiosk Background Image</h2>
-          <p className="text-sm text-muted-foreground mb-4">Upload a background image (9:16 aspect ratio, e.g., 1080x1920)</p>
-          {backgroundImage ? (
-            <div className="space-y-4">
-              <div className="w-full max-w-xs mx-auto">
-                <div className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '9/16', maxHeight: '400px' }}>
-                  <img src={backgroundImage} alt="Kiosk background" className="w-full h-full object-cover" />
+          {/* Background Image */}
+          <Card>
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-4">Kiosk Background Image</h2>
+              <p className="text-sm text-muted-foreground mb-4">9:16 aspect ratio</p>
+              {backgroundImage ? (
+                <div className="space-y-4">
+                  <div className="w-full max-w-xs mx-auto">
+                    <div className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '9/16', maxHeight: '400px' }}>
+                      <img src={backgroundImage} alt="Kiosk background" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                  <Button variant="destructive" onClick={handleRemoveImage} className="w-full">
+                    <X className="w-4 h-4 mr-2" />Remove Background Image
+                  </Button>
                 </div>
-              </div>
-              <Button variant="destructive" onClick={handleRemoveImage} className="w-full">
-                <X className="w-4 h-4 mr-2" />Remove Background Image
-              </Button>
+              ) : (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => backgroundInputRef.current?.click()}>
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <div className="text-sm text-muted-foreground mb-2">Click to upload</div>
+                  <div className="text-xs text-muted-foreground">PNG, JPG up to 10MB</div>
+                  <input ref={backgroundInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-              onClick={() => backgroundInputRef.current?.click()}>
-              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <div className="text-sm text-muted-foreground mb-2">Click to upload</div>
-              <div className="text-xs text-muted-foreground">PNG, JPG up to 10MB (9:16 aspect ratio)</div>
-              <input ref={backgroundInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
-            </div>
-          )}
-        </Card>
+          </Card>
+        </div>
 
         {/* Edit Kiosk popup (new kiosks register themselves from the kiosk setup panel) */}
         <Dialog open={!!editingId} onOpenChange={(open) => { if (!open) resetForm(); }}>
