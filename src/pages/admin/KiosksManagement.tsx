@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import PosKioskHealthPanel from "@/components/admin/PosKioskHealthPanel";
 import { effectiveState, POS_HEALTH_META, type PosHealthState } from "@/lib/posHealth";
 
