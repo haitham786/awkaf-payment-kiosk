@@ -677,9 +677,10 @@ const KiosksManagement = () => {
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">{kiosks.length === 0 ? 'No kiosks registered yet.' : 'No kiosks match this filter.'}</p>
               </Card>
-            ) : (
-              visibleKiosks.map((kiosk) => (
-                <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
+             ) : (
+              <div ref={listRef} className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+              {visibleKiosks.map((kiosk) => (
+                <Card key={kiosk.id} className={`p-4 w-[420px] shrink-0 snap-start ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
