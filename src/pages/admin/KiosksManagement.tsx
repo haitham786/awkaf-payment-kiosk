@@ -647,6 +647,19 @@ const KiosksManagement = () => {
               />
             </Card>
 
+            {kiosks.length > 1 && (
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8"
+                  onClick={() => listRef.current?.scrollBy({ left: -440, behavior: 'smooth' })}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8"
+                  onClick={() => listRef.current?.scrollBy({ left: 440, behavior: 'smooth' })}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
             {(() => {
               const term = fleetSearch.trim().toLowerCase();
               const visibleKiosks = kiosks
