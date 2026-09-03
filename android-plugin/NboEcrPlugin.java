@@ -57,6 +57,7 @@ public class NboEcrPlugin extends Plugin {
     private static final String CMD_PURCHASE = "100";
     private static final String CMD_VOID_PURCHASE = "102";
     private static final String CMD_GET_STATUS = "114";
+    private static final String CMD_TERMINAL_INFO = "109";
 
     private final AtomicBoolean cancelRequested = new AtomicBoolean(false);
     private volatile boolean busy = false;
@@ -125,7 +126,86 @@ public class NboEcrPlugin extends Plugin {
         boolean attached = !manager.getDeviceList().isEmpty();
         ret.put("available", true);
         ret.put("deviceAttached", attached);
+        String connectionInfo = null;
+        for (UsbDevice device : manager.getDeviceList().values()) {
+            connectionInfo = String.format("%04X:%04X · %s", device.getVendorId(), device.getProductId(),
+                    device.getDeviceName());
+            break;
+        }
+        ret.put("connectionInfo", connectionInfo);
         call.resolve(ret);
+    }
+
+    /**
+     * Terminal identity (spec: GetTerminalInfo, CommandType 109).
+     * Health only — never called while a payment is in flight.
+     */
+    @PluginMethod
+    public void getTerminalInfo(final PluginCall call) {
+        final int baudRate = call.getInt("baudRate", 115200);
+        final int vendorId = call.getInt("vendorId", 0);
+        final int productId = call.getInt("productId", 0);
+        final int timeoutSeconds = call.getInt("timeoutSeconds", 8);
+
+        if (busy) {
+            JSObject ret = new JSObject();
+            ret.put("responded", false);
+            ret.put("error", "Terminal busy with a transaction");
+            call.resolve(ret);
+            return;
+        }
+
+        new Thread(() -> {
+            JSObject ret = new JSObject();
+            Session session = null;
+            try {
+                session = openSession(vendorId, productId, baudRate);
+                if (session == null) {
+                    ret.put("responded", false);
+                    ret.put("error", "OM-A880 terminal not detected on USB");
+                    call.resolve(ret);
+                    return;
+                }
+                session.writeFrame("<EFTData><CommandType>" + CMD_TERMINAL_INFO + "</CommandType></EFTData>");
+
+                long deadline = System.currentTimeMillis() + (long) timeoutSeconds * 1000L;
+                String frame = null;
+                while (System.currentTimeMillis() < deadline) {
+                    frame = session.readFrame(1000);
+                    if (frame == null) continue;
+                    session.writeByte(ACK);
+                    break;
+                }
+
+                if (frame == null) {
+                    ret.put("responded", false);
+                    ret.put("error", "No reply to GetTerminalInfo");
+                } else {
+                    ret.put("responded", true);
+                    ret.put("tid", firstTag(frame, "TID", "TerminalId", "TerminalID"));
+                    ret.put("merchantId", firstTag(frame, "MID", "MerchantId", "MerchantID"));
+                    ret.put("serialNumber", firstTag(frame, "SerialNumber", "SerialNo", "TerminalSerialNumber"));
+                    ret.put("firmwareVersion", firstTag(frame, "FirmwareVersion", "AppVersion", "SoftwareVersion", "Version"));
+                    ret.put("raw", frame);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "getTerminalInfo failed", e);
+                ret.put("responded", false);
+                ret.put("error", e.getMessage());
+            } finally {
+                if (session != null) session.close();
+            }
+            call.resolve(ret);
+        }).start();
+    }
+
+    /** First non-empty value among several possible tag spellings. */
+    private String firstTag(String frame, String... names) {
+        for (String name : names) {
+            String value = tag(frame, name);
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
+        return null;
     }
 
     @PluginMethod
