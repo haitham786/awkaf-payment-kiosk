@@ -14,3 +14,9 @@
 - [x] Restyle kiosk settings Logout control
 - [x] Rename Android workflow and generate launcher icon from Awkaf logo
 - [x] Validate UI, workflow syntax, and NBO integration preservation
+
+- [ ] Restyle Kiosk Setup login controls and authenticated header
+- [ ] Remove Payment tab and rename Status to POS Status
+- [ ] Match on-device OM-A880 POS Status screen to the supplied redesign
+- [ ] Restyle first-install Settings access without colored icon backgrounds
+- [ ] Validate the setup-panel changes without altering NBO payment communication
