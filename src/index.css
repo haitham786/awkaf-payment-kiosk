@@ -70,6 +70,25 @@
     --warning: 45 100% 50%;
     --warning-foreground: 240 10% 10%;
 
+    /* Premium per-kiosk terminal card */
+    --kiosk-page: 220 30% 97%;
+    --kiosk-surface: 0 0% 100%;
+    --kiosk-border: 216 38% 94%;
+    --kiosk-text: 216 50% 12%;
+    --kiosk-muted: 213 12% 47%;
+    --kiosk-brand: 220 84% 56%;
+    --kiosk-brand-soft: 218 100% 96%;
+    --kiosk-ready: 160 76% 34%;
+    --kiosk-ready-text: 159 79% 27%;
+    --kiosk-ready-soft: 143 47% 94%;
+    --kiosk-attention: 41 100% 39%;
+    --kiosk-attention-text: 43 100% 27%;
+    --kiosk-attention-soft: 42 85% 92%;
+    --kiosk-offline: 4 72% 56%;
+    --kiosk-offline-text: 4 69% 41%;
+    --kiosk-offline-soft: 4 80% 96%;
+    --kiosk-shadow: 0 10px 30px hsl(220 60% 16% / 0.08);
+
     /* Light gradients */
     --gradient-primary: linear-gradient(135deg, hsl(210 100% 45%) 0%, hsl(210 100% 60%) 50%, hsl(220 100% 50%) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(35 100% 60%) 100%);

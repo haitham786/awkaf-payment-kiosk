@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
 import { computeUptime, effectiveState, lastSeenLabel, omanTimestamp, type HistoryRow, POS_HEALTH_META } from "@/lib/posHealth";
-import { History } from "lucide-react";
+import { ChevronDown, ChevronRight, History } from "lucide-react";
 import PosAlertSettingsCard from "@/components/admin/PosAlertSettingsCard";
+import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 
 interface Props {
   kioskId: string;
@@ -87,7 +88,7 @@ export const PosKioskHealthPanel = ({ kioskId, kioskName, fallbackTerminalLabel,
   const uptimeWeek = computeUptime(history, 7 * 24 * 3600 * 1000);
 
   return (
-    <div className="mt-3 max-w-md space-y-2">
+    <div className="mt-4 space-y-3">
       <PosHealthIndicator
         state={state}
         message={
@@ -113,28 +114,63 @@ export const PosKioskHealthPanel = ({ kioskId, kioskName, fallbackTerminalLabel,
         live
       />
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-        <span>Uptime today: {history.length ? `${uptimeDay.percent.toFixed(1)}%` : "—"}</span>
-        <span>7-day: {history.length ? `${uptimeWeek.percent.toFixed(1)}%` : "—"}</span>
-        <span>
-          Last outage:{" "}
-          {uptimeWeek.lastOutageAt
-            ? `${lastSeenLabel(uptimeWeek.lastOutageAt)} (${uptimeWeek.lastOutageMinutes}m)`
-            : "none in 7 days"}
-        </span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-kiosk-border bg-kiosk-page/50 p-3">
+          <p className="text-[9px] font-semibold uppercase text-kiosk-muted">Uptime today</p>
+          <p className={`mt-1 text-xl font-extrabold ${history.length && uptimeDay.percent < 90 ? "text-kiosk-attention-text" : "text-kiosk-text"}`}>
+            {history.length ? `${uptimeDay.percent.toFixed(1)}%` : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-kiosk-border bg-kiosk-page/50 p-3">
+          <p className="text-[9px] font-semibold uppercase text-kiosk-muted">Uptime · 7 days</p>
+          <p className={`mt-1 text-xl font-extrabold ${history.length && uptimeWeek.percent < 90 ? "text-kiosk-attention-text" : "text-kiosk-text"}`}>
+            {history.length ? `${uptimeWeek.percent.toFixed(1)}%` : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-kiosk-border bg-kiosk-page/50 p-3">
+          <p className="text-[9px] font-semibold uppercase text-kiosk-muted">Last outage</p>
+          <p className="mt-1 text-base font-extrabold text-kiosk-text">{uptimeWeek.lastOutageAt ? lastSeenLabel(uptimeWeek.lastOutageAt) : "None"}</p>
+          <p className="text-[10px] text-kiosk-muted">{uptimeWeek.lastOutageAt ? `lasted ${uptimeWeek.lastOutageMinutes}m` : "in 7 days"}</p>
+        </div>
+        <div className="rounded-xl border border-kiosk-border bg-kiosk-page/50 p-3">
+          <p className="text-[9px] font-semibold uppercase text-kiosk-muted">Declined today</p>
+          <p className={`mt-1 text-xl font-extrabold ${tx?.declined ? "text-kiosk-offline-text" : "text-kiosk-text"}`}>{tx?.declined ?? "—"}</p>
+          <p className="text-[10px] text-kiosk-muted">{tx?.approved ?? 0} approved</p>
+        </div>
       </div>
 
-      {tx && (
-        <div className="text-[11px] text-muted-foreground">
-          Today: {tx.approved} approved · {tx.declined} declined · OMR {tx.amount.toFixed(3)} collected
+      <div className="flex items-center justify-between rounded-xl border border-kiosk-brand/10 bg-kiosk-brand-soft px-3 py-2.5 text-xs font-semibold text-kiosk-brand">
+        <span>Collected today</span>
+        <span className="flex items-center gap-1.5 text-sm font-extrabold"><CurrencyLogo className="h-4 w-4 object-contain" />{(tx?.amount ?? 0).toFixed(3)}</span>
+      </div>
+
+      <div className="border-t border-kiosk-border pt-3">
+        <h4 className="mb-1 text-[9px] font-semibold uppercase tracking-normal text-kiosk-muted">Terminal details</h4>
+        <div className="grid grid-cols-2 text-[10px]">
+          {[
+            ["TID", status?.tid || "—"], ["Serial", status?.serial_number || "—"],
+            ["Firmware", status?.firmware_version || "—"], ["App", status?.app_version || "—"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-2 border-b border-kiosk-border py-2 odd:pr-3 even:pl-3">
+              <span className="text-kiosk-muted">{label}</span><span className="truncate font-semibold text-kiosk-text">{value}</span>
+            </div>
+          ))}
+          <div className="col-span-2 flex justify-between gap-3 border-b border-kiosk-border py-2">
+            <span className="text-kiosk-muted">USB</span><span className="break-all text-right font-semibold text-kiosk-text">{status?.connection_info || "—"}</span>
+          </div>
+          <div className="col-span-2 flex justify-between gap-3 border-b border-kiosk-border py-2">
+            <span className="shrink-0 text-kiosk-muted">Last transaction</span>
+            <span className="text-right font-semibold text-kiosk-text">{tx?.lastResult || "—"}{tx?.lastAt ? ` · ${lastSeenLabel(tx.lastAt)} · ${omanTimestamp(tx.lastAt)}` : ""}</span>
+          </div>
         </div>
-      )}
+      </div>
 
       <PosAlertSettingsCard kioskId={kioskId} kioskName={kioskName} />
 
-      <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setShowHistory((v) => !v)}>
-        <History className="mr-1 h-3 w-3" />
-        {showHistory ? "Hide status history" : "Status history"}
+      <Button variant="ghost" size="sm" className="h-10 w-full justify-start rounded-xl border border-kiosk-border px-3 text-xs text-kiosk-text hover:bg-kiosk-page" onClick={() => setShowHistory((v) => !v)}>
+        <History className="mr-2 h-4 w-4 text-kiosk-muted" />
+        Status history
+        {showHistory ? <ChevronDown className="ml-auto h-3.5 w-3.5 text-kiosk-muted" /> : <ChevronRight className="ml-auto h-3.5 w-3.5 text-kiosk-muted" />}
       </Button>
 
       {showHistory && (

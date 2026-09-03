@@ -83,49 +83,34 @@ export const PosHealthIndicator = ({
   const batteryStyle = chipColor(batteryOk);
   const readerStyle = readerColor(reader);
 
-  const identityItems = [
-    terminalLabel ? `Terminal: ${terminalLabel}` : null,
-    tid ? `TID: ${tid}` : null,
-    serialNumber ? `S/N: ${serialNumber}` : null,
-    firmwareVersion ? `Firmware: ${firmwareVersion}` : null,
-    appVersion ? `App: ${appVersion}` : null,
-    connectionInfo ? `USB: ${connectionInfo}` : null,
-  ].filter(Boolean) as string[];
-
   return (
     <div
-      className="rounded-lg border bg-white p-3"
-      style={{ borderLeftWidth: 4, borderLeftColor: meta.borderColor, borderColor: "#E5EAF1" }}
+      className="rounded-2xl border border-kiosk-border bg-kiosk-surface p-3.5"
+      style={{ borderLeftWidth: 4, borderLeftColor: meta.borderColor }}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
           <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
             style={{ backgroundColor: meta.softBg, color: meta.dotColor }}
           >
             <Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold" style={{ color: "#172231" }}>
-                OM-A880 Terminal
-              </span>
-              <span
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                style={{ backgroundColor: meta.pillBg, color: meta.pillText }}
-              >
-                {meta.label}
+              <span className="text-[15px] font-semibold text-kiosk-text">
+                Terminal {meta.label}
               </span>
             </div>
           </div>
         </div>
-        <div className="shrink-0 text-right" style={{ minWidth: "100px" }}>
-          <div className="flex items-center justify-end gap-1.5 text-[11px]" style={{ color: "#64748B" }}>
+        <div className="min-w-[112px] shrink-0 text-right text-kiosk-muted">
+          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap text-[11px] font-semibold">
             {live && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: meta.dotColor }} />}
-            <span>Updated {lastSeenLabel(updatedAt)}</span>
+            <span>{lastSeenLabel(updatedAt)}</span>
           </div>
-          <p className="text-[10px]" style={{ color: "#64748B" }}>
+          <p className="whitespace-nowrap text-[9px]">
             {omanTimestamp(updatedAt)}
           </p>
         </div>
@@ -133,30 +118,30 @@ export const PosHealthIndicator = ({
 
       {/* Explanation line */}
       {message && (
-        <p className="mt-2 text-xs" style={{ color: "#64748B" }}>
+        <p className="mt-1.5 max-w-[270px] text-[11px] font-normal leading-4 text-kiosk-muted">
           {message}
         </p>
       )}
 
       {/* Metric chips */}
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         <span
-          className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
+          className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
           style={{ backgroundColor: paperStyle.bg, color: paperStyle.text, border: `1px solid ${paperStyle.border}` }}
         >
-          Paper: {paperLabel}
+          <span className="mr-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: paperStyle.text }} /> Paper {paperLabel}
         </span>
         <span
-          className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
+          className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
           style={{ backgroundColor: batteryStyle.bg, color: batteryStyle.text, border: `1px solid ${batteryStyle.border}` }}
         >
-          Battery: {batteryLabel}
+          <span className="mr-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: batteryStyle.text }} /> Battery {batteryLabel}
         </span>
         <span
-          className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
+          className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
           style={{ backgroundColor: readerStyle.bg, color: readerStyle.text, border: `1px solid ${readerStyle.border}` }}
         >
-          Reader: {reader}
+          <span className="mr-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: readerStyle.text }} /> Reader {reader}
         </span>
       </div>
 
@@ -164,34 +149,13 @@ export const PosHealthIndicator = ({
       {meta.blocksDonations && (
         <div className="mt-2">
           <span
-            className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-            style={{ backgroundColor: "#FDECEC", color: "#B42318" }}
+            className="inline-flex items-center rounded-full bg-kiosk-offline-text px-2.5 py-1 text-[10px] font-semibold text-primary-foreground"
           >
             Cannot take payments
           </span>
         </div>
       )}
 
-      {errorCode && (
-        <p className="mt-2 text-[11px]" style={{ color: "#64748B" }}>
-          Last code: {errorCode}
-        </p>
-      )}
-
-      {identityItems.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t pt-2 text-[10px]" style={{ borderColor: "#E5EAF1", color: "#64748B" }}>
-          {identityItems.map((item, i) => (
-            <span key={i}>{item}</span>
-          ))}
-        </div>
-      )}
-
-      {(lastTransactionAt || lastTransactionResult) && (
-        <p className="mt-2 text-[10px]" style={{ color: "#64748B" }}>
-          Last transaction: {lastTransactionResult ?? "—"}
-          {lastTransactionAt ? ` · ${lastSeenLabel(lastTransactionAt)} (${omanTimestamp(lastTransactionAt)})` : ""}
-        </p>
-      )}
     </div>
   );
 };
