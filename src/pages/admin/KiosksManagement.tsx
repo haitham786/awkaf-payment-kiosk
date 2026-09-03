@@ -632,6 +632,7 @@ const KiosksManagement = () => {
                     ? kiosks.length
                     : kiosks.filter(k => effectiveState(posStatus[k.id]?.state, posStatus[k.id]?.updated_at) === key).length;
                   const label = key === 'all' ? 'All kiosks' : POS_HEALTH_META[key].label;
+                  const m = key === 'all' ? null : POS_HEALTH_META[key];
                   return (
                     <button
                       key={key}
@@ -639,7 +640,12 @@ const KiosksManagement = () => {
                       onClick={() => setHealthFilter(key)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                         healthFilter === key ? 'ring-2 ring-primary ' : ''
-                      }${key === 'all' ? 'bg-muted text-foreground border-border' : POS_HEALTH_META[key].chipClass}`}
+                      }`}
+                      style={
+                        key === 'all'
+                          ? undefined
+                          : { backgroundColor: m!.pillBg, color: m!.pillText, borderColor: m!.borderColor }
+                      }
                     >
                       {label}: {count}
                     </button>
