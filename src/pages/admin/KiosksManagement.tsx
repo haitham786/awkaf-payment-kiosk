@@ -11,7 +11,6 @@ import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } fro
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PosKioskHealthPanel from "@/components/admin/PosKioskHealthPanel";
-import PosAlertSettingsCard from "@/components/admin/PosAlertSettingsCard";
 import { effectiveState, POS_HEALTH_META, type PosHealthState } from "@/lib/posHealth";
 
 
@@ -624,8 +623,6 @@ const KiosksManagement = () => {
                 </span>
               )}
             </div>
-
-            <PosAlertSettingsCard />
 
             {/* Fleet summary + filters */}
             <Card className="p-3 space-y-3">
