@@ -753,7 +753,8 @@ const KiosksManagement = () => {
                   </div>
                 </Card>
               ))
-            )}
+            );
+            })()}
           </div>
         </div>
       </div>
