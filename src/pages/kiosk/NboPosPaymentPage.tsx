@@ -8,6 +8,7 @@ import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { getCachedNboPosConfig, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import NboEcr, { type NboPurchaseResult } from "@/services/nboEcrPlugin";
+import { conditionText, isHousekeepingCode } from "@/lib/posHealth";
 
 type Stage = "processing" | "declined" | "error";
 
@@ -152,6 +153,19 @@ const NboPosPaymentPage = () => {
         return;
       }
 
+
+      // Housekeeping conditions (no paper E006, low battery E011, printer
+      // faults) are NOT card declines — never present them as a refused
+      // payment. The donation session simply ends with a service message.
+      if (isHousekeepingCode(result.errorCode)) {
+        setErrorMessage(
+          `يرجى إبلاغ الموظف المسؤول — الجهاز يحتاج إلى صيانة بسيطة.\n${
+            conditionText(result.errorCode) ?? "Terminal needs attention (housekeeping)."
+          }`,
+        );
+        setStage("error");
+        return;
+      }
 
       // The terminal refused the card (insufficient funds, expired card, ...).
       // Record the failed attempt so no receipt/billing is generated.

@@ -12,7 +12,7 @@ export class NboEcrPluginWeb extends WebPlugin implements NboEcrPluginInterface 
   private cancelled = false;
 
   async isAvailable() {
-    return { available: false, deviceAttached: false, error: "USB serial is only available in the Android kiosk app" };
+    return { available: false, deviceAttached: false, connectionInfo: null, error: "USB serial is only available in the Android kiosk app" };
   }
 
   async listDevices() {
@@ -44,6 +44,13 @@ export class NboEcrPluginWeb extends WebPlugin implements NboEcrPluginInterface 
   async cancel() {
     this.cancelled = true;
     return { cancelled: true };
+  }
+
+  async getTerminalInfo() {
+    return {
+      responded: false,
+      error: "USB serial is only available in the Android kiosk app",
+    };
   }
 
   async getStatus() {

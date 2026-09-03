@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
-import { effectiveState } from "@/lib/posHealth";
+import PosKioskHealthPanel from "@/components/admin/PosKioskHealthPanel";
+import PosAlertSettingsCard from "@/components/admin/PosAlertSettingsCard";
+import { effectiveState, POS_HEALTH_META, type PosHealthState } from "@/lib/posHealth";
 
 
 type PaymentMode = 'test_payment' | 'nbo_pos';
@@ -69,6 +70,8 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [posStatus, setPosStatus] = useState<Record<string, any>>({});
+  const [healthFilter, setHealthFilter] = useState<'all' | PosHealthState>('all');
+  const [fleetSearch, setFleetSearch] = useState('');
 
 
   const sanitizeConfiguration = (configuration: KioskConfiguration): KioskConfiguration => ({
@@ -621,14 +624,58 @@ const KiosksManagement = () => {
                 </span>
               )}
             </div>
-            {loading ? (
+
+            <PosAlertSettingsCard />
+
+            {/* Fleet summary + filters */}
+            <Card className="p-3 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {(['all', 'ready', 'attention', 'not_responding', 'offline', 'unknown'] as const).map((key) => {
+                  const count = key === 'all'
+                    ? kiosks.length
+                    : kiosks.filter(k => effectiveState(posStatus[k.id]?.state, posStatus[k.id]?.updated_at) === key).length;
+                  const label = key === 'all' ? 'All kiosks' : POS_HEALTH_META[key].label;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setHealthFilter(key)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                        healthFilter === key ? 'ring-2 ring-primary ' : ''
+                      }${key === 'all' ? 'bg-muted text-foreground border-border' : POS_HEALTH_META[key].chipClass}`}
+                    >
+                      {label}: {count}
+                    </button>
+                  );
+                })}
+              </div>
+              <Input
+                value={fleetSearch}
+                onChange={(e) => setFleetSearch(e.target.value)}
+                placeholder="Search by kiosk name, location or terminal ID (TID)"
+                className="h-8 text-sm"
+              />
+            </Card>
+
+            {(() => {
+              const term = fleetSearch.trim().toLowerCase();
+              const visibleKiosks = kiosks
+                .filter(k => healthFilter === 'all' || effectiveState(posStatus[k.id]?.state, posStatus[k.id]?.updated_at) === healthFilter)
+                .filter(k => !term || [k.name, k.location, k.reference_number, posStatus[k.id]?.tid, posStatus[k.id]?.terminal_label]
+                  .some((v: any) => String(v || '').toLowerCase().includes(term)))
+                .sort((a, b) => {
+                  const rank: Record<string, number> = { offline: 0, not_responding: 1, attention: 2, unknown: 3, ready: 4 };
+                  return rank[effectiveState(posStatus[a.id]?.state, posStatus[a.id]?.updated_at)] -
+                    rank[effectiveState(posStatus[b.id]?.state, posStatus[b.id]?.updated_at)];
+                });
+              return loading ? (
               <p>Loading...</p>
-            ) : kiosks.length === 0 ? (
+            ) : visibleKiosks.length === 0 ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No kiosks registered yet.</p>
+                <p className="text-muted-foreground">{kiosks.length === 0 ? 'No kiosks registered yet.' : 'No kiosks match this filter.'}</p>
               </Card>
             ) : (
-              kiosks.map((kiosk) => (
+              visibleKiosks.map((kiosk) => (
                 <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -680,22 +727,11 @@ const KiosksManagement = () => {
                       </div>
 
                       {/* OM-A880 POS health & status */}
-                      <div className="mt-3 max-w-md">
-                        <PosHealthIndicator
-                          state={effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at)}
-                          message={
-                            posStatus[kiosk.id]
-                              ? effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at) === 'offline'
-                                ? 'Terminal not reachable — reseat USB cable / charge / power on'
-                                : posStatus[kiosk.id]?.message
-                              : 'No health beat received from this kiosk yet'
-                          }
-                          paperOk={posStatus[kiosk.id]?.paper_ok}
-                          batteryOk={posStatus[kiosk.id]?.battery_ok}
-                          terminalLabel={posStatus[kiosk.id]?.terminal_label || kiosk.configuration?.nbo_pos?.terminal_label}
-                          updatedAt={posStatus[kiosk.id]?.updated_at}
-                        />
-                      </div>
+                      <PosKioskHealthPanel
+                        kioskId={kiosk.id}
+                        status={posStatus[kiosk.id] || null}
+                        fallbackTerminalLabel={kiosk.configuration?.nbo_pos?.terminal_label}
+                      />
                     </div>
 
                     <div className="flex gap-2">
@@ -717,7 +753,8 @@ const KiosksManagement = () => {
                   </div>
                 </Card>
               ))
-            )}
+            );
+            })()}
           </div>
         </div>
       </div>

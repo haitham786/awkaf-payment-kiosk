@@ -369,7 +369,7 @@ const KioskSetupPanel = () => {
                 <h2 className="text-lg font-bold text-gray-900">POS Health &amp; Status</h2>
                 <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => refreshPosHealth()} disabled={posHealthChecking}>
                   {posHealthChecking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                  Refresh
+                  Ping / Test now
                 </Button>
               </div>
               <PosHealthIndicator
@@ -377,8 +377,15 @@ const KioskSetupPanel = () => {
                 message={posHealth.message}
                 paperOk={posHealth.paperOk}
                 batteryOk={posHealth.batteryOk}
+                readerStatus={posHealth.readerStatus}
+                errorCode={posHealth.errorCode}
                 terminalLabel={posHealth.terminalLabel}
+                tid={posHealth.tid}
+                serialNumber={posHealth.serialNumber}
+                firmwareVersion={posHealth.firmwareVersion}
+                connectionInfo={posHealth.connectionInfo}
                 updatedAt={posHealth.checkedAt}
+                live
               />
               <p className="mt-2 text-[11px] text-gray-500">
                 Checks USB transport, terminal heartbeat (GetStatus 114) and housekeeping (paper / battery) every 20 seconds while idle.

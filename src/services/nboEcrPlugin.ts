@@ -72,14 +72,33 @@ export interface NboStatusOptions {
   timeoutSeconds?: number;
 }
 
+export interface NboTerminalInfoResult {
+  /** True when the terminal answered GetTerminalInfo (109). */
+  responded: boolean;
+  tid?: string | null;
+  merchantId?: string | null;
+  serialNumber?: string | null;
+  firmwareVersion?: string | null;
+  raw?: string | null;
+  error?: string | null;
+}
+
 export interface NboEcrPluginInterface {
-  isAvailable(): Promise<{ available: boolean; deviceAttached: boolean; error?: string }>;
+  isAvailable(): Promise<{
+    available: boolean;
+    deviceAttached: boolean;
+    /** Human readable "VID:PID · name" of the attached device, when known. */
+    connectionInfo?: string | null;
+    error?: string;
+  }>;
   listDevices(): Promise<{ devices: Array<{ vendorId: number; productId: number; name: string }> }>;
   purchase(options: NboPurchaseOptions): Promise<NboPurchaseResult>;
   /** Aborts the in-flight purchase and clears the amount on the terminal. */
   cancel(): Promise<{ cancelled: boolean; error?: string }>;
   /** Health probe (CommandType 114). Never call during an active transaction. */
   getStatus(options?: NboStatusOptions): Promise<NboStatusResult>;
+  /** Terminal identity (CommandType 109). Never call during an active transaction. */
+  getTerminalInfo(options?: NboStatusOptions): Promise<NboTerminalInfoResult>;
   addListener(
     eventName: "posConnection",
     listener: (event: { attached: boolean; vendorId?: number; productId?: number }) => void,
