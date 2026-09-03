@@ -746,7 +746,6 @@ const KiosksManagement = () => {
               ))
             );
             })()}
-          </div>
         </div>
       </div>
     </div>
