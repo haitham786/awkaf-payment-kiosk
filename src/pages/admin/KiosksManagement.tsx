@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import PosKioskHealthPanel from "@/components/admin/PosKioskHealthPanel";
 import { effectiveState, POS_HEALTH_META, type PosHealthState } from "@/lib/posHealth";
 
@@ -48,6 +50,7 @@ const KiosksManagement = () => {
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [kiosks, setKiosks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -194,25 +197,6 @@ const KiosksManagement = () => {
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
         toast.success("Kiosk updated successfully");
-      } else {
-        if (referenceNumber) {
-          const { data: duplicateKiosk, error: duplicateError } = await supabase
-            .from('kiosks')
-            .select('id')
-            .eq('reference_number', referenceNumber)
-            .maybeSingle();
-
-          if (duplicateError) throw duplicateError;
-          if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
-        }
-
-        const { error } = await supabase.from('kiosks').insert([{
-          name: formData.name, reference_number: referenceNumber,
-          location: formData.location, status: formData.status,
-          configuration: publicConfig
-        } as any]);
-        if (error) throw error;
-        toast.success("Kiosk added successfully");
       }
       resetForm();
       loadKiosks();
@@ -425,10 +409,12 @@ const KiosksManagement = () => {
           )}
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Form */}
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">{editingId ? 'Edit Kiosk' : 'Add New Kiosk'}</h2>
+        {/* Edit Kiosk popup (new kiosks register themselves from the kiosk setup panel) */}
+        <Dialog open={!!editingId} onOpenChange={(open) => { if (!open) resetForm(); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Kiosk</DialogTitle>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Kiosk Name</Label>
@@ -607,14 +593,15 @@ const KiosksManagement = () => {
 
 
               <div className="flex gap-2">
-                <Button type="submit" className="flex-1">{editingId ? 'Update' : 'Add'} Kiosk</Button>
-                {editingId && <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>}
+                <Button type="submit" className="flex-1">Update Kiosk</Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
               </div>
             </form>
-          </Card>
+          </DialogContent>
+        </Dialog>
 
-          {/* Kiosks List */}
-          <div className="space-y-4">
+        {/* Kiosks List */}
+        <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Existing Kiosks ({kiosks.length})</h2>
               {kiosks.filter(k => k.status === 'pending_approval').length > 0 && (
@@ -660,6 +647,19 @@ const KiosksManagement = () => {
               />
             </Card>
 
+            {kiosks.length > 1 && (
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8"
+                  onClick={() => listRef.current?.scrollBy({ left: -440, behavior: 'smooth' })}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8"
+                  onClick={() => listRef.current?.scrollBy({ left: 440, behavior: 'smooth' })}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
             {(() => {
               const term = fleetSearch.trim().toLowerCase();
               const visibleKiosks = kiosks
@@ -677,30 +677,32 @@ const KiosksManagement = () => {
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">{kiosks.length === 0 ? 'No kiosks registered yet.' : 'No kiosks match this filter.'}</p>
               </Card>
-            ) : (
-              visibleKiosks.map((kiosk) => (
-                <Card key={kiosk.id} className={`p-4 ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
+             ) : (
+              <div ref={listRef} className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+              {visibleKiosks.map((kiosk) => (
+                <Card key={kiosk.id} className={`p-4 w-[420px] shrink-0 snap-start ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-bold">{kiosk.name}</h3>
                         {kiosk.status === 'pending_approval' && (
-                          <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">Needs Approval</span>
+                          <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">Pending</span>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{kiosk.location}</p>
                       <div className="flex gap-4 mt-2">
                         <p className="text-xs text-muted-foreground">Ref: {kiosk.reference_number || 'N/A'}</p>
-                        <p className="text-xs">
-                          <span className={`px-2 py-1 rounded ${
-                            kiosk.status === 'active' ? 'bg-success/20 text-success' :
-                            kiosk.status === 'pending_approval' ? 'bg-destructive/20 text-destructive' :
-                            kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
-                            'bg-warning/20 text-warning'
-                          }`}>
-                            {kiosk.status.replace('_', ' ')}
-                          </span>
-                        </p>
+                        {kiosk.status !== 'pending_approval' && (
+                          <p className="text-xs">
+                            <span className={`px-2 py-1 rounded ${
+                              kiosk.status === 'active' ? 'bg-success/20 text-success' :
+                              kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
+                              'bg-warning/20 text-warning'
+                            }`}>
+                              {kiosk.status.replace('_', ' ')}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       {/* Payment Mode */}
                        <div className="mt-2 flex items-center gap-2">
@@ -756,10 +758,10 @@ const KiosksManagement = () => {
                     </div>
                   </div>
                 </Card>
-              ))
+              ))}
+              </div>
             );
             })()}
-          </div>
         </div>
       </div>
     </div>
