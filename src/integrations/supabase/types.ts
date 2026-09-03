@@ -172,44 +172,74 @@ export type Database = {
       }
       kiosk_pos_status: {
         Row: {
+          alerted_at: string | null
+          alerted_state: string | null
+          app_version: string | null
           battery_ok: boolean | null
+          connection_info: string | null
           error_code: string | null
+          firmware_version: string | null
           kiosk_id: string
+          last_transaction_at: string | null
+          last_transaction_result: string | null
           message: string | null
           paper_ok: boolean | null
           printer_status: string | null
           reader_status: string | null
           responded: boolean
+          serial_number: string | null
           state: string
+          state_since: string
           terminal_label: string | null
+          tid: string | null
           transport_connected: boolean
           updated_at: string
         }
         Insert: {
+          alerted_at?: string | null
+          alerted_state?: string | null
+          app_version?: string | null
           battery_ok?: boolean | null
+          connection_info?: string | null
           error_code?: string | null
+          firmware_version?: string | null
           kiosk_id: string
+          last_transaction_at?: string | null
+          last_transaction_result?: string | null
           message?: string | null
           paper_ok?: boolean | null
           printer_status?: string | null
           reader_status?: string | null
           responded?: boolean
+          serial_number?: string | null
           state?: string
+          state_since?: string
           terminal_label?: string | null
+          tid?: string | null
           transport_connected?: boolean
           updated_at?: string
         }
         Update: {
+          alerted_at?: string | null
+          alerted_state?: string | null
+          app_version?: string | null
           battery_ok?: boolean | null
+          connection_info?: string | null
           error_code?: string | null
+          firmware_version?: string | null
           kiosk_id?: string
+          last_transaction_at?: string | null
+          last_transaction_result?: string | null
           message?: string | null
           paper_ok?: boolean | null
           printer_status?: string | null
           reader_status?: string | null
           responded?: boolean
+          serial_number?: string | null
           state?: string
+          state_since?: string
           terminal_label?: string | null
+          tid?: string | null
           transport_connected?: boolean
           updated_at?: string
         }
@@ -218,6 +248,56 @@ export type Database = {
             foreignKeyName: "kiosk_pos_status_kiosk_id_fkey"
             columns: ["kiosk_id"]
             isOneToOne: true
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kiosk_pos_status_history: {
+        Row: {
+          battery_ok: boolean | null
+          created_at: string
+          error_code: string | null
+          id: string
+          kiosk_id: string
+          message: string | null
+          paper_ok: boolean | null
+          previous_state: string | null
+          responded: boolean | null
+          state: string
+          transport_connected: boolean | null
+        }
+        Insert: {
+          battery_ok?: boolean | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          kiosk_id: string
+          message?: string | null
+          paper_ok?: boolean | null
+          previous_state?: string | null
+          responded?: boolean | null
+          state: string
+          transport_connected?: boolean | null
+        }
+        Update: {
+          battery_ok?: boolean | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          kiosk_id?: string
+          message?: string | null
+          paper_ok?: boolean | null
+          previous_state?: string | null
+          responded?: boolean | null
+          state?: string
+          transport_connected?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kiosk_pos_status_history_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
             referencedRelation: "kiosks"
             referencedColumns: ["id"]
           },
@@ -391,6 +471,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pos_alert_settings: {
+        Row: {
+          alert_on_attention: boolean
+          channel: string
+          enabled: boolean
+          id: string
+          offline_threshold_seconds: number
+          quiet_hours_end: number | null
+          quiet_hours_start: number | null
+          recipients: string[]
+          updated_at: string
+        }
+        Insert: {
+          alert_on_attention?: boolean
+          channel?: string
+          enabled?: boolean
+          id?: string
+          offline_threshold_seconds?: number
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          recipients?: string[]
+          updated_at?: string
+        }
+        Update: {
+          alert_on_attention?: boolean
+          channel?: string
+          enabled?: boolean
+          id?: string
+          offline_threshold_seconds?: number
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          recipients?: string[]
+          updated_at?: string
+        }
+        Relationships: []
       }
       pos_diagnostics: {
         Row: {
