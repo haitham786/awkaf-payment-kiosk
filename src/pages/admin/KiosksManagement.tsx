@@ -196,25 +196,6 @@ const KiosksManagement = () => {
         const { error } = await supabase.from('kiosks').update(updatePayload).eq('id', editingId);
         if (error) throw error;
         toast.success("Kiosk updated successfully");
-      } else {
-        if (referenceNumber) {
-          const { data: duplicateKiosk, error: duplicateError } = await supabase
-            .from('kiosks')
-            .select('id')
-            .eq('reference_number', referenceNumber)
-            .maybeSingle();
-
-          if (duplicateError) throw duplicateError;
-          if (duplicateKiosk) throw new Error('This kiosk reference number is already used by another kiosk.');
-        }
-
-        const { error } = await supabase.from('kiosks').insert([{
-          name: formData.name, reference_number: referenceNumber,
-          location: formData.location, status: formData.status,
-          configuration: publicConfig
-        } as any]);
-        if (error) throw error;
-        toast.success("Kiosk added successfully");
       }
       resetForm();
       loadKiosks();
