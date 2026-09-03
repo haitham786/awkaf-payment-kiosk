@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
-import { effectiveState } from "@/lib/posHealth";
+import PosKioskHealthPanel from "@/components/admin/PosKioskHealthPanel";
+import PosAlertSettingsCard from "@/components/admin/PosAlertSettingsCard";
+import { effectiveState, POS_HEALTH_META, type PosHealthState } from "@/lib/posHealth";
 
 
 type PaymentMode = 'test_payment' | 'nbo_pos';
@@ -69,6 +70,8 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [posStatus, setPosStatus] = useState<Record<string, any>>({});
+  const [healthFilter, setHealthFilter] = useState<'all' | PosHealthState>('all');
+  const [fleetSearch, setFleetSearch] = useState('');
 
 
   const sanitizeConfiguration = (configuration: KioskConfiguration): KioskConfiguration => ({
@@ -680,22 +683,11 @@ const KiosksManagement = () => {
                       </div>
 
                       {/* OM-A880 POS health & status */}
-                      <div className="mt-3 max-w-md">
-                        <PosHealthIndicator
-                          state={effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at)}
-                          message={
-                            posStatus[kiosk.id]
-                              ? effectiveState(posStatus[kiosk.id]?.state, posStatus[kiosk.id]?.updated_at) === 'offline'
-                                ? 'Terminal not reachable — reseat USB cable / charge / power on'
-                                : posStatus[kiosk.id]?.message
-                              : 'No health beat received from this kiosk yet'
-                          }
-                          paperOk={posStatus[kiosk.id]?.paper_ok}
-                          batteryOk={posStatus[kiosk.id]?.battery_ok}
-                          terminalLabel={posStatus[kiosk.id]?.terminal_label || kiosk.configuration?.nbo_pos?.terminal_label}
-                          updatedAt={posStatus[kiosk.id]?.updated_at}
-                        />
-                      </div>
+                      <PosKioskHealthPanel
+                        kioskId={kiosk.id}
+                        status={posStatus[kiosk.id] || null}
+                        fallbackTerminalLabel={kiosk.configuration?.nbo_pos?.terminal_label}
+                      />
                     </div>
 
                     <div className="flex gap-2">
