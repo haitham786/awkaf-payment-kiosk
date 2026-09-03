@@ -593,14 +593,15 @@ const KiosksManagement = () => {
 
 
               <div className="flex gap-2">
-                <Button type="submit" className="flex-1">{editingId ? 'Update' : 'Add'} Kiosk</Button>
-                {editingId && <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>}
+                <Button type="submit" className="flex-1">Update Kiosk</Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
               </div>
             </form>
-          </Card>
+          </DialogContent>
+        </Dialog>
 
-          {/* Kiosks List */}
-          <div className="space-y-4">
+        {/* Kiosks List */}
+        <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Existing Kiosks ({kiosks.length})</h2>
               {kiosks.filter(k => k.status === 'pending_approval').length > 0 && (
