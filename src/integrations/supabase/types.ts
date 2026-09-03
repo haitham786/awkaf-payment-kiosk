@@ -478,6 +478,7 @@ export type Database = {
           channel: string
           enabled: boolean
           id: string
+          kiosk_id: string | null
           offline_threshold_seconds: number
           quiet_hours_end: number | null
           quiet_hours_start: number | null
@@ -489,6 +490,7 @@ export type Database = {
           channel?: string
           enabled?: boolean
           id?: string
+          kiosk_id?: string | null
           offline_threshold_seconds?: number
           quiet_hours_end?: number | null
           quiet_hours_start?: number | null
@@ -500,13 +502,22 @@ export type Database = {
           channel?: string
           enabled?: boolean
           id?: string
+          kiosk_id?: string | null
           offline_threshold_seconds?: number
           quiet_hours_end?: number | null
           quiet_hours_start?: number | null
           recipients?: string[]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pos_alert_settings_kiosk_id_fkey"
+            columns: ["kiosk_id"]
+            isOneToOne: false
+            referencedRelation: "kiosks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_diagnostics: {
         Row: {
