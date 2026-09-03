@@ -130,31 +130,54 @@ Deno.serve(async (req) => {
     // Alerting — one alert per outage, plus one recovery notice (de-duplicated
     // through alerted_state so repeated heartbeats never re-notify).
     if (changed) {
-      const { data: settings } = await supabase.from("pos_alert_settings").select("*").limit(1).maybeSingle();
+      // Per-kiosk settings; the row with a NULL kiosk_id is only a fleet default
+      // template for kiosks that have not been configured yet.
+      const { data: ownSettings } = await supabase
+        .from("pos_alert_settings")
+        .select("*")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+      let settings = ownSettings;
+      if (!settings) {
+        const { data: fleetDefault } = await supabase
+          .from("pos_alert_settings")
+          .select("*")
+          .is("kiosk_id", null)
+          .maybeSingle();
+        settings = fleetDefault;
+      }
+
       const recipients: string[] = Array.isArray(settings?.recipients) ? settings!.recipients : [];
       const enabled = settings?.enabled !== false && recipients.length > 0;
       const alertOnAttention = settings?.alert_on_attention !== false;
       const alerted = previous?.alerted_state ?? null;
 
-      if (enabled && !inQuietHours(settings?.quiet_hours_start ?? null, settings?.quiet_hours_end ?? null)) {
+      if (enabled) {
         const { data: kiosk } = await supabase.from("kiosks").select("name, location").eq("id", kioskId).maybeSingle();
-        const who = `${kiosk?.name ?? "Kiosk"}${kiosk?.location ? ` (${kiosk.location})` : ""}`;
+        const tid = body?.tid ?? null;
+        const who = `${kiosk?.name ?? "Kiosk"}${kiosk?.location ? ` (${kiosk.location}` : ""}${
+          kiosk?.location ? (tid ? `, TID ${tid})` : ")") : tid ? ` (TID ${tid})` : ""
+        }`;
+        const offlineMinutes = Math.max(1, Math.round(Number(settings?.offline_threshold_seconds ?? 180) / 60));
         const shouldAlert = ALERT_STATES.has(state) && (state !== "attention" || alertOnAttention);
+        // Offline is critical and overrides this kiosk's quiet hours.
+        const quiet =
+          state !== "offline" && inQuietHours(settings?.quiet_hours_start ?? null, settings?.quiet_hours_end ?? null);
 
-        if (shouldAlert && alerted !== state) {
-          const label =
-            state === "offline" ? "OFFLINE" : state === "not_responding" ? "NOT RESPONDING" : "NEEDS ATTENTION";
-          await sendSmsAlert(
-            supabase,
-            recipients,
-            `Awkaf POS alert: ${who} terminal is ${label}. ${body?.message ?? ""}`.trim(),
-          );
+        if (shouldAlert && alerted !== state && !quiet) {
+          const detail =
+            state === "offline"
+              ? `is OFFLINE — no heartbeat >${offlineMinutes}min. Cannot take payments.`
+              : state === "not_responding"
+                ? "is NOT RESPONDING — terminal connected but silent. Cannot take payments."
+                : `NEEDS ATTENTION — ${body?.message ?? "check paper / battery"}.`;
+          await sendSmsAlert(supabase, recipients, `Awkaf POS: ${who} ${detail}`.replace(/\s+/g, " ").trim());
           await supabase
             .from("kiosk_pos_status")
             .update({ alerted_state: state, alerted_at: nowIso })
             .eq("kiosk_id", kioskId);
         } else if (state === "ready" && alerted && alerted !== "ready") {
-          await sendSmsAlert(supabase, recipients, `Awkaf POS recovery: ${who} terminal is back online and Ready.`);
+          await sendSmsAlert(supabase, recipients, `Awkaf POS recovery: ${who} is back online and Ready.`);
           await supabase
             .from("kiosk_pos_status")
             .update({ alerted_state: null, alerted_at: nowIso })

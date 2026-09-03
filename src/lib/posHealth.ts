@@ -200,11 +200,16 @@ export function deriveHealth(
 }
 
 /** Apply the server-side staleness rule to a stored row. */
-export function effectiveState(state: string | null | undefined, updatedAt: string | null | undefined): PosHealthState {
+export function effectiveState(
+  state: string | null | undefined,
+  updatedAt: string | null | undefined,
+  /** Per-kiosk offline threshold in ms (falls back to the 3-minute spec rule). */
+  staleAfterMs: number = STALE_AFTER_MS,
+): PosHealthState {
   if (!state && !updatedAt) return "unknown";
   const known = (state ?? "offline") as PosHealthState;
   if (!updatedAt) return "unknown";
-  if (Date.now() - new Date(updatedAt).getTime() > STALE_AFTER_MS) return "offline";
+  if (Date.now() - new Date(updatedAt).getTime() > staleAfterMs) return "offline";
   return POS_HEALTH_META[known] ? known : "offline";
 }
 
@@ -285,4 +290,17 @@ export function computeUptime(rows: HistoryRow[], windowMs: number, now = Date.n
   if (covered <= 0) return { percent: 0, outages: 0, lastOutageAt: null, lastOutageMinutes: null };
   const percent = Math.max(0, Math.min(100, ((covered - downMs) / covered) * 100));
   return { percent, outages, lastOutageAt, lastOutageMinutes };
+}
+
+/** Plain-language card-reader wording (never a bare numeric code). */
+export function readerLabel(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (["0", "00", "OK", "IDLE", "READY"].includes(upper)) return "idle";
+  if (["1", "01", "CARD", "CARD PRESENT", "BUSY"].includes(upper)) return "card present";
+  if (upper.includes("FAULT") || upper.includes("ERROR")) return "fault — needs service";
+  if (upper.includes("REMOV")) return "waiting for card removal";
+  return raw.toLowerCase();
 }

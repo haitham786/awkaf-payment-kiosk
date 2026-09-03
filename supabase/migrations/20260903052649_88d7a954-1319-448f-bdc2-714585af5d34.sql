@@ -1,0 +1,3 @@
+ALTER TABLE public.pos_alert_settings ADD COLUMN IF NOT EXISTS kiosk_id uuid REFERENCES public.kiosks(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX IF NOT EXISTS pos_alert_settings_kiosk_unique ON public.pos_alert_settings (kiosk_id) WHERE kiosk_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS pos_alert_settings_fleet_default_unique ON public.pos_alert_settings ((kiosk_id IS NULL)) WHERE kiosk_id IS NULL;
