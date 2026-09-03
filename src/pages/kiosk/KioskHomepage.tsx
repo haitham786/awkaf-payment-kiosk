@@ -155,9 +155,11 @@ const KioskHomepage = () => {
       {kioskStatus !== 'active' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <Card className="max-w-sm w-full p-6 text-center bg-white/70 backdrop-blur-md shadow-2xl border border-white/40">
-            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full shadow-lg flex items-center justify-center">
-              {kioskStatus === 'unregistered' ? <Settings className="w-10 h-10 text-white" /> : <AlertTriangle className="w-10 h-10 text-white" />}
-            </div>
+            {kioskStatus !== 'unregistered' && (
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-kiosk-attention-soft">
+                <AlertTriangle className="h-10 w-10 text-kiosk-attention-text" />
+              </div>
+            )}
             <h2 className="text-2xl font-bold text-gray-900 mb-3">
               {statusMessages[kioskStatus]?.en || 'Currently Unavailable'}
             </h2>
@@ -165,8 +167,8 @@ const KioskHomepage = () => {
               {statusMessageEn[kioskMessage] || ''}
             </p>
             {kioskStatus === 'unregistered' && (
-              <Button size="default" className="text-sm px-4 py-2 max-w-[250px] w-full bg-emerald-600 hover:bg-emerald-700" onClick={() => navigate('/kiosk/setup')}>
-                <Settings className="w-4 h-4 mr-1 flex-shrink-0" />
+              <Button size="default" variant="ghost" className="w-full max-w-[250px] gap-1 bg-transparent px-4 py-2 text-sm text-kiosk-text hover:bg-transparent" onClick={() => navigate('/kiosk/setup')}>
+                <Settings className="h-4 w-4 flex-shrink-0 text-kiosk-text" />
                 <span>Settings</span>
               </Button>
             )}

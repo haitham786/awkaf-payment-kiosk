@@ -6,13 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Settings, Eye, EyeOff, Smartphone, CheckCircle, XCircle, Loader2, Info, Globe, LogOut } from "lucide-react";
+import { ArrowLeft, Settings, Eye, EyeOff, Loader2, Info, LogOut, RefreshCw, Cloud, Cable, CheckCircle2, AlertTriangle, HelpCircle, Unplug, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScreenSize } from "@/hooks/useScreenSize";
-import { checkNFCAvailability, initializeSoftPOS, getSoftPOSStatus, SoftPosMode } from "@/services/softPosService";
 import { loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import { useNboPosHealth } from "@/hooks/useNboPosHealth";
-import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
+import { lastSeenLabel, omanTimestamp, POS_HEALTH_META, readerLabel, type PosHealthState } from "@/lib/posHealth";
 
 
 const KioskSetupPanel = () => {
@@ -26,18 +25,6 @@ const KioskSetupPanel = () => {
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [kioskForm, setKioskForm] = useState({ name: "", location: "" });
-
-  const [softPosConfig, setSoftPosConfig] = useState({
-    authKey: "",
-    isProduction: false,
-    mode: "test" as SoftPosMode,
-  });
-  
-  const [softPosNfcStatus, setSoftPosNfcStatus] = useState<{
-    isAvailable: boolean; isEnabled: boolean; checking: boolean; tested: boolean;
-  }>({ isAvailable: false, isEnabled: false, checking: false, tested: false });
-  
-  const [kioskPaymentMode, setKioskPaymentMode] = useState<'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos'>('soft_pos');
 
   const storedKioskId = typeof window !== 'undefined' ? localStorage.getItem('kiosk_id') : null;
   const { snapshot: posHealth, checking: posHealthChecking, refresh: refreshPosHealth } = useNboPosHealth(storedKioskId, isAuthenticated);
@@ -57,11 +44,6 @@ const KioskSetupPanel = () => {
   const applyKioskConfig = (configRaw: unknown) => {
     const config = configRaw as Record<string, unknown> | null | undefined;
     if (!config) return;
-    setKioskPaymentMode((config.payment_mode as 'soft_pos' | 'payment_gateway' | 'test_payment' | 'hardware_pos') || 'soft_pos');
-    if (config.soft_pos && typeof config.soft_pos === 'object') {
-      const sp = config.soft_pos as { auth_key?: string; is_production?: boolean; mode?: string };
-      setSoftPosConfig(prev => ({ authKey: sp.auth_key ?? prev.authKey, isProduction: sp.is_production ?? false, mode: (sp.mode as SoftPosMode) || 'test' }));
-    }
   };
 
   useEffect(() => {
@@ -104,25 +86,6 @@ const KioskSetupPanel = () => {
     } catch (error: any) { console.error('Error loading kiosk data:', error); }
   };
   
-  const handleTestSoftPosNfc = async () => {
-    setSoftPosNfcStatus(prev => ({ ...prev, checking: true }));
-    toast({ title: "Testing NFC", description: "Checking NFC availability..." });
-    try {
-      await initializeSoftPOS({ authKey: softPosConfig.authKey || 'TEST_AUTH_KEY', isProduction: softPosConfig.isProduction, mode: softPosConfig.mode });
-      const nfcStatus = await checkNFCAvailability();
-      setSoftPosNfcStatus({ isAvailable: nfcStatus.isAvailable, isEnabled: nfcStatus.isEnabled, checking: false, tested: true });
-      const status = getSoftPOSStatus();
-      if (nfcStatus.isAvailable && nfcStatus.isEnabled) {
-        toast({ title: "NFC Ready", description: `Thawani Lamsa Soft POS ready. Mode: ${status.mode === 'test' ? 'Test' : 'Live'}` });
-      } else {
-        toast({ title: "NFC Not Available", description: "Running in simulation mode.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      setSoftPosNfcStatus(prev => ({ ...prev, checking: false }));
-      toast({ title: "NFC Test Failed", description: error.message, variant: "destructive" });
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -201,8 +164,8 @@ const KioskSetupPanel = () => {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-10">Login</Button>
-            <Button type="button" variant="outline" className="w-full h-10" onClick={() => navigate('/kiosk')}>Back to Kiosk</Button>
+            <Button type="submit" variant="outline" className="h-10 w-full border-kiosk-border bg-transparent font-semibold text-kiosk-text hover:bg-kiosk-page">Login</Button>
+            <Button type="button" variant="outline" className="h-10 w-full border-kiosk-border bg-transparent font-semibold text-kiosk-text hover:bg-kiosk-page" onClick={() => navigate('/kiosk')}>Back to Kiosk</Button>
           </form>
         </Card>
       </div>
@@ -212,22 +175,21 @@ const KioskSetupPanel = () => {
   return (
     <div className="min-h-screen bg-white p-4" style={{ fontSize: `${scaleFactor}rem` }}>
       <div className="max-w-4xl mx-auto space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate('/kiosk')} className="text-gray-900 hover:bg-gray-100 h-9">
-            <ArrowLeft className="w-4 h-4 mr-2" />Back to Kiosk
+        <div className="flex items-center justify-between gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/kiosk')} className="h-9 w-9 shrink-0 text-kiosk-text hover:bg-kiosk-page" aria-label="Back to kiosk">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Kiosk Setup Panel</h1>
-          <Button variant="ghost" onClick={() => { supabase.auth.signOut(); setIsAuthenticated(false); }} className="h-9 gap-2 text-gray-900 hover:bg-gray-100">
+          <h1 className="mr-auto text-xl font-bold text-kiosk-text sm:text-2xl">Kiosk Setup Panel</h1>
+          <Button variant="ghost" onClick={() => { supabase.auth.signOut(); setIsAuthenticated(false); }} className="h-9 shrink-0 gap-2 text-kiosk-text hover:bg-kiosk-page">
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Logout
           </Button>
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 h-10">
-            <TabsTrigger value="general" className="text-sm text-gray-900 data-[state=active]:bg-white">General</TabsTrigger>
-            <TabsTrigger value="payment" className="text-sm text-gray-900 data-[state=active]:bg-white">Payment</TabsTrigger>
-            <TabsTrigger value="status" className="text-sm text-gray-900 data-[state=active]:bg-white">Status</TabsTrigger>
+           <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-kiosk-page p-1">
+             <TabsTrigger value="general" className="rounded-lg text-sm text-kiosk-muted data-[state=active]:bg-kiosk-surface data-[state=active]:text-kiosk-text data-[state=active]:shadow-sm">General</TabsTrigger>
+             <TabsTrigger value="status" className="rounded-lg text-sm text-kiosk-muted data-[state=active]:bg-kiosk-surface data-[state=active]:text-kiosk-text data-[state=active]:shadow-sm">POS Status</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-3">
@@ -255,164 +217,91 @@ const KioskSetupPanel = () => {
             </Card>
           </TabsContent>
 
-          {/* Payment Configuration Tab */}
-          <TabsContent value="payment" className="space-y-3">
-            <Card className="p-4 bg-white border-gray-200">
-              <h2 className="text-lg font-bold mb-3 text-gray-900">Payment Configuration</h2>
-              <p className="text-xs text-gray-600 mb-3">Payment method is managed from admin panel under "Manage KIOSK".</p>
-              
-              <div className="space-y-3">
-                {/* Current Payment Mode */}
-                <div className={`p-3 rounded-lg flex items-center gap-2 ${
-                  kioskPaymentMode === 'soft_pos' ? 'bg-emerald-50 border border-emerald-200' :
-                  kioskPaymentMode === 'payment_gateway' ? 'bg-blue-50 border border-blue-200' :
-                  kioskPaymentMode === 'test_payment' ? 'bg-amber-50 border border-amber-200' :
-                  'bg-gray-50 border border-gray-200'
-                }`}>
-                  {kioskPaymentMode === 'soft_pos' ? (
-                    <><Smartphone className="w-4 h-4 text-emerald-600" /><span className="text-sm font-medium text-emerald-700">Soft POS Active - Thawani Lamsa NFC</span></>
-                  ) : kioskPaymentMode === 'test_payment' ? (
-                    <><Info className="w-4 h-4 text-amber-600" /><span className="text-sm font-medium text-amber-700">Testing Mode Active - Simulated Successful Payments</span></>
-                  ) : kioskPaymentMode === 'hardware_pos' ? (
-                    <><Smartphone className="w-4 h-4 text-gray-700" /><span className="text-sm font-medium text-gray-700">Hardware POS Terminal Active - ApexECR (Ahli Bank / AFS)</span></>
-                  ) : (
-                    <><Globe className="w-4 h-4 text-blue-600" /><span className="text-sm font-medium text-blue-700">Payment Gateway Active - Thawani Checkout</span></>
-                  )}
-                </div>
+          <TabsContent value="status" className="space-y-3">
+            {(() => {
+              const state = posHealth.state as PosHealthState;
+              const meta = POS_HEALTH_META[state] ?? POS_HEALTH_META.unknown;
+              const StateIcon = state === "ready" ? CheckCircle2 : state === "attention" ? AlertTriangle : state === "offline" ? Unplug : state === "not_responding" ? HelpCircle : Clock;
+              const stateAccent = state === "ready" ? "border-l-kiosk-ready bg-kiosk-ready-soft/40" : state === "attention" ? "border-l-kiosk-attention bg-kiosk-attention-soft/40" : state === "unknown" ? "border-l-kiosk-muted bg-kiosk-page" : "border-l-kiosk-offline bg-kiosk-offline-soft/40";
+              const stateText = state === "ready" ? "text-kiosk-ready-text" : state === "attention" ? "text-kiosk-attention-text" : state === "unknown" ? "text-kiosk-muted" : "text-kiosk-offline-text";
+              const adminConnected = kioskData?.status === "active";
+              const usbConnected = posHealth.transportConnected;
+              const reader = readerLabel(posHealth.readerStatus) ?? "idle";
+              const chip = (ok: boolean | null | undefined) => ok === true ? "border-kiosk-ready/30 bg-kiosk-ready-soft text-kiosk-ready-text" : ok === false ? "border-kiosk-attention/30 bg-kiosk-attention-soft text-kiosk-attention-text" : "border-kiosk-border bg-kiosk-page text-kiosk-muted";
+              const connectionPill = (connected: boolean) => connected ? "border-kiosk-ready/30 bg-kiosk-ready-soft text-kiosk-ready-text" : "border-kiosk-offline/30 bg-kiosk-offline-soft text-kiosk-offline-text";
+              return (
+                <>
+                  <Card className="rounded-2xl border-kiosk-border bg-kiosk-surface p-4 shadow-kiosk">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold text-kiosk-text">POS Health &amp; Status</h2>
+                      <Button variant="outline" size="sm" className="h-9 gap-1.5 border-kiosk-brand/15 bg-kiosk-brand-soft px-3 text-xs font-semibold text-kiosk-brand hover:bg-kiosk-brand-soft/70" onClick={() => refreshPosHealth()} disabled={posHealthChecking}>
+                        {posHealthChecking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        Ping / Test
+                      </Button>
+                    </div>
 
-                {kioskPaymentMode === 'soft_pos' && (
-                  <>
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <Smartphone className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs font-semibold text-blue-900">
-                            Mode: {softPosConfig.mode === 'test' ? 'Test / Simulation' : 'Live (Production)'}
-                          </p>
-                          <p className="text-[10px] text-blue-700 mt-1">
-                            {softPosConfig.mode === 'test' ? 'Payments are simulated for testing.' : 'Thawani Lamsa SDK active. Real card transactions.'}
-                          </p>
+                    <div className={`rounded-xl border border-l-4 border-kiosk-border p-3.5 ${stateAccent}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${stateText} ${state === "ready" ? "bg-kiosk-ready-soft" : state === "attention" ? "bg-kiosk-attention-soft" : state === "unknown" ? "bg-kiosk-page" : "bg-kiosk-offline-soft"}`}>
+                            <StateIcon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <h3 className="text-sm font-semibold text-kiosk-text">OM-A880 Terminal</h3>
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${stateText} ${state === "ready" ? "bg-kiosk-ready-soft" : state === "attention" ? "bg-kiosk-attention-soft" : state === "unknown" ? "bg-kiosk-page" : "bg-kiosk-offline-soft"}`}>{meta.label}</span>
+                            </div>
+                            <p className="mt-1 text-[10px] font-normal leading-4 text-kiosk-muted">{posHealth.message || "Awaiting terminal status"}{posHealth.responded ? " · USB connected · responding" : ""}</p>
+                          </div>
+                        </div>
+                        <div className="min-w-[112px] shrink-0 text-right text-kiosk-muted">
+                          <p className="whitespace-nowrap text-[10px] font-semibold"><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${state === "ready" ? "bg-kiosk-ready" : state === "attention" ? "bg-kiosk-attention" : "bg-kiosk-offline"}`} />{lastSeenLabel(posHealth.checkedAt)}</p>
+                          <p className="mt-0.5 whitespace-nowrap text-[8px] font-normal">{omanTimestamp(posHealth.checkedAt)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold ${chip(posHealth.paperOk)}`}>Paper {posHealth.paperOk === false ? "Low / Empty" : posHealth.paperOk === true ? "OK" : "Unknown"}</span>
+                        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold ${chip(posHealth.batteryOk)}`}>Battery {posHealth.batteryOk === false ? "Low" : posHealth.batteryOk === true ? "OK" : "Unknown"}</span>
+                        <span className="rounded-full border border-kiosk-border bg-kiosk-page px-2.5 py-1 text-[9px] font-semibold text-kiosk-muted">Reader {reader}</span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 border-t border-kiosk-border pt-1 text-[9px]">
+                        {[["TID", posHealth.tid], ["Serial", posHealth.serialNumber], ["Firmware", posHealth.firmwareVersion], ["App", posHealth.appVersion ?? "kiosk-web"]].map(([label, value]) => (
+                          <div key={label} className="flex min-w-0 justify-between gap-2 border-b border-kiosk-border py-2 odd:pr-3 even:pl-3">
+                            <span className="text-kiosk-muted">{label}</span><span className="truncate font-semibold text-kiosk-text">{value || "—"}</span>
+                          </div>
+                        ))}
+                        <div className="col-span-2 flex justify-between gap-3 py-2">
+                          <span className="shrink-0 text-kiosk-muted">USB</span><span className="break-all text-right font-semibold text-kiosk-text">{posHealth.connectionInfo || "—"}</span>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-gray-900 text-sm">Environment</Label>
-                        <Input value={softPosConfig.isProduction ? 'Production' : 'Staging'} className="bg-gray-50 text-gray-700 border-gray-300 h-9" readOnly />
-                      </div>
-                      <div>
-                        <Label className="text-gray-900 text-sm">Auth Key</Label>
-                        <Input value={softPosConfig.authKey ? '••••••••' : 'Not configured'} className="bg-gray-50 text-gray-700 border-gray-300 h-9" readOnly />
-                      </div>
+
+                    <div className="mt-2 flex items-start gap-1.5 px-1 text-[9px] font-normal leading-4 text-kiosk-muted">
+                      <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                      <p>Checks USB transport, terminal heartbeat (GetStatus 114) and housekeeping (paper / battery) every 20 seconds while idle.</p>
                     </div>
+                  </Card>
 
-                    {/* NFC Status */}
-                    <div className={`p-3 rounded-lg flex items-center gap-2 ${
-                      softPosNfcStatus.tested
-                        ? softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'
-                        : 'bg-gray-50 border border-gray-200'
-                    }`}>
-                      {softPosNfcStatus.checking ? <Loader2 className="w-4 h-4 text-blue-600 animate-spin" /> :
-                       softPosNfcStatus.tested ? (softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-600" />) :
-                       <div className="w-4 h-4 rounded-full bg-gray-400" />}
-                      <span className={`text-sm font-medium ${
-                        softPosNfcStatus.tested ? (softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled ? 'text-emerald-700' : 'text-red-700') : 'text-gray-700'
-                      }`}>
-                        {softPosNfcStatus.checking ? 'Checking NFC...' :
-                         softPosNfcStatus.tested ? (softPosNfcStatus.isAvailable && softPosNfcStatus.isEnabled ? 'NFC Ready' : 'NFC Not Available') :
-                         'NFC Status Unknown'}
-                      </span>
+                  <Card className="rounded-2xl border-kiosk-border bg-kiosk-surface p-4 shadow-kiosk">
+                    <h2 className="mb-3 text-base font-semibold text-kiosk-text">Connection Status</h2>
+                    <div className="divide-y divide-kiosk-border overflow-hidden rounded-xl border border-kiosk-border">
+                      {[
+                        { label: "Admin Panel", sublabel: adminConnected ? "Cloud backend · syncing status & heartbeats" : "Awaiting activation by administrator", connected: adminConnected, Icon: Cloud },
+                        { label: "Terminal (USB)", sublabel: posHealth.connectionInfo ? `OM-A880 · ${posHealth.connectionInfo}` : "OM-A880 · USB device not detected", connected: usbConnected, Icon: Cable },
+                      ].map(({ label, sublabel, connected, Icon }) => (
+                        <div key={label} className="flex items-center gap-3 bg-kiosk-surface p-3">
+                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${connected ? "bg-kiosk-ready-soft text-kiosk-ready-text" : "bg-kiosk-offline-soft text-kiosk-offline-text"}`}><Icon className="h-4 w-4" /></span>
+                          <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-kiosk-text">{label}</p><p className="truncate text-[9px] font-normal text-kiosk-muted">{sublabel}</p></div>
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-semibold ${connectionPill(connected)}`}><span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-kiosk-ready" : "bg-kiosk-offline"}`} />{connected ? "Connected" : "Disconnected"}</span>
+                        </div>
+                      ))}
                     </div>
-
-                    <Button onClick={handleTestSoftPosNfc} className="w-full h-9 text-sm" disabled={softPosNfcStatus.checking}>
-                      {softPosNfcStatus.checking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Smartphone className="w-3 h-3 mr-1" />}
-                      {softPosNfcStatus.checking ? 'Testing...' : 'Test NFC / Soft POS'}
-                    </Button>
-                  </>
-                )}
-
-                {kioskPaymentMode === 'payment_gateway' && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <Globe className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-blue-900">Thawani Payment Gateway</p>
-                        <p className="text-[10px] text-blue-700 mt-1">
-                          Donors will be redirected to Thawani's secure checkout page to enter card details.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {kioskPaymentMode === 'test_payment' && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-amber-900">Standalone Testing Mode</p>
-                        <p className="text-[10px] text-amber-700 mt-1">
-                          Donations are recorded as successful transactions without launching Thawani services.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="status" className="space-y-3">
-            <Card className="p-4 bg-white border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-gray-900">POS Health &amp; Status</h2>
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => refreshPosHealth()} disabled={posHealthChecking}>
-                  {posHealthChecking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                  Ping / Test now
-                </Button>
-              </div>
-              <PosHealthIndicator
-                state={posHealth.state}
-                message={posHealth.message}
-                paperOk={posHealth.paperOk}
-                batteryOk={posHealth.batteryOk}
-                readerStatus={posHealth.readerStatus}
-                errorCode={posHealth.errorCode}
-                terminalLabel={posHealth.terminalLabel}
-                tid={posHealth.tid}
-                serialNumber={posHealth.serialNumber}
-                firmwareVersion={posHealth.firmwareVersion}
-                connectionInfo={posHealth.connectionInfo}
-                updatedAt={posHealth.checkedAt}
-                live
-              />
-              <p className="mt-2 text-[11px] text-gray-500">
-                Checks USB transport, terminal heartbeat (GetStatus 114) and housekeeping (paper / battery) every 20 seconds while idle.
-              </p>
-            </Card>
-
-            <Card className="p-4 bg-white border-gray-200">
-              <h2 className="text-lg font-bold mb-3 text-gray-900">Connection Status</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4 text-gray-700" />
-                    <div>
-                      <p className="font-semibold text-sm text-gray-900">Admin Panel</p>
-                      <p className="text-xs text-gray-600">{kioskData?.status === 'active' ? 'Connected' : 'Pending'}</p>
-                    </div>
-                  </div>
-                  <div className={`w-2 h-2 rounded-full ${kioskData?.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                </div>
-
-                {kioskData?.status !== 'active' && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-xs text-yellow-700">This kiosk is pending approval. Please contact an administrator.</p>
-                  </div>
-                )}
-              </div>
-            </Card>
+                  </Card>
+                </>
+              );
+            })()}
           </TabsContent>
 
         </Tabs>
