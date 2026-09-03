@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { BellRing } from "lucide-react";
+import { BellRing, ChevronDown, ChevronRight } from "lucide-react";
 
 interface AlertSettings {
   id?: string;
@@ -27,23 +26,46 @@ const DEFAULTS: AlertSettings = {
   quiet_hours_end: null,
 };
 
-/** Admin control for POS outage / recovery alerts (recipients, threshold, quiet hours). */
-export const PosAlertSettingsCard = () => {
+interface Props {
+  /** Alerts always belong to one kiosk — every value is stored keyed by this id. */
+  kioskId: string;
+  kioskName?: string;
+}
+
+/** Per-kiosk POS outage / recovery alert settings (recipients, threshold, quiet hours). */
+export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
+  const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<AlertSettings>(DEFAULTS);
   const [recipientsText, setRecipientsText] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from("pos_alert_settings").select("*").limit(1).maybeSingle();
-      if (data) {
-        const next = { ...DEFAULTS, ...(data as any), recipients: (data as any).recipients ?? [] };
+      // This kiosk's own row first; fall back to the fleet default only as a pre-fill.
+      const { data } = await supabase
+        .from("pos_alert_settings")
+        .select("*")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+
+      let source: any = data;
+      if (!source) {
+        const { data: fleetDefault } = await supabase
+          .from("pos_alert_settings")
+          .select("*")
+          .is("kiosk_id", null)
+          .maybeSingle();
+        source = fleetDefault ? { ...fleetDefault, id: undefined } : null;
+      }
+
+      if (source) {
+        const next = { ...DEFAULTS, ...source, recipients: source.recipients ?? [] } as AlertSettings;
         setSettings(next);
         setRecipientsText((next.recipients || []).join(", "));
       }
     };
     void load();
-  }, []);
+  }, [kioskId]);
 
   const save = async () => {
     setSaving(true);
@@ -53,6 +75,7 @@ export const PosAlertSettingsCard = () => {
         .map((r) => r.trim())
         .filter(Boolean);
       const payload = {
+        kiosk_id: kioskId,
         enabled: settings.enabled,
         recipients,
         offline_threshold_seconds: settings.offline_threshold_seconds,
@@ -61,12 +84,12 @@ export const PosAlertSettingsCard = () => {
         quiet_hours_end: settings.quiet_hours_end,
         updated_at: new Date().toISOString(),
       };
-      const { error } = settings.id
-        ? await supabase.from("pos_alert_settings").update(payload).eq("id", settings.id)
-        : await supabase.from("pos_alert_settings").insert(payload);
+      const { data, error } = settings.id
+        ? await supabase.from("pos_alert_settings").update(payload).eq("id", settings.id).select("id").maybeSingle()
+        : await supabase.from("pos_alert_settings").insert(payload).select("id").maybeSingle();
       if (error) throw error;
-      setSettings((s) => ({ ...s, recipients }));
-      toast.success("POS alert settings saved");
+      setSettings((s) => ({ ...s, recipients, id: (data as any)?.id ?? s.id }));
+      toast.success(`Alert settings saved${kioskName ? ` for ${kioskName}` : ""}`);
     } catch (err: any) {
       toast.error(err?.message || "Could not save alert settings");
     } finally {
@@ -75,77 +98,100 @@ export const PosAlertSettingsCard = () => {
   };
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <BellRing className="w-4 h-4 text-muted-foreground" />
-          <h3 className="font-bold">POS Health Alerts</h3>
-        </div>
-        <Switch checked={settings.enabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, enabled: v }))} />
-      </div>
+    <div className="mt-2 rounded-md border">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-semibold"
+      >
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <BellRing className="h-3 w-3 text-muted-foreground" />
+        Alerts for this kiosk
+        <span className="ms-auto text-[10px] font-normal text-muted-foreground">
+          {settings.enabled ? `${settings.recipients.length} recipient(s)` : "off"}
+        </span>
+      </button>
 
-      <div className="space-y-3">
-        <div>
-          <Label className="text-xs">Alert recipients (mobile numbers, comma separated)</Label>
-          <Input
-            value={recipientsText}
-            onChange={(e) => setRecipientsText(e.target.value)}
-            placeholder="96891234567, 96897654321"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            One SMS per outage (Offline / Not responding / Needs attention) and one when the terminal is back to Ready.
+      {open && (
+        <div className="space-y-3 border-t p-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">Enable alerts for this kiosk</span>
+            <Switch checked={settings.enabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, enabled: v }))} />
+          </div>
+
+          <div>
+            <Label className="text-xs">Alert recipients (mobile numbers, comma separated)</Label>
+            <Input
+              value={recipientsText}
+              onChange={(e) => setRecipientsText(e.target.value)}
+              placeholder="96891234567, 96897654321"
+              className="h-8 text-sm"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              One SMS per outage on this kiosk and one when its terminal is back to Ready. The message names the kiosk,
+              location and TID.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <Label className="text-xs">Offline after (seconds)</Label>
+              <Input
+                type="number"
+                min={60}
+                className="h-8 text-sm"
+                value={settings.offline_threshold_seconds}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, offline_threshold_seconds: Number(e.target.value) || 180 }))
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Quiet from (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                className="h-8 text-sm"
+                value={settings.quiet_hours_start ?? ""}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, quiet_hours_start: e.target.value === "" ? null : Number(e.target.value) }))
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Quiet to (0-23)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                className="h-8 text-sm"
+                value={settings.quiet_hours_end ?? ""}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, quiet_hours_end: e.target.value === "" ? null : Number(e.target.value) }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border p-2">
+            <span className="text-xs">Also alert on “Needs attention” (paper / battery)</span>
+            <Switch
+              checked={settings.alert_on_attention}
+              onCheckedChange={(v) => setSettings((s) => ({ ...s, alert_on_attention: v }))}
+            />
+          </div>
+
+          <p className="text-[10px] text-muted-foreground">
+            Offline alerts are critical and are sent even during quiet hours.
           </p>
-        </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <Label className="text-xs">Offline after (seconds)</Label>
-            <Input
-              type="number"
-              min={60}
-              value={settings.offline_threshold_seconds}
-              onChange={(e) => setSettings((s) => ({ ...s, offline_threshold_seconds: Number(e.target.value) || 180 }))}
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Quiet hours from (0-23)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={23}
-              value={settings.quiet_hours_start ?? ""}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, quiet_hours_start: e.target.value === "" ? null : Number(e.target.value) }))
-              }
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Quiet hours to (0-23)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={23}
-              value={settings.quiet_hours_end ?? ""}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, quiet_hours_end: e.target.value === "" ? null : Number(e.target.value) }))
-              }
-            />
-          </div>
+          <Button onClick={save} disabled={saving} size="sm" className="h-7 text-xs">
+            {saving ? "Saving…" : "Save alert settings"}
+          </Button>
         </div>
-
-        <div className="flex items-center justify-between rounded-md border p-2">
-          <span className="text-xs">Also alert on “Needs attention” (paper / battery)</span>
-          <Switch
-            checked={settings.alert_on_attention}
-            onCheckedChange={(v) => setSettings((s) => ({ ...s, alert_on_attention: v }))}
-          />
-        </div>
-
-        <Button onClick={save} disabled={saving} size="sm">
-          {saving ? "Saving…" : "Save alert settings"}
-        </Button>
-      </div>
-    </Card>
+      )}
+    </div>
   );
 };
 
