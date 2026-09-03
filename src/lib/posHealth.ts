@@ -61,53 +61,66 @@ export function conditionText(code: string | null | undefined): string | null {
 
 export interface PosHealthMeta {
   label: string;
-  labelAr: string;
   /** Lucide icon name rendered next to the word (never colour alone). */
   icon: "check" | "alert" | "help" | "plug" | "clock";
-  dotClass: string;
-  chipClass: string;
+  dotColor: string;
+  pillText: string;
+  pillBg: string;
+  borderColor: string;
+  softBg: string;
   blocksDonations: boolean;
 }
 
+/** English-only state tokens. Colours are accent-only (pill / dot / 4px border). */
 export const POS_HEALTH_META: Record<PosHealthState, PosHealthMeta> = {
   ready: {
     label: "Ready",
-    labelAr: "جاهز",
     icon: "check",
-    dotClass: "bg-emerald-500",
-    chipClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dotColor: "#16A34A",
+    pillText: "#0F7A52",
+    pillBg: "#E7F6EF",
+    borderColor: "#16A34A",
+    softBg: "#E7F6EF",
     blocksDonations: false,
   },
   attention: {
     label: "Needs attention",
-    labelAr: "يحتاج إلى متابعة",
     icon: "alert",
-    dotClass: "bg-amber-500",
-    chipClass: "bg-amber-50 text-amber-800 border-amber-300",
+    dotColor: "#E8A400",
+    pillText: "#8A6300",
+    pillBg: "#FEF4DA",
+    borderColor: "#E8A400",
+    softBg: "#FEF4DA",
     blocksDonations: false,
   },
   not_responding: {
     label: "Not responding",
-    labelAr: "لا يستجيب",
     icon: "help",
-    dotClass: "bg-red-500",
-    chipClass: "bg-red-50 text-red-700 border-red-300",
+    dotColor: "#DC3545",
+    pillText: "#B42318",
+    pillBg: "#FDECEC",
+    borderColor: "#DC3545",
+    softBg: "#FDECEC",
     blocksDonations: true,
   },
   offline: {
     label: "Offline",
-    labelAr: "غير متصل",
     icon: "plug",
-    dotClass: "bg-red-600",
-    chipClass: "bg-red-100 text-red-800 border-red-400",
+    dotColor: "#DC3545",
+    pillText: "#B42318",
+    pillBg: "#FDECEC",
+    borderColor: "#DC3545",
+    softBg: "#FDECEC",
     blocksDonations: true,
   },
   unknown: {
     label: "Awaiting first heartbeat",
-    labelAr: "بانتظار أول اتصال",
     icon: "clock",
-    dotClass: "bg-slate-400",
-    chipClass: "bg-slate-50 text-slate-600 border-slate-200",
+    dotColor: "#64748B",
+    pillText: "#475569",
+    pillBg: "#F1F5F9",
+    borderColor: "#94A3B8",
+    softBg: "#F1F5F9",
     blocksDonations: false,
   },
 };
