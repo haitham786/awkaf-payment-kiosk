@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb, MapPin, Volume2, VolumeX } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -678,46 +678,38 @@ const KiosksManagement = () => {
                 <p className="text-muted-foreground">{kiosks.length === 0 ? 'No kiosks registered yet.' : 'No kiosks match this filter.'}</p>
               </Card>
              ) : (
-              <div ref={listRef} className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+              <div ref={listRef} className="flex gap-5 overflow-x-auto bg-kiosk-page p-5 pb-6 snap-x snap-mandatory">
               {visibleKiosks.map((kiosk) => (
-                <Card key={kiosk.id} className={`p-4 w-[420px] shrink-0 snap-start ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                <Card key={kiosk.id} className={`w-[380px] shrink-0 snap-start rounded-[20px] border-kiosk-border bg-kiosk-surface p-4 shadow-kiosk ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-kiosk-brand to-primary-glow text-sm font-bold text-primary-foreground shadow-neon">
+                      {String(kiosk.name || "K").split(/\s+/).map((part: string) => part[0]).join("").slice(0, 3).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold">{kiosk.name}</h3>
+                        <h3 className="truncate text-lg font-bold text-kiosk-text">{kiosk.name}</h3>
                         {kiosk.status === 'pending_approval' && (
                           <span className="px-2 py-0.5 bg-destructive/20 text-destructive rounded text-xs font-medium">Pending</span>
                         )}
+                        {kiosk.status !== 'pending_approval' && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${kiosk.status === 'active' ? 'bg-kiosk-ready-soft text-kiosk-ready-text' : 'bg-kiosk-attention-soft text-kiosk-attention-text'}`}>{kiosk.status.replace('_', ' ')}</span>}
                       </div>
-                      <p className="text-sm text-muted-foreground">{kiosk.location}</p>
-                      <div className="flex gap-4 mt-2">
-                        <p className="text-xs text-muted-foreground">Ref: {kiosk.reference_number || 'N/A'}</p>
-                        {kiosk.status !== 'pending_approval' && (
-                          <p className="text-xs">
-                            <span className={`px-2 py-1 rounded ${
-                              kiosk.status === 'active' ? 'bg-success/20 text-success' :
-                              kiosk.status === 'inactive' ? 'bg-gray-400/20 text-gray-600' :
-                              'bg-warning/20 text-warning'
-                            }`}>
-                              {kiosk.status.replace('_', ' ')}
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                      {/* Payment Mode */}
-                       <div className="mt-2 flex items-center gap-2">
-                         {kiosk.configuration?.payment_mode === 'test_payment'
-                           ? <FlaskConical className="w-3 h-3 text-amber-600" />
-                           : <Usb className="w-3 h-3 text-emerald-600" />}
-                        <p className="text-xs text-muted-foreground">{getPaymentModeLabel(kiosk)}</p>
-                      </div>
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-kiosk-muted"><MapPin className="h-3 w-3" />{kiosk.location}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-0.5">
+                      {kiosk.status === 'pending_approval' && (
+                        <Button size="sm" variant="default" onClick={async () => { await supabase.from('kiosks').update({ status: 'active' }).eq('id', kiosk.id); toast.success("Kiosk approved and activated"); loadKiosks(); }} className="h-7 bg-success px-2 text-[10px] hover:bg-success/90">Approve</Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-kiosk-muted" onClick={() => handleEdit(kiosk)} aria-label={`Edit ${kiosk.name}`}><Edit className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(kiosk.id)} aria-label={`Delete ${kiosk.name}`}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </div>
+                  </div>
 
-                      {/* Sound */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-muted-foreground">Sound Effects:</span>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-kiosk-page px-2.5 py-1 text-[10px] text-kiosk-muted">Ref · {kiosk.reference_number || 'N/A'}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-kiosk-page px-2.5 py-1 text-[10px] text-kiosk-muted">{kiosk.configuration?.payment_mode === 'test_payment' ? <FlaskConical className="h-3 w-3" /> : <Usb className="h-3 w-3" />}{kiosk.configuration?.payment_mode === 'test_payment' ? 'Testing' : 'NBO POS Terminal'}</span>
+                    <span className="inline-flex items-center rounded-full bg-kiosk-page text-[10px] text-kiosk-muted">
                         <Button
-                          size="sm"
-                          variant={kiosk.configuration?.sound_enabled !== false ? "default" : "outline"}
+                          size="sm" variant="ghost"
                           onClick={async () => {
                             const currentSoundEnabled = kiosk.configuration?.sound_enabled !== false;
                             const publicConfig = sanitizeConfiguration({ ...kiosk.configuration, sound_enabled: !currentSoundEnabled });
@@ -725,38 +717,20 @@ const KiosksManagement = () => {
                             toast.success(`Sound ${!currentSoundEnabled ? 'enabled' : 'muted'} for ${kiosk.name}`);
                             loadKiosks();
                           }}
-                          className="h-6 text-xs px-2"
+                          className="h-6 rounded-full px-2.5 text-[10px] font-normal hover:bg-kiosk-border"
                         >
-                          {kiosk.configuration?.sound_enabled !== false ? '🔊 Enabled' : '🔇 Muted'}
+                          {kiosk.configuration?.sound_enabled !== false ? <Volume2 className="mr-1 h-3 w-3" /> : <VolumeX className="mr-1 h-3 w-3" />}
+                          Sound {kiosk.configuration?.sound_enabled !== false ? 'on' : 'off'}
                         </Button>
-                      </div>
+                    </span>
+                  </div>
 
-                      {/* OM-A880 POS health & status */}
-                      <PosKioskHealthPanel
+                  <PosKioskHealthPanel
                         kioskId={kiosk.id}
                         kioskName={kiosk.name}
                         status={posStatus[kiosk.id] || null}
                         fallbackTerminalLabel={kiosk.configuration?.nbo_pos?.terminal_label}
                       />
-                    </div>
-
-                    <div className="flex gap-2">
-                      {kiosk.status === 'pending_approval' && (
-                        <Button size="sm" variant="default"
-                          onClick={async () => {
-                            await supabase.from('kiosks').update({ status: 'active' }).eq('id', kiosk.id);
-                            toast.success("Kiosk approved and activated");
-                            loadKiosks();
-                          }}
-                          className="bg-success hover:bg-success/90"
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(kiosk)}><Edit className="w-4 h-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(kiosk.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  </div>
                 </Card>
               ))}
               </div>

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { BellRing, ChevronDown, ChevronRight } from "lucide-react";
+import { Bell, ChevronDown, ChevronRight } from "lucide-react";
 
 interface AlertSettings {
   id?: string;
@@ -98,34 +98,35 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
   };
 
   return (
-    <div className="mt-2 rounded-md border">
-      <button
+    <div className="rounded-xl border border-kiosk-border bg-kiosk-surface">
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-semibold"
+        className="flex min-h-10 w-full items-center justify-start gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-kiosk-text hover:bg-kiosk-page"
       >
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <BellRing className="h-3 w-3 text-muted-foreground" />
+        <Bell className="h-4 w-4 text-kiosk-brand" />
         Alerts for this kiosk
         <span className="ms-auto text-[10px] font-normal text-muted-foreground">
           {settings.enabled ? `${settings.recipients.length} recipient(s)` : "off"}
         </span>
-      </button>
+        {open ? <ChevronDown className="h-3.5 w-3.5 text-kiosk-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-kiosk-muted" />}
+      </Button>
 
       {open && (
-        <div className="space-y-3 border-t p-2">
+        <div className="space-y-4 border-t border-kiosk-border p-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium">Enable alerts for this kiosk</span>
             <Switch checked={settings.enabled} onCheckedChange={(v) => setSettings((s) => ({ ...s, enabled: v }))} />
           </div>
 
           <div>
-            <Label className="text-xs">Alert recipients (mobile numbers, comma separated)</Label>
+            <Label className="text-[11px] font-semibold text-kiosk-muted">Alert recipients (mobile numbers)</Label>
             <Input
               value={recipientsText}
               onChange={(e) => setRecipientsText(e.target.value)}
               placeholder="96891234567, 96897654321"
-              className="h-8 text-sm"
+              className="mt-1 h-9 rounded-xl border-kiosk-border text-sm"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
               One SMS per outage on this kiosk and one when its terminal is back to Ready. The message names the kiosk,
@@ -133,13 +134,15 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold text-kiosk-muted">Timing</p>
+            <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs">Offline after (seconds)</Label>
+              <Label className="text-[10px] text-kiosk-muted">Offline after (s)</Label>
               <Input
                 type="number"
                 min={60}
-                className="h-8 text-sm"
+                className="mt-1 h-9 rounded-xl border-kiosk-border text-sm"
                 value={settings.offline_threshold_seconds}
                 onChange={(e) =>
                   setSettings((s) => ({ ...s, offline_threshold_seconds: Number(e.target.value) || 180 }))
@@ -147,12 +150,12 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
               />
             </div>
             <div>
-              <Label className="text-xs">Quiet from (0-23)</Label>
+              <Label className="text-[10px] text-kiosk-muted">Quiet from</Label>
               <Input
                 type="number"
                 min={0}
                 max={23}
-                className="h-8 text-sm"
+                className="mt-1 h-9 rounded-xl border-kiosk-border text-sm"
                 value={settings.quiet_hours_start ?? ""}
                 onChange={(e) =>
                   setSettings((s) => ({ ...s, quiet_hours_start: e.target.value === "" ? null : Number(e.target.value) }))
@@ -160,22 +163,23 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
               />
             </div>
             <div>
-              <Label className="text-xs">Quiet to (0-23)</Label>
+              <Label className="text-[10px] text-kiosk-muted">Quiet to</Label>
               <Input
                 type="number"
                 min={0}
                 max={23}
-                className="h-8 text-sm"
+                className="mt-1 h-9 rounded-xl border-kiosk-border text-sm"
                 value={settings.quiet_hours_end ?? ""}
                 onChange={(e) =>
                   setSettings((s) => ({ ...s, quiet_hours_end: e.target.value === "" ? null : Number(e.target.value) }))
                 }
               />
             </div>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-md border p-2">
-            <span className="text-xs">Also alert on “Needs attention” (paper / battery)</span>
+          <div className="flex items-center justify-between rounded-xl border border-kiosk-border p-3">
+            <span className="pr-3 text-xs font-semibold text-kiosk-text">Also alert on “Needs attention” (paper / battery)</span>
             <Switch
               checked={settings.alert_on_attention}
               onCheckedChange={(v) => setSettings((s) => ({ ...s, alert_on_attention: v }))}
@@ -186,7 +190,7 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
             Offline alerts are critical and are sent even during quiet hours.
           </p>
 
-          <Button onClick={save} disabled={saving} size="sm" className="h-7 text-xs">
+          <Button onClick={save} disabled={saving} size="sm" className="h-10 w-full rounded-xl bg-kiosk-brand text-xs hover:bg-kiosk-brand/90">
             {saving ? "Saving…" : "Save alert settings"}
           </Button>
         </div>
