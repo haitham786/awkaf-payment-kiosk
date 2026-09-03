@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Clock, HelpCircle, Unplug } from "lucide-react";
-import { POS_HEALTH_META, lastSeenLabel, omanTimestamp, readerLabel, type PosHealthState } from "@/lib/posHealth";
+import { POS_HEALTH_META, lastSeenLabel, readerLabel, type PosHealthState } from "@/lib/posHealth";
 
 interface PosHealthIndicatorProps {
   state: PosHealthState;
