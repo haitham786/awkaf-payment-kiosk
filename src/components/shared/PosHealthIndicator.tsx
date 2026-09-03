@@ -77,14 +77,14 @@ export const PosHealthIndicator = ({
   const reader = readerLabel(readerStatus) ?? "idle";
 
   const chipColor = (ok: boolean | null | undefined) => {
-    if (ok === true) return { bg: "#E7F6EF", text: "#0F7A52", border: "#16A34A" };
-    if (ok === false) return { bg: "#FEF4DA", text: "#8A6300", border: "#E8A400" };
+    if (ok === true) return { bg: "#E9F7EF", text: "#0E7A50", border: "#159A66" };
+    if (ok === false) return { bg: "#FDF3DA", text: "#8A6300", border: "#C98A00" };
     return { bg: "#F1F5F9", text: "#64748B", border: "#CBD5E1" };
   };
   const readerColor = (value: string) => {
     if (value === "idle") return { bg: "#F1F5F9", text: "#64748B", border: "#CBD5E1" };
-    if (value.includes("fault") || value.includes("needs service")) return { bg: "#FDECEC", text: "#B42318", border: "#DC3545" };
-    return { bg: "#E7F6EF", text: "#0F7A52", border: "#16A34A" };
+    if (value.includes("fault") || value.includes("needs service")) return { bg: "#FDECEA", text: "#B3271C", border: "#E0483D" };
+    return { bg: "#E9F7EF", text: "#0E7A50", border: "#159A66" };
   };
 
   const paperStyle = chipColor(paperOk);
