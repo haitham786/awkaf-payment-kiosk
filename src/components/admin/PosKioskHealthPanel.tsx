@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import PosHealthIndicator from "@/components/shared/PosHealthIndicator";
 import { computeUptime, effectiveState, lastSeenLabel, omanTimestamp, type HistoryRow, POS_HEALTH_META } from "@/lib/posHealth";
 import { History } from "lucide-react";
+import PosAlertSettingsCard from "@/components/admin/PosAlertSettingsCard";
 
 interface Props {
   kioskId: string;
+  kioskName?: string;
   fallbackTerminalLabel?: string | null;
   status: any | null;
 }
@@ -20,11 +22,12 @@ interface TxSummary {
 }
 
 /** Per-kiosk health block: state, identity, uptime, last transaction and history. */
-export const PosKioskHealthPanel = ({ kioskId, fallbackTerminalLabel, status }: Props) => {
+export const PosKioskHealthPanel = ({ kioskId, kioskName, fallbackTerminalLabel, status }: Props) => {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const [tx, setTx] = useState<TxSummary | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [offlineAfterMs, setOfflineAfterMs] = useState(3 * 60 * 1000);
 
   useEffect(() => {
     const load = async () => {
@@ -67,7 +70,19 @@ export const PosKioskHealthPanel = ({ kioskId, fallbackTerminalLabel, status }: 
     void load();
   }, [kioskId, status?.updated_at]);
 
-  const state = effectiveState(status?.state, status?.updated_at);
+  useEffect(() => {
+    const loadThreshold = async () => {
+      const { data } = await supabase
+        .from("pos_alert_settings")
+        .select("offline_threshold_seconds")
+        .eq("kiosk_id", kioskId)
+        .maybeSingle();
+      if (data?.offline_threshold_seconds) setOfflineAfterMs(Number(data.offline_threshold_seconds) * 1000);
+    };
+    void loadThreshold();
+  }, [kioskId]);
+
+  const state = effectiveState(status?.state, status?.updated_at, offlineAfterMs);
   const uptimeDay = computeUptime(history, 24 * 3600 * 1000);
   const uptimeWeek = computeUptime(history, 7 * 24 * 3600 * 1000);
 
@@ -78,7 +93,7 @@ export const PosKioskHealthPanel = ({ kioskId, fallbackTerminalLabel, status }: 
         message={
           status
             ? state === "offline"
-              ? "No heartbeat for over 3 minutes — USB disconnected or kiosk app not running"
+              ? `No heartbeat for over ${Math.round(offlineAfterMs / 60000)} minute(s) — USB disconnected or kiosk app not running`
               : status.message
             : "No health beat received from this kiosk yet"
         }
@@ -114,6 +129,8 @@ export const PosKioskHealthPanel = ({ kioskId, fallbackTerminalLabel, status }: 
           Today: {tx.approved} approved · {tx.declined} declined · OMR {tx.amount.toFixed(3)} collected
         </div>
       )}
+
+      <PosAlertSettingsCard kioskId={kioskId} kioskName={kioskName} />
 
       <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setShowHistory((v) => !v)}>
         <History className="mr-1 h-3 w-3" />

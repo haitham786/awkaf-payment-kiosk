@@ -726,6 +726,7 @@ const KiosksManagement = () => {
                       {/* OM-A880 POS health & status */}
                       <PosKioskHealthPanel
                         kioskId={kiosk.id}
+                        kioskName={kiosk.name}
                         status={posStatus[kiosk.id] || null}
                         fallbackTerminalLabel={kiosk.configuration?.nbo_pos?.terminal_label}
                       />
