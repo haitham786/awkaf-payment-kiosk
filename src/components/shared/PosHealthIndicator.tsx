@@ -36,15 +36,6 @@ export const PosHealthIndicator = ({
   paperOk,
   batteryOk,
   readerStatus,
-  errorCode,
-  terminalLabel,
-  tid,
-  serialNumber,
-  firmwareVersion,
-  appVersion,
-  connectionInfo,
-  lastTransactionAt,
-  lastTransactionResult,
   updatedAt,
   live = false,
   compact = false,
@@ -82,11 +73,25 @@ export const PosHealthIndicator = ({
   const paperStyle = chipColor(paperOk);
   const batteryStyle = chipColor(batteryOk);
   const readerStyle = readerColor(reader);
+  const compactOmanTimestamp = (value: string | null | undefined) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    const text = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Muscat",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+    return `${text} GST`;
+  };
 
   return (
     <div
       className="rounded-2xl border border-kiosk-border bg-kiosk-surface p-3.5"
-      style={{ borderLeftWidth: 4, borderLeftColor: meta.borderColor }}
+      style={{ borderLeftWidth: 4, borderLeftColor: meta.borderColor, background: `linear-gradient(115deg, ${meta.softBg}, #FFFFFF 58%)` }}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
@@ -99,7 +104,7 @@ export const PosHealthIndicator = ({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[15px] font-semibold text-kiosk-text">
+              <span className="text-[15px] font-semibold" style={{ color: meta.pillText }}>
                 Terminal {meta.label}
               </span>
             </div>
@@ -111,7 +116,7 @@ export const PosHealthIndicator = ({
             <span>{lastSeenLabel(updatedAt)}</span>
           </div>
           <p className="whitespace-nowrap text-[9px]">
-            {omanTimestamp(updatedAt)}
+            {compactOmanTimestamp(updatedAt)}
           </p>
         </div>
       </div>

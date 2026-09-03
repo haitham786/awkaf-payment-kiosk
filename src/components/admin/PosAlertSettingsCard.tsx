@@ -99,10 +99,11 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
 
   return (
     <div className="rounded-xl border border-kiosk-border bg-kiosk-surface">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-kiosk-text"
+        className="flex min-h-10 w-full items-center justify-start gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-kiosk-text hover:bg-kiosk-page"
       >
         <Bell className="h-4 w-4 text-kiosk-brand" />
         Alerts for this kiosk
@@ -110,7 +111,7 @@ export const PosAlertSettingsCard = ({ kioskId, kioskName }: Props) => {
           {settings.enabled ? `${settings.recipients.length} recipient(s)` : "off"}
         </span>
         {open ? <ChevronDown className="h-3.5 w-3.5 text-kiosk-muted" /> : <ChevronRight className="h-3.5 w-3.5 text-kiosk-muted" />}
-      </button>
+      </Button>
 
       {open && (
         <div className="space-y-4 border-t border-kiosk-border p-3">
