@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock, HelpCircle, Unplug } from "lucide-react";
 import { POS_HEALTH_META, lastSeenLabel, readerLabel, type PosHealthState } from "@/lib/posHealth";
+import { cn } from "@/lib/utils";
 
 interface PosHealthIndicatorProps {
   state: PosHealthState;
@@ -27,6 +28,22 @@ const ICONS = {
   help: HelpCircle,
   plug: Unplug,
   clock: Clock,
+};
+
+const STATE_PANEL_CLASSES: Record<PosHealthState, string> = {
+  ready: "border-l-kiosk-ready bg-gradient-to-br from-kiosk-ready-soft to-kiosk-surface",
+  attention: "border-l-kiosk-attention bg-gradient-to-br from-kiosk-attention-soft to-kiosk-surface",
+  not_responding: "border-l-kiosk-offline bg-gradient-to-br from-kiosk-offline-soft to-kiosk-surface",
+  offline: "border-l-kiosk-offline bg-gradient-to-br from-kiosk-offline-soft to-kiosk-surface",
+  unknown: "border-l-kiosk-muted bg-gradient-to-br from-kiosk-page to-kiosk-surface",
+};
+
+const STATE_TITLE_CLASSES: Record<PosHealthState, string> = {
+  ready: "text-kiosk-ready-text",
+  attention: "text-kiosk-attention-text",
+  not_responding: "text-kiosk-offline-text",
+  offline: "text-kiosk-offline-text",
+  unknown: "text-kiosk-muted",
 };
 
 /** Per-kiosk OM-A880 health block: light card with a 4px state-coloured accent border, status pill, and neutral metric chips. */
@@ -89,10 +106,7 @@ export const PosHealthIndicator = ({
   };
 
   return (
-    <div
-      className="rounded-2xl border border-kiosk-border bg-kiosk-surface p-3.5"
-      style={{ borderLeftWidth: 4, borderLeftColor: meta.borderColor, background: `linear-gradient(115deg, ${meta.softBg}, #FFFFFF 58%)` }}
-    >
+    <div className={cn("rounded-2xl border border-l-4 border-kiosk-border p-3.5", STATE_PANEL_CLASSES[state])}>
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2">
@@ -104,7 +118,7 @@ export const PosHealthIndicator = ({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[15px] font-semibold" style={{ color: meta.pillText }}>
+              <span className={cn("text-[15px] font-semibold", STATE_TITLE_CLASSES[state])}>
                 Terminal {meta.label}
               </span>
             </div>
