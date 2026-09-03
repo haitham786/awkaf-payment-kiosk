@@ -90,7 +90,7 @@ export const PosHealthIndicator = ({
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] opacity-90">
         <span>Paper: {paperLabel}</span>
         <span>Battery: {batteryLabel}</span>
-        {readerStatus && <span>Reader: {readerStatus}</span>}
+        {readerLabel(readerStatus) && <span>Reader: {readerLabel(readerStatus)}</span>}
         {meta.blocksDonations && <span className="font-semibold">Cannot take payments</span>}
       </div>
 
