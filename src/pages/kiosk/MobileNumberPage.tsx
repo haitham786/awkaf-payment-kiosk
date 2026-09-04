@@ -99,17 +99,17 @@ const MobileNumberPage = () => {
 
             <div className="grid grid-cols-3 gap-1.5 justify-items-center">
               {['1','2','3','4','5','6','7','8','9'].map((n) => (
-                <KioskButton key={n} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(n)} className="aspect-square w-full min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 rounded-lg text-xl font-bold">
+                <KioskButton key={n} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(n)} className="aspect-square h-auto w-full min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 rounded-lg text-xl font-bold">
                   {n}
                 </KioskButton>
               ))}
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('back')} aria-label="Backspace" className="aspect-square w-full min-h-0 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-lg text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('back')} aria-label="Backspace" className="aspect-square h-auto w-full min-h-0 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 rounded-lg text-xl font-bold">
                 <Delete className="w-5 h-5" />
               </KioskButton>
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('0')} className="aspect-square w-full min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 rounded-lg text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('0')} className="aspect-square h-auto w-full min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 rounded-lg text-xl font-bold">
                 0
               </KioskButton>
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('clear')} aria-label="Clear" className="aspect-square w-full min-h-0 bg-white/70 hover:bg-amber-50/90 text-gray-800 border-0 rounded-lg text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('clear')} aria-label="Clear" className="aspect-square h-auto w-full min-h-0 bg-white/70 hover:bg-amber-50/90 text-gray-800 border-0 rounded-lg text-xl font-bold">
                 <Eraser className="w-5 h-5" />
               </KioskButton>
             </div>
