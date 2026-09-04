@@ -26,8 +26,8 @@
 - [x] Show a bilingual disconnected-terminal error before attempting payment
 - [x] Validate kiosk flows and production build
 
-- [ ] Refine confirmation buttons and donation amount label
-- [ ] Compact the terminal payment frame and Arabic instruction
-- [ ] Match the SMS keypad to the manual amount keypad
-- [ ] Compact and reword the successful-payment receipt prompt
-- [ ] Validate the four kiosk views at kiosk dimensions
+- [x] Refine confirmation buttons and donation amount label
+- [x] Compact the terminal payment frame and Arabic instruction
+- [x] Match the SMS keypad to the manual amount keypad
+- [x] Compact and reword the successful-payment receipt prompt
+- [x] Validate the four kiosk views at kiosk dimensions

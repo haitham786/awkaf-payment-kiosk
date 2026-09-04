@@ -111,8 +111,8 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 pt-8 overflow-hidden">
-        <div className="w-[90%] max-w-xs rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 pt-6 overflow-hidden">
+        <div className="w-[84%] max-w-[17rem] rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-4 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
             <div className="w-12 h-12 mb-1 flex items-center justify-center">
@@ -131,12 +131,12 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           </div>
 
           {/* Tap animation */}
-          <div className="relative w-32 h-32 my-1">
+          <div className="relative w-28 h-28 my-1">
             {stage === "waiting" && (
               <>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div
-                    className="w-28 h-28 rounded-full border-2 border-emerald-400/40 animate-ping"
+                    className="w-24 h-24 rounded-full border-2 border-emerald-400/40 animate-ping"
                     style={{ animationDuration: "2s" }}
                   />
                 </div>
@@ -150,7 +150,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             )}
             {stage === "processing" && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-28 h-28 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
+                <div className="w-24 h-24 rounded-full border-4 border-emerald-500/25 border-t-emerald-500 animate-spin" />
               </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
@@ -162,14 +162,14 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
 
           {/* Instruction */}
           <div className="text-center leading-tight">
-            <h2 className="text-gray-900 text-base font-bold whitespace-nowrap">يرجى وضع بطاقة البنك على جهاز الدفع</h2>
+            <h2 className="text-gray-900 text-sm font-bold whitespace-nowrap">يرجى وضع بطاقة البنك على جهاز الدفع</h2>
             <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
           </div>
 
         </div>
 
           {/* Accepted payment methods */}
-          <div className="mt-4 w-[90%] max-w-xs">
+          <div className="mt-4 w-[84%] max-w-[17rem]">
             <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2">
               <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 w-auto object-contain" />
               <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
