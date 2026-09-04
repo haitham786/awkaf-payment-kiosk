@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import awqafLogo from "@/assets/awkaflogo-3.png.asset.json";
 
 const Auth = () => {
   const navigate = useNavigate();
