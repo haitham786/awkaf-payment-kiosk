@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb, MapPin, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, CreditCard, FlaskConical, Usb, MapPin, Volume2, VolumeX } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
