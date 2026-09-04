@@ -719,9 +719,23 @@ const KiosksManagement = () => {
               {visibleKiosks.map((kiosk) => (
                 <Card key={kiosk.id} className={`w-[380px] shrink-0 snap-start rounded-[20px] border-kiosk-border bg-kiosk-surface p-4 shadow-kiosk ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start gap-3">
-                    <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-kiosk-brand to-primary-glow text-sm font-bold text-primary-foreground shadow-neon">
-                      {String(kiosk.name || "K").split(/\s+/).map((part: string) => part[0]).join("").slice(0, 3).toUpperCase()}
-                    </div>
+                    <label
+                      title="Upload kiosk image (JPG, JPEG or PNG)"
+                      className={`relative flex h-[42px] w-[42px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-kiosk-brand to-primary-glow text-sm font-bold text-primary-foreground shadow-neon transition hover:opacity-80 ${uploadingIconId === kiosk.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {kiosk.icon_url ? (
+                        <img src={kiosk.icon_url} alt={`${kiosk.name} icon`} className="h-full w-full object-cover" />
+                      ) : (
+                        String(kiosk.name || "K").split(/\s+/).map((part: string) => part[0]).join("").slice(0, 3).toUpperCase()
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png"
+                        className="hidden"
+                        disabled={uploadingIconId === kiosk.id}
+                        onChange={(e) => handleIconUpload(kiosk, e)}
+                      />
+                    </label>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="truncate text-lg font-bold text-kiosk-text">{kiosk.name}</h3>
