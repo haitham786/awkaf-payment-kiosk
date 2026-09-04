@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { KioskButton } from "@/components/ui/kiosk-button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
@@ -98,7 +97,7 @@ const ConfirmationPage = () => {
               </div>
 
               <div className="rounded-lg p-4 border-0">
-                <p className="text-sm text-gray-600 mb-0.5">مبلغ التبرع</p>
+                <p className="text-sm text-gray-900 mb-0.5">مبلغ التبرع</p>
                 <p className="text-xs text-gray-400 mb-1">Donation Amount</p>
                 <p className="text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
                   <CurrencyLogo className="h-6" />
@@ -115,9 +114,8 @@ const ConfirmationPage = () => {
             size="xl"
             soundEffect="navigation"
             onClick={handleBack}
-            className="min-w-[150px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
+            className="min-w-[150px] min-h-[64px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
-            <ArrowRight className="absolute left-4 w-5 h-5" />
             <span className="flex flex-col items-center text-center leading-tight">
               <span>تعديل المبلغ</span>
               <span className="text-xs text-gray-500">Edit Amount</span>
@@ -129,13 +127,12 @@ const ConfirmationPage = () => {
             size="xl"
             soundEffect="navigation"
             onClick={handleConfirm}
-            className="min-w-[150px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
+            className="min-w-[150px] min-h-[64px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
             <span className="flex flex-col items-center text-center leading-tight">
               <span>التأكيد و الدفع</span>
               <span className="text-xs text-gray-500">Confirm & Pay</span>
             </span>
-            <ArrowLeft className="absolute right-4 w-5 h-5" />
           </KioskButton>
         </div>
       </div>
