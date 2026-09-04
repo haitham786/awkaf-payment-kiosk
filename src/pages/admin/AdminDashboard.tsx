@@ -274,12 +274,19 @@ const AdminDashboard = () => {
       <header className="bg-card border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-              {profile?.full_name && (
-                <p className="text-sm text-muted-foreground">Welcome, {profile.full_name}</p>
-              )}
-              <p className="text-xs text-muted-foreground">Kiosk Management System</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={awqafLogo.url}
+                alt="Awqaf Al Lawatia"
+                className="h-10 w-auto object-contain"
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
+                {profile?.full_name && (
+                  <p className="text-sm text-muted-foreground">Welcome, {profile.full_name}</p>
+                )}
+                <p className="text-xs text-muted-foreground">Kiosk Management System</p>
+              </div>
             </div>
             <div className="flex gap-2 items-center">
               <ThemeToggle />
