@@ -111,6 +111,15 @@ const NboPosPaymentPage = () => {
     void loadKioskRuntimeConfig(kioskId, { forceRefresh: true }).catch(() => undefined);
 
     try {
+      const availability = await NboEcr.isAvailable();
+      if (!availability.available || !availability.deviceAttached) {
+        setErrorMessage(
+          "جهاز الدفع غير متصل. يرجى إبلاغ الموظف المسؤول.\nPOS device is disconnected. Please inform a staff member.",
+        );
+        setStage("error");
+        return;
+      }
+
       const result = await NboEcr.purchase({
         amountBaisas: Math.round(amount),
         transactionId,
