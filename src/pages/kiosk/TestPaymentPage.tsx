@@ -51,7 +51,7 @@ const TestPaymentPage = () => {
 
       if (isOnline()) {
         try {
-          const { data, error } = await supabase.functions.invoke("process-payment", { body: payload });
+          const { error } = await supabase.functions.invoke("process-payment", { body: payload });
           if (error) throw error;
 
           return;

@@ -1,10 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type KioskPaymentMode = "test_payment" | "nbo_pos";
+// Legacy values remain readable only so older installed kiosks can be migrated
+// safely to NBO without ever reopening their retired payment screens.
+export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "hardware_pos" | "test_payment" | "nbo_pos";
 export type ReceiptChannel = "sms" | "whatsapp" | "both";
 
 export interface KioskRuntimeConfig {
   payment_mode?: KioskPaymentMode;
+  soft_pos?: {
+    auth_key?: string;
+    is_production?: boolean;
+    mode?: "test" | "live";
+  };
+  payment_gateway?: {
+    mode?: "test" | "live";
+  };
+  hardware_pos?: {
+    tid?: string;
+    mid?: string;
+    service_url?: string;
+    currency_code?: string;
+    environment?: "uat" | "production";
+    timeout_seconds?: number;
+  };
   /** National Bank of Oman OM-A880 terminal over USB (local ECR link). */
   nbo_pos?: {
     baud_rate?: number;
