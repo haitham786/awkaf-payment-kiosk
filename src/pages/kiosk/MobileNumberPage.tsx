@@ -84,14 +84,14 @@ const MobileNumberPage = () => {
 
   return (
     <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-md mx-auto" onClick={resetTimer}>
+      <div className="w-[88%] max-w-sm mx-auto" onClick={resetTimer}>
         <div className="text-center mb-4">
-          <h1 className="text-xl font-bold text-gray-900">إدخال رقم الهاتف</h1>
+          <h1 className="text-xl font-bold text-gray-900">أدخل رقم النقال</h1>
           <p className="text-sm text-gray-600">Enter Phone Number</p>
         </div>
 
-        <Card className="p-4 bg-white/60 backdrop-blur-sm shadow-md border-0">
-          <div className="space-y-3">
+        <Card className="p-3 bg-white/60 backdrop-blur-sm shadow-md border-0">
+          <div className="space-y-2">
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-medium text-gray-700 z-10">+968</div>
               <Input ref={inputRef} value={mobileNumber} readOnly placeholder="" className="text-2xl text-center h-14 bg-gray-200 border-0 text-gray-900 pl-16 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none" maxLength={8} />
@@ -99,17 +99,17 @@ const MobileNumberPage = () => {
 
             <div className="grid grid-cols-3 gap-2">
               {['1','2','3','4','5','6','7','8','9'].map((n) => (
-                <KioskButton key={n} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(n)} className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
+                <KioskButton key={n} variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress(n)} className="h-14 min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
                   {n}
                 </KioskButton>
               ))}
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('back')} aria-label="Backspace" className="aspect-square bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('back')} aria-label="Backspace" className="h-14 min-h-0 bg-white/70 hover:bg-red-50/90 text-gray-800 border-0 text-xl font-bold">
                 <Delete className="w-5 h-5" />
               </KioskButton>
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('0')} className="aspect-square bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('0')} className="h-14 min-h-0 bg-white/70 hover:bg-white/90 text-gray-900 border-0 text-xl font-bold">
                 0
               </KioskButton>
-              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('clear')} aria-label="Clear" className="aspect-square bg-white/70 hover:bg-amber-50/90 text-gray-800 border-0 text-xl font-bold">
+              <KioskButton variant="keypad" soundEffect="keypad" onClick={() => handleKeypadPress('clear')} aria-label="Clear" className="h-14 min-h-0 bg-white/70 hover:bg-amber-50/90 text-gray-800 border-0 text-xl font-bold">
                 <Eraser className="w-5 h-5" />
               </KioskButton>
             </div>
@@ -123,7 +123,7 @@ const MobileNumberPage = () => {
             soundEffect="navigation"
             onClick={handleSendSMS}
             disabled={mobileNumber.length !== 8 || sending}
-            className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-1 rounded-xl"
+            className="h-auto px-10 py-4 text-xs font-bold bg-white/70 hover:bg-white/90 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-1 rounded-xl"
           >
             <span className="text-sm">{sending ? 'جاري الإرسال...' : 'إرسال الإيصال'}</span>
             <span className="text-gray-900">{sending ? 'Sending...' : 'Send Receipt'}</span>

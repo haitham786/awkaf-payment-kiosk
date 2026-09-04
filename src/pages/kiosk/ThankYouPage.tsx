@@ -117,7 +117,7 @@ const ThankYouPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-3xl mx-auto flex flex-col items-center justify-center min-h-[70vh]">
+      <div className="w-[92%] max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[66vh]">
         {verifying ? (
           <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-md">
             <div className="space-y-4">
@@ -128,11 +128,11 @@ const ThankYouPage = () => {
           </Card>
         ) : (
           <>
-            <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-md">
+            <Card className="p-5 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-sm">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold text-emerald-700">شكرا لكم</h1>
-                  <p className="text-lg text-gray-500">Thank You</p>
+                  <p className="text-lg text-emerald-700">Thank You</p>
                   <h2 className="text-xl font-semibold text-gray-900">تم قبول تبرعكم بنجاح</h2>
                   <p className="text-sm text-gray-500">Your donation has been accepted successfully</p>
                 </div>
@@ -150,15 +150,15 @@ const ThankYouPage = () => {
                 </div>
 
                 <div className="py-2">
-                  <p className="text-3xl font-bold text-emerald-700 flex items-center justify-center gap-2">
-                    <CurrencyLogo className="h-6" />
+                  <p className="text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
+                    <CurrencyLogo className="h-5" />
                     {formatAmountNum(amount)}
                   </p>
                 </div>
               </div>
             </Card>
 
-            <div className="mt-6 text-center space-y-3">
+             <div className="mt-4 text-center space-y-2">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">هل تريد إيصال عبر الرسائل النصية؟</h3>
                 <p className="text-sm text-gray-500">Would you like an SMS receipt?</p>
@@ -170,7 +170,7 @@ const ThankYouPage = () => {
                   size="sm"
                   soundEffect="navigation"
                   onClick={handleSMSReceipt}
-                  className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-1 rounded-xl"
+                  className="h-12 px-10 py-1 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center justify-center gap-0.5 rounded-xl -translate-y-1"
                 >
                   <span className="text-sm">نعم</span>
                   <span className="text-gray-900">Yes</span>

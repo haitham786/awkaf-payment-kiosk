@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2, FlaskConical } from "lucide-react";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
-import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
 import { toast } from "sonner";
 import { readCachedCategory } from "@/lib/kioskCategoryCache";
@@ -100,38 +97,7 @@ const TestPaymentPage = () => {
     void completeTestPayment();
   }, [amount, category, categoryReference, kioskId, navigate, transactionId]);
 
-  const formatAmountNum = (totalBaisas: number) => {
-    const rials = Math.floor(totalBaisas / 1000);
-    const baisas = totalBaisas % 1000;
-    return `${rials}.${baisas.toString().padStart(3, "0")}`;
-  };
-
-  return (
-    <KioskLayout showHomeButton={false}>
-      <div className="w-full max-w-xl mx-auto space-y-4">
-        <Card className="p-4 bg-accent/30 shadow-md border text-center">
-          <p className="text-sm text-muted-foreground mb-0.5">المبلغ <span className="text-xs text-muted-foreground/70">Amount</span></p>
-          <p className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-            <CurrencyLogo className="h-5" />
-            {formatAmountNum(amount)}
-          </p>
-        </Card>
-
-        <Card className="p-8 bg-card shadow-lg border text-center">
-          <div className="space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-accent/40 flex items-center justify-center">
-              <FlaskConical className="w-8 h-8 text-primary" />
-            </div>
-            <Loader2 className="w-12 h-12 mx-auto text-primary animate-spin" />
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">جاري تسجيل عملية اختبار ناجحة...</h2>
-              <p className="text-sm text-muted-foreground">Recording a successful test payment...</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </KioskLayout>
-  );
+  return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
 };
 
 export default TestPaymentPage;
