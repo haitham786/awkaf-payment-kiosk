@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "test_payment" | "hardware_pos" | "nbo_pos";
+// Legacy values remain readable only so older installed kiosks can be migrated
+// safely to NBO without ever reopening their retired payment screens.
+export type KioskPaymentMode = "soft_pos" | "payment_gateway" | "hardware_pos" | "test_payment" | "nbo_pos";
 export type ReceiptChannel = "sms" | "whatsapp" | "both";
 
 export interface KioskRuntimeConfig {
@@ -66,7 +68,8 @@ function withConfigTimeout<T>(promise: Promise<T>): Promise<T> {
 export function getCachedPaymentMode(kioskId: string): KioskPaymentMode | null {
   try {
     const v = localStorage.getItem(PAYMENT_MODE_LS_KEY(kioskId));
-    if (v === "soft_pos" || v === "payment_gateway" || v === "test_payment" || v === "hardware_pos" || v === "nbo_pos") return v;
+    if (v === "test_payment" || v === "nbo_pos") return v;
+    if (v === "soft_pos" || v === "payment_gateway" || v === "hardware_pos") return "nbo_pos";
     return null;
   } catch {
     return null;

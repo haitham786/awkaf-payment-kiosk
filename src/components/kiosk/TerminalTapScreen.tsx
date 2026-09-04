@@ -4,7 +4,6 @@ import { CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrencyLogo } from "@/components/kiosk/CurrencyLogo";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
-import nboLogoAsset from "@/assets/nbo-logo.svg.asset.json";
 
 interface TerminalTapScreenProps {
   amount: number;
@@ -113,7 +112,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pt-8 overflow-hidden">
-        <div className="w-full max-w-sm rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
+        <div className="w-[90%] max-w-xs rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-5 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
             <div className="w-12 h-12 mb-1 flex items-center justify-center">
@@ -167,8 +166,10 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
             <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
           </div>
 
+        </div>
+
           {/* Accepted payment methods */}
-          <div className="mt-2 pt-2 w-full border-t border-white/70">
+          <div className="mt-4 w-[90%] max-w-xs">
             <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2">
               <img src="/images/payment-logos/visa.svg" alt="Visa" className="h-4 w-auto object-contain" />
               <img src="/images/payment-logos/mastercard.svg" alt="Mastercard" className="h-5 w-auto object-contain" />
@@ -180,15 +181,6 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
                 <img src="/images/payment-logos/googlepay.svg" alt="Google Pay" className="h-5 w-auto object-contain" />
               </span>
             </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex shrink-0 items-center justify-center" aria-label="National Bank of Oman">
-          <img
-            src={nboLogoAsset.url}
-            alt="National Bank of Oman"
-            className="h-16 w-auto max-w-[210px] object-contain"
-          />
         </div>
       </div>
     </div>

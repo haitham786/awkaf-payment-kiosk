@@ -6,11 +6,8 @@ import { Loader2 } from "lucide-react";
 
 const routeFor = (mode: KioskPaymentMode | null | undefined, category: string, amount: number): string => {
   if (mode === 'test_payment') return `/kiosk/test-payment?category=${category}&amount=${amount}`;
-  if (mode === 'payment_gateway') return `/kiosk/thawani-gateway?category=${category}&amount=${amount}`;
-  if (mode === 'hardware_pos') return `/kiosk/hardware-pos?category=${category}&amount=${amount}`;
-  if (mode === 'nbo_pos') return `/kiosk/nbo-pos?category=${category}&amount=${amount}`;
-  // Default to Soft POS (Thawani Lamsa) — the primary payment path.
-  return `/kiosk/nfc-payment?category=${category}&amount=${amount}`;
+  // NBO is the sole live terminal. Legacy stored modes route safely to NBO.
+  return `/kiosk/nbo-pos?category=${category}&amount=${amount}`;
 };
 
 const PaymentRequestPage = () => {
@@ -23,8 +20,7 @@ const PaymentRequestPage = () => {
     const kioskId = localStorage.getItem('kiosk_id');
 
     // INSTANT ROUTING: use the last-known payment mode from localStorage so the
-    // donor lands on the Thawani Lamsa screen immediately — no waiting for the
-    // edge-function round-trip. We refresh the cache in the background.
+    // donor lands on the configured NBO or test flow without a network wait.
     const cachedMode = kioskId ? getCachedPaymentMode(kioskId) : null;
     navigate(routeFor(cachedMode, category, amount), { replace: true });
 

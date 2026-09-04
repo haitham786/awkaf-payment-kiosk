@@ -109,7 +109,7 @@ const KioskSetupPanel = () => {
       if (!kioskId) {
         const { data, error } = await supabase.from('kiosks').insert([{
           name: kioskForm.name, location: kioskForm.location, status: 'pending_approval',
-          configuration: { payment_mode: 'soft_pos', sound_enabled: true },
+          configuration: { payment_mode: 'nbo_pos', sound_enabled: true },
         }]).select().single();
         if (error) throw error;
         kioskId = data.id;
@@ -179,7 +179,7 @@ const KioskSetupPanel = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/kiosk')} className="h-9 w-9 shrink-0 text-kiosk-text hover:bg-kiosk-page" aria-label="Back to kiosk">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="mr-auto text-xl font-bold text-kiosk-text sm:text-2xl">Kiosk Setup Panel</h1>
+          <h1 className="mr-auto -ml-1 text-xl font-bold text-kiosk-text sm:text-2xl">Kiosk Setup Panel</h1>
           <Button variant="ghost" onClick={() => { supabase.auth.signOut(); setIsAuthenticated(false); }} className="h-9 shrink-0 gap-2 text-kiosk-text hover:bg-kiosk-page">
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Logout
@@ -210,7 +210,7 @@ const KioskSetupPanel = () => {
                     <p><strong>Reference Number:</strong> {kioskData.reference_number || 'Pending'}</p>
                   </div>
                 )}
-                <Button onClick={handleRegisterKiosk} className="w-full h-10">
+                <Button variant="outline" onClick={handleRegisterKiosk} className="w-full h-10 border-kiosk-border bg-transparent text-kiosk-text hover:bg-kiosk-page">
                   {kioskData ? 'Update Kiosk Information' : 'Register Kiosk'}
                 </Button>
               </div>

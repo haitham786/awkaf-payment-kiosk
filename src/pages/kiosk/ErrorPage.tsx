@@ -12,7 +12,6 @@ const ErrorPage = () => {
   const [searchParams] = useSearchParams();
   const categoryId = searchParams.get('category') || 'donation';
   const amount = parseFloat(searchParams.get('amount') || '0');
-  const source = searchParams.get('source') || ''; // 'gateway' for Thawani retry
   const [categoryData, setCategoryData] = useState<{ title: string; title_en: string | null; icon_url: string | null } | null>(null);
   const errorType = searchParams.get('error') || 'payment';
 
@@ -21,12 +20,6 @@ const ErrorPage = () => {
     const timer = setTimeout(() => navigate('/kiosk'), 10000);
     return () => clearTimeout(timer);
   }, [navigate]);
-
-  useEffect(() => {
-    if (source !== 'gateway') return;
-    sessionStorage.removeItem('kiosk_pending_gateway_payment');
-    localStorage.removeItem('kiosk_pending_gateway_payment');
-  }, [source]);
 
   useEffect(() => {
     const loadCategoryData = async () => {
@@ -61,12 +54,7 @@ const ErrorPage = () => {
   };
 
   const handleTryAgain = () => {
-    if (source === 'gateway') {
-      // Re-launch Thawani gateway with same amount
-      navigate(`/kiosk/thawani-gateway?category=${categoryId}&amount=${amount}&retry=${Date.now()}`, { replace: true });
-    } else {
-      navigate(`/kiosk/amount?category=${categoryId}`);
-    }
+    navigate(`/kiosk/amount?category=${categoryId}`);
   };
 
   return (

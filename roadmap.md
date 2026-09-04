@@ -20,3 +20,8 @@
 - [x] Match on-device OM-A880 POS Status screen to the supplied redesign
 - [x] Restyle first-install Settings access without colored icon backgrounds
 - [x] Validate the setup-panel changes without altering NBO payment communication
+
+- [x] Refine confirmation, SMS receipt, success, setup, and NBO payment screen layout
+- [x] Remove legacy Thawani payment pages and route legacy modes safely to NBO
+- [x] Show a bilingual disconnected-terminal error before attempting payment
+- [x] Validate kiosk flows and production build

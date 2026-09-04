@@ -53,20 +53,8 @@ const ConfirmationPage = () => {
         navigate(`/kiosk/test-payment?category=${category}&amount=${amount}`);
         return;
       }
-      if (mode === 'payment_gateway') {
-        navigate(`/kiosk/thawani-gateway?category=${category}&amount=${amount}`);
-        return;
-      }
-      if (mode === 'hardware_pos') {
-        navigate(`/kiosk/hardware-pos?category=${category}&amount=${amount}`);
-        return;
-      }
-      if (mode === 'nbo_pos') {
+      if (mode === 'nbo_pos' || mode === 'soft_pos' || mode === 'payment_gateway' || mode === 'hardware_pos') {
         navigate(`/kiosk/nbo-pos?category=${category}&amount=${amount}`);
-        return;
-      }
-      if (mode === 'soft_pos') {
-        navigate(`/kiosk/nfc-payment?category=${category}&amount=${amount}`);
         return;
       }
 
@@ -85,7 +73,7 @@ const ConfirmationPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-full max-w-3xl mx-auto">
+      <div className="w-[92%] max-w-2xl mx-auto">
         <div className="text-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900 drop-shadow-lg">تأكيد المبلغ</h1>
           <p className="text-base text-gray-600">Confirm Amount</p>
@@ -127,10 +115,10 @@ const ConfirmationPage = () => {
             size="xl"
             soundEffect="navigation"
             onClick={handleBack}
-            className="min-w-[160px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
+            className="min-w-[150px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
-            <ArrowRight className="w-5 h-5 ml-2" />
-            <span className="flex flex-col items-start">
+            <ArrowRight className="absolute left-4 w-5 h-5" />
+            <span className="flex flex-col items-center text-center leading-tight">
               <span>تعديل المبلغ</span>
               <span className="text-xs text-gray-500">Edit Amount</span>
             </span>
@@ -141,13 +129,13 @@ const ConfirmationPage = () => {
             size="xl"
             soundEffect="navigation"
             onClick={handleConfirm}
-            className="min-w-[160px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
+            className="min-w-[150px] bg-white/40 backdrop-blur-sm border-0 hover:bg-white/60 text-gray-900"
           >
-            <span className="flex flex-col items-end">
+            <span className="flex flex-col items-center text-center leading-tight">
               <span>التأكيد و الدفع</span>
               <span className="text-xs text-gray-500">Confirm & Pay</span>
             </span>
-            <ArrowLeft className="w-5 h-5 mr-2" />
+            <ArrowLeft className="absolute right-4 w-5 h-5" />
           </KioskButton>
         </div>
       </div>
