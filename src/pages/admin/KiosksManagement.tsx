@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trash2, Edit, Upload, X, CreditCard, FlaskConical, Usb, MapPin, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Upload, CreditCard, FlaskConical, Usb, MapPin, Volume2, VolumeX } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -397,9 +397,10 @@ const KiosksManagement = () => {
                       <img src={backgroundImage} alt="Kiosk background" className="w-full h-full object-cover" />
                     </div>
                   </div>
-                  <Button variant="destructive" onClick={handleRemoveImage} className="w-full">
-                    <X className="w-4 h-4 mr-2" />Remove Background Image
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => backgroundInputRef.current?.click()} disabled={uploadingImage} className="flex-1">Change Image</Button>
+                    <Button variant="destructive" onClick={handleRemoveImage} disabled={uploadingImage}>Remove Image</Button>
+                  </div>
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"

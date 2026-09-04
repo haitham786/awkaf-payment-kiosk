@@ -155,12 +155,12 @@ const KioskHomepage = () => {
       {kioskStatus !== 'active' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <Card className="max-w-sm w-full p-6 text-center bg-white/70 backdrop-blur-md shadow-2xl border border-white/40">
-            {kioskStatus !== 'unregistered' && (
+            {kioskStatus !== 'unregistered' && kioskStatus !== 'pending_approval' && (
               <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-kiosk-attention-soft">
                 <AlertTriangle className="h-10 w-10 text-kiosk-attention-text" />
               </div>
             )}
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            <h2 className={`text-2xl font-bold mb-3 ${kioskStatus === 'unregistered' || kioskStatus === 'pending_approval' ? 'text-red-600' : 'text-gray-900'}`}>
               {statusMessages[kioskStatus]?.en || 'Currently Unavailable'}
             </h2>
             <p className="text-base text-gray-700 leading-relaxed mb-4">
@@ -171,11 +171,6 @@ const KioskHomepage = () => {
                 <Settings className="h-4 w-4 flex-shrink-0 text-kiosk-text" />
                 <span>Settings</span>
               </Button>
-            )}
-            {kioskStatus !== 'unregistered' && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-600">Thank you for your understanding</p>
-              </div>
             )}
           </Card>
         </div>
