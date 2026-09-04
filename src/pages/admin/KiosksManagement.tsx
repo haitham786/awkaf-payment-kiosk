@@ -346,6 +346,36 @@ const KiosksManagement = () => {
       ? 'Testing Mode (Simulated Success)'
       : 'National Bank of Oman (NBO) POS Terminal';
 
+  const handleIconUpload = async (kiosk: any, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      toast.error("Please upload a JPG, JPEG or PNG file");
+      return;
+    }
+    setUploadingIconId(kiosk.id);
+    try {
+      if (kiosk.icon_url) {
+        const oldPath = kiosk.icon_url.split('/').pop();
+        if (oldPath) await supabase.storage.from('kiosk-backgrounds').remove([oldPath]);
+      }
+      const fileExt = file.name.split('.').pop();
+      const fileName = `icon-${kiosk.id}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('kiosk-backgrounds').upload(fileName, file, { cacheControl: '3600', upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('kiosk-backgrounds').getPublicUrl(fileName);
+      const { error: updateError } = await supabase.from('kiosks').update({ icon_url: publicUrl } as any).eq('id', kiosk.id);
+      if (updateError) throw updateError;
+      setKiosks((prev) => prev.map((k) => (k.id === kiosk.id ? { ...k, icon_url: publicUrl } : k)));
+      toast.success("Kiosk image uploaded!");
+    } catch (error: any) {
+      toast.error(`Error uploading image: ${error.message}`);
+    } finally {
+      setUploadingIconId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
