@@ -397,9 +397,9 @@ const KiosksManagement = () => {
                       <img src={backgroundImage} alt="Kiosk background" className="w-full h-full object-cover" />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full max-w-xs mx-auto">
                     <Button variant="outline" onClick={() => backgroundInputRef.current?.click()} disabled={uploadingImage} className="flex-1">Change Image</Button>
-                    <Button variant="destructive" onClick={handleRemoveImage} disabled={uploadingImage}>Remove Image</Button>
+                    <Button variant="destructive" onClick={handleRemoveImage} disabled={uploadingImage} className="flex-1">Remove Image</Button>
                   </div>
                 </div>
               ) : (
