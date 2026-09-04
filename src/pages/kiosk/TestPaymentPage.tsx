@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { queueTransaction, isOnline } from "@/services/offlineQueueService";
-import { toast } from "sonner";
 import { readCachedCategory } from "@/lib/kioskCategoryCache";
 
 const TestPaymentPage = () => {
@@ -13,28 +11,7 @@ const TestPaymentPage = () => {
   const amount = parseFloat(searchParams.get("amount") || "0");
   const kioskId = localStorage.getItem("kiosk_id") || "";
   const transactionId = useMemo(() => crypto.randomUUID(), []);
-  const [categoryReference, setCategoryReference] = useState("");
-
-  useEffect(() => {
-    const loadCategory = async () => {
-      const cached = readCachedCategory(category);
-      if (cached) {
-        const parsed = cached;
-        setCategoryReference(parsed?.category_reference || "");
-        return;
-      }
-
-      const { data } = await supabase
-        .from("donation_categories")
-        .select("category_reference")
-        .eq("category_id", category)
-        .maybeSingle();
-
-      setCategoryReference(data?.category_reference || "");
-    };
-
-    loadCategory();
-  }, [category]);
+  const categoryReference = readCachedCategory(category)?.category_reference || "";
 
   useEffect(() => {
     const completeTestPayment = async () => {
@@ -42,6 +19,10 @@ const TestPaymentPage = () => {
         navigate("/kiosk/error");
         return;
       }
+
+      // Open the success screen immediately; recording continues in the
+      // background so Test Mode never shows an intermediate progress page.
+      navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=test_payment&catRef=${categoryReference}`, { replace: true });
 
       const simulatedResult = {
         success: true,
@@ -73,7 +54,6 @@ const TestPaymentPage = () => {
           const { data, error } = await supabase.functions.invoke("process-payment", { body: payload });
           if (error) throw error;
 
-          navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${data.transaction?.reference_number || transactionId}&transactionId=${transactionId}&paymentMethod=test_payment&catRef=${categoryReference}`);
           return;
         } catch (error) {
           console.error("Test payment processing failed:", error);
@@ -90,14 +70,12 @@ const TestPaymentPage = () => {
         provider: "simulator",
         createdAt: new Date().toISOString(),
       } as any);
-      toast.info("Test payment saved. It will sync automatically.");
-      navigate(`/kiosk/thank-you?category=${category}&amount=${amount}&ref=${transactionId}&transactionId=${transactionId}&paymentMethod=test_payment&catRef=${categoryReference}`);
     };
 
     void completeTestPayment();
   }, [amount, category, categoryReference, kioskId, navigate, transactionId]);
 
-  return <KioskLayout showHomeButton={false}>{null}</KioskLayout>;
+  return null;
 };
 
 export default TestPaymentPage;
