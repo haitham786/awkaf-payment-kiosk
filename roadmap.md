@@ -25,3 +25,9 @@
 - [x] Remove legacy Thawani payment pages and route legacy modes safely to NBO
 - [x] Show a bilingual disconnected-terminal error before attempting payment
 - [x] Validate kiosk flows and production build
+
+- [ ] Refine confirmation buttons and donation amount label
+- [ ] Compact the terminal payment frame and Arabic instruction
+- [ ] Match the SMS keypad to the manual amount keypad
+- [ ] Compact and reword the successful-payment receipt prompt
+- [ ] Validate the four kiosk views at kiosk dimensions
