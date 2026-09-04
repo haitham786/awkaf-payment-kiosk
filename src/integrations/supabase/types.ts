@@ -375,6 +375,7 @@ export type Database = {
         Row: {
           configuration: Json | null
           created_at: string
+          icon_url: string | null
           id: string
           last_heartbeat: string | null
           location: string
@@ -386,6 +387,7 @@ export type Database = {
         Insert: {
           configuration?: Json | null
           created_at?: string
+          icon_url?: string | null
           id?: string
           last_heartbeat?: string | null
           location: string
@@ -397,6 +399,7 @@ export type Database = {
         Update: {
           configuration?: Json | null
           created_at?: string
+          icon_url?: string | null
           id?: string
           last_heartbeat?: string | null
           location?: string
