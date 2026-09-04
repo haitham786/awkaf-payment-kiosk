@@ -24,4 +24,4 @@
 - [x] Refine confirmation, SMS receipt, success, setup, and NBO payment screen layout
 - [x] Remove legacy Thawani payment pages and route legacy modes safely to NBO
 - [x] Show a bilingual disconnected-terminal error before attempting payment
-- [ ] Validate kiosk flows and production build
+- [x] Validate kiosk flows and production build
