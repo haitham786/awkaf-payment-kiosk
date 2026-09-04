@@ -72,6 +72,7 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [posStatus, setPosStatus] = useState<Record<string, any>>({});
+  const [uploadingIconId, setUploadingIconId] = useState<string | null>(null);
   const [healthFilter, setHealthFilter] = useState<'all' | PosHealthState>('all');
   const [fleetSearch, setFleetSearch] = useState('');
 
