@@ -233,6 +233,11 @@ const Auth = () => {
     <div className="min-h-screen bg-gradient-primary/10 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 bg-card/95 backdrop-blur-sm shadow-elegant border-2 border-primary/20">
         <div className="text-center mb-8">
+          <img
+            src={awqafLogo.url}
+            alt="Awqaf Al Lawatia"
+            className="h-20 w-auto mx-auto mb-4 object-contain"
+          />
           <h1 className="text-3xl font-bold text-primary mb-2">
             Admin Portal
           </h1>
