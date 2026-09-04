@@ -72,6 +72,7 @@ const KiosksManagement = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [posStatus, setPosStatus] = useState<Record<string, any>>({});
+  const [uploadingIconId, setUploadingIconId] = useState<string | null>(null);
   const [healthFilter, setHealthFilter] = useState<'all' | PosHealthState>('all');
   const [fleetSearch, setFleetSearch] = useState('');
 
@@ -344,6 +345,36 @@ const KiosksManagement = () => {
     kiosk.configuration?.payment_mode === 'test_payment'
       ? 'Testing Mode (Simulated Success)'
       : 'National Bank of Oman (NBO) POS Terminal';
+
+  const handleIconUpload = async (kiosk: any, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      toast.error("Please upload a JPG, JPEG or PNG file");
+      return;
+    }
+    setUploadingIconId(kiosk.id);
+    try {
+      if (kiosk.icon_url) {
+        const oldPath = kiosk.icon_url.split('/').pop();
+        if (oldPath) await supabase.storage.from('kiosk-backgrounds').remove([oldPath]);
+      }
+      const fileExt = file.name.split('.').pop();
+      const fileName = `icon-${kiosk.id}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('kiosk-backgrounds').upload(fileName, file, { cacheControl: '3600', upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('kiosk-backgrounds').getPublicUrl(fileName);
+      const { error: updateError } = await supabase.from('kiosks').update({ icon_url: publicUrl } as any).eq('id', kiosk.id);
+      if (updateError) throw updateError;
+      setKiosks((prev) => prev.map((k) => (k.id === kiosk.id ? { ...k, icon_url: publicUrl } : k)));
+      toast.success("Kiosk image uploaded!");
+    } catch (error: any) {
+      toast.error(`Error uploading image: ${error.message}`);
+    } finally {
+      setUploadingIconId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -688,9 +719,23 @@ const KiosksManagement = () => {
               {visibleKiosks.map((kiosk) => (
                 <Card key={kiosk.id} className={`w-[380px] shrink-0 snap-start rounded-[20px] border-kiosk-border bg-kiosk-surface p-4 shadow-kiosk ${kiosk.status === 'pending_approval' ? 'border-destructive' : ''}`}>
                   <div className="flex items-start gap-3">
-                    <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-kiosk-brand to-primary-glow text-sm font-bold text-primary-foreground shadow-neon">
-                      {String(kiosk.name || "K").split(/\s+/).map((part: string) => part[0]).join("").slice(0, 3).toUpperCase()}
-                    </div>
+                    <label
+                      title="Upload kiosk image (JPG, JPEG or PNG)"
+                      className={`relative flex h-[42px] w-[42px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-kiosk-brand to-primary-glow text-sm font-bold text-primary-foreground shadow-neon transition hover:opacity-80 ${uploadingIconId === kiosk.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {kiosk.icon_url ? (
+                        <img src={kiosk.icon_url} alt={`${kiosk.name} icon`} className="h-full w-full object-cover" />
+                      ) : (
+                        String(kiosk.name || "K").split(/\s+/).map((part: string) => part[0]).join("").slice(0, 3).toUpperCase()
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png"
+                        className="hidden"
+                        disabled={uploadingIconId === kiosk.id}
+                        onChange={(e) => handleIconUpload(kiosk, e)}
+                      />
+                    </label>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="truncate text-lg font-bold text-kiosk-text">{kiosk.name}</h3>
