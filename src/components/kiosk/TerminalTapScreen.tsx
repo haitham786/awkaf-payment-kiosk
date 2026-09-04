@@ -112,7 +112,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pt-6 overflow-hidden">
-        <div className="w-[84%] max-w-[17rem] rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-4 py-3 flex flex-col items-center">
+        <div className="w-[92%] max-w-[20rem] rounded-3xl bg-white/45 backdrop-blur-xl border border-white/60 shadow-xl px-4 py-3 flex flex-col items-center">
           {/* Category */}
           <div className="text-center flex flex-col items-center">
             <div className="w-12 h-12 mb-1 flex items-center justify-center">
