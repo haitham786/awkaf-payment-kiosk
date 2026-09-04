@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import awqafLogo from "@/assets/awkaflogo-3.png.asset.json";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
