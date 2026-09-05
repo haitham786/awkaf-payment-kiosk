@@ -128,16 +128,16 @@ const ThankYouPage = () => {
           </Card>
         ) : (
           <>
-            <Card className="px-5 py-2.5 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-sm">
-              <div className="space-y-1.5">
+            <Card className="px-5 py-5 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-sm">
+              <div className="space-y-2">
                 <div className="space-y-0.5">
                   <h1 className="text-3xl font-bold text-emerald-700">شكرا لكم</h1>
-                  <p className="text-lg text-emerald-700">Thank You</p>
+                  <p className="text-xl text-emerald-700">Thank You</p>
                   <h2 className="text-xl font-semibold text-gray-900">تم قبول تبرعكم بنجاح</h2>
                   <p className="text-xs text-gray-900 whitespace-nowrap">Your Donation has been accepted</p>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-0.5 min-h-[56px]">
+                <div className="flex flex-col items-center justify-center gap-1 min-h-[60px]">
                   <div className="w-12 h-12 flex items-center justify-center">
                     {categoryData?.icon_url && isReady && (
                       <img src={categoryData.icon_url} alt={categoryData.title} className="w-full h-full object-contain" />
@@ -149,7 +149,7 @@ const ThankYouPage = () => {
                   )}
                 </div>
 
-                <div>
+                <div className="mt-1">
                   <p className="text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
                     <CurrencyLogo className="h-5" />
                     {formatAmountNum(amount)}
@@ -158,12 +158,12 @@ const ThankYouPage = () => {
               </div>
             </Card>
 
-             <div className="mt-2 text-center space-y-2">
+             <div className="mt-5 text-center space-y-2">
               <div className="space-y-0.5">
-                <h3 className="text-base font-semibold text-gray-900">هل تريد إيصال عبر الرسائل النصية؟</h3>
-                <p className="text-xs text-gray-900 whitespace-nowrap">Would you like to receive a receipt via SMS?</p>
+                <h3 className="text-base font-semibold text-gray-900">هل تريد الإيصال عبر رسالة نصية ؟</h3>
+                <p className="text-xs text-gray-900 whitespace-nowrap">Would you like a receipt via SMS?</p>
               </div>
-              
+
               <div className="flex justify-center">
                 <KioskButton
                   variant="secondary"
