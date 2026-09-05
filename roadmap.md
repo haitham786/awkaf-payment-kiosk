@@ -34,3 +34,7 @@
 
 - [x] Match Enhanced Statistics layout and arrangement to the supplied redesign
 - [x] Validate the redesigned reporting page in the live preview
+
+- [ ] Match the admin homepage Transactions table to the supplied finance-table reference
+- [ ] Add filtering, summaries, sorting, date grouping, pagination, and reconciliation detail
+- [ ] Validate the redesigned transaction workflow in the live preview

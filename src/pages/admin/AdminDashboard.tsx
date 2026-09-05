@@ -4,28 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
   DollarSign, CreditCard, TrendingUp, Activity, 
-  LogOut, Download, RefreshCw, Search, Settings, BarChart3, Users, User
+  LogOut, RefreshCw, Settings, BarChart3, Users
 } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import awqafLogo from "@/assets/awkaflogo-3.png.asset.json";
+import TransactionsFinanceTable from "@/components/admin/TransactionsFinanceTable";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -36,8 +28,6 @@ const AdminDashboard = () => {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kiosks, setKiosks] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalTransactions: 0,
@@ -67,23 +57,6 @@ const AdminDashboard = () => {
       clearInterval(pollInterval);
     };
   }, []);
-
-  useEffect(() => {
-    // Filter transactions based on search query
-    if (searchQuery.trim() === '') {
-      setFilteredTransactions(transactions);
-    } else {
-      const filtered = transactions.filter(txn =>
-        txn.reference_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        txn.payment_reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        txn.category_reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        txn.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        txn.kiosks?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        txn.kiosks?.reference_number?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredTransactions(filtered);
-    }
-  }, [searchQuery, transactions]);
 
   const checkAuth = async (): Promise<boolean> => {
     try {
@@ -163,22 +136,29 @@ const AdminDashboard = () => {
   };
 
   const loadTransactions = async () => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        kiosks (name, location)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const pageSize = 1000;
+    const allTransactions: any[] = [];
+    let from = 0;
 
-    if (error) {
-      console.error('Error loading transactions:', error);
-      return;
+    while (true) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`*, kiosks (name, location, reference_number)`)
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('Error loading transactions:', error);
+        return;
+      }
+
+      allTransactions.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
     }
 
-    setTransactions(data || []);
-    calculateStats(data || []);
+    setTransactions(allTransactions);
+    calculateStats(allTransactions);
   };
 
   const loadKiosks = async () => {
@@ -220,17 +200,6 @@ const AdminDashboard = () => {
     return `${rials}.${remainingBaisas.toString().padStart(3, '0')} OMR`;
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      completed: 'default',
-      pending: 'secondary',
-      processing: 'secondary',
-      failed: 'destructive',
-      cancelled: 'outline',
-    };
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
-  };
-
   // Chart data
   const categoryData = transactions.reduce((acc: any[], t) => {
     const existing = acc.find(item => item.name === t.category);
@@ -269,7 +238,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="admin-panel transactions-finance min-h-screen bg-muted text-foreground">
       {/* Header */}
       <header className="bg-card border-b border-border">
         <div className="container mx-auto px-4 py-4">
@@ -422,77 +391,7 @@ const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="transactions">
-            <Card>
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-                  <h3 className="text-lg font-semibold">Recent Transactions</h3>
-                  <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by reference, category, kiosk..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                    <Button variant="outline" size="sm" onClick={loadTransactions}>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh
-                    </Button>
-                  </div>
-                </div>
-                {searchQuery && (
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Found {filteredTransactions.length} transaction(s)
-                  </p>
-                )}
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Kiosk</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTransactions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            No transactions found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredTransactions.map((txn) => (
-                          <TableRow key={txn.id}>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>{new Date(txn.created_at).toLocaleDateString('en-GB')}</div>
-                                <div className="text-muted-foreground">{new Date(txn.created_at).toLocaleTimeString('en-GB')}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{txn.reference_number || txn.payment_reference || '-'}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>{txn.kiosks?.name || 'N/A'}</div>
-                                <div className="text-muted-foreground text-xs">{txn.kiosks?.reference_number || ''}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{txn.category_reference || txn.category || '-'}</TableCell>
-                            <TableCell>{formatAmount(txn.amount_baisas)}</TableCell>
-                            <TableCell>{getStatusBadge(txn.status)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </Card>
+            <TransactionsFinanceTable transactions={transactions} kiosks={kiosks} isSuperAdmin={isSuperAdmin} />
           </TabsContent>
 
           <TabsContent value="kiosks">
