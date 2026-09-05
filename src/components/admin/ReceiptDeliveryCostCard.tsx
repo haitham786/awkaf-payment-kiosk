@@ -55,7 +55,7 @@ const ChannelBlock = ({
   </div>
 );
 
-const ReceiptDeliveryCostCard = ({ transactions }: Props) => {
+const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props) => {
   const { toast } = useToast();
   const [rateId, setRateId] = useState<string | null>(null);
   const [smsRate, setSmsRate] = useState("0");
