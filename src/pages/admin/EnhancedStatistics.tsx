@@ -299,11 +299,11 @@ const EnhancedStatistics = () => {
   };
 
   return (
-    <div className="admin-panel stats-report min-h-screen bg-muted/40 px-4 py-6 sm:px-6 lg:px-8 print:bg-background print:p-0">
-      <main className="mx-auto max-w-7xl rounded-lg border bg-muted/30 p-4 shadow-sm sm:p-6">
+    <div className="admin-panel stats-report min-h-screen bg-muted px-4 py-6 text-foreground sm:px-6 lg:px-8 print:bg-background print:p-0">
+      <main className="mx-auto max-w-7xl rounded-lg border bg-muted p-4 shadow-sm sm:p-6">
         <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
-            <Button variant="outline" size="icon" onClick={() => navigate('/admin')} aria-label="Back to admin dashboard" className="mt-1 print:hidden">
+            <Button variant="outline" size="icon" onClick={() => navigate('/admin')} aria-label="Back to admin dashboard" className="mt-1 text-foreground print:hidden">
               <ArrowLeft />
             </Button>
             <div>
@@ -316,10 +316,10 @@ const EnhancedStatistics = () => {
               <Switch id="include-test" checked={includeTest} onCheckedChange={setIncludeTest} />
               <Label htmlFor="include-test" className="max-w-24 text-xs leading-tight">Include test payments</Label>
             </div>
-            <Button variant="outline" className="h-11 bg-background" onClick={handleDownloadCSV} disabled={exporting}>
+            <Button variant="outline" className="h-11 bg-background text-foreground" onClick={handleDownloadCSV} disabled={exporting}>
               <Download />{exporting ? "Preparing..." : "Download CSV"}
             </Button>
-            <Button variant="outline" className="h-11 bg-background" onClick={handlePrint}><Printer />Print</Button>
+            <Button variant="outline" className="h-11 bg-background text-foreground" onClick={handlePrint}><Printer />Print</Button>
           </div>
         </header>
 
@@ -327,7 +327,7 @@ const EnhancedStatistics = () => {
           <div className="rounded-lg border bg-background px-3 py-2">
             <Label className="text-[11px] uppercase text-muted-foreground">Time period</Label>
             <Select value={timeFilter} onValueChange={setTimeFilter}>
-              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 border-0 p-0 text-foreground shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly (from Sunday)</SelectItem>
                 <SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem><SelectItem value="all">All Time</SelectItem>
@@ -337,14 +337,14 @@ const EnhancedStatistics = () => {
           <div className="rounded-lg border bg-background px-3 py-2">
             <Label className="text-[11px] uppercase text-muted-foreground">Category</Label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 border-0 p-0 text-foreground shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All categories</SelectItem>{categories.map((c) => <SelectItem key={c.category_reference} value={c.category_reference || ''}>{c.title}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="rounded-lg border bg-background px-3 py-2">
             <Label className="text-[11px] uppercase text-muted-foreground">Kiosk</Label>
             <Select value={selectedKiosk} onValueChange={setSelectedKiosk}>
-              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 border-0 p-0 text-foreground shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All kiosks</SelectItem>{kiosks.map((k) => <SelectItem key={k.id} value={k.id}>{k.name} ({k.reference_number})</SelectItem>)}</SelectContent>
             </Select>
           </div>
