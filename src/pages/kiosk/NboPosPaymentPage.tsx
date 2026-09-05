@@ -115,6 +115,8 @@ const NboPosPaymentPage = () => {
     const nbo = getCachedNboPosConfig(kioskId) || {};
     void loadKioskRuntimeConfig(kioskId, { forceRefresh: true }).catch(() => undefined);
 
+    // Lock out the health heartbeat for the whole terminal dialogue.
+    setPosTransactionActive(true);
     try {
       const availability = await NboEcr.isAvailable();
       if (!availability.available || !availability.deviceAttached) {
@@ -134,7 +136,11 @@ const NboPosPaymentPage = () => {
         timeoutSeconds: nbo.timeout_seconds || 90,
       });
 
+      // Learn paper / battery from the real response instead of polling for it.
+      recordTransactionCondition(result.errorCode, result.approved);
+
       if (result.cancelled) return;
+
 
       if (result.approved) {
         // Billing only happens on a terminal-approved transaction.
