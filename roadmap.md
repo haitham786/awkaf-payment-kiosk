@@ -33,4 +33,4 @@
 - [x] Validate the four kiosk views at kiosk dimensions
 
 - [x] Match Enhanced Statistics layout and arrangement to the supplied redesign
-- [ ] Validate the redesigned reporting page in the live preview
+- [x] Validate the redesigned reporting page in the live preview

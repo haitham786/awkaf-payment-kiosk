@@ -299,7 +299,7 @@ const EnhancedStatistics = () => {
   };
 
   return (
-    <div className="admin-panel min-h-screen bg-muted/40 px-4 py-6 sm:px-6 lg:px-8 print:bg-background print:p-0">
+    <div className="admin-panel stats-report min-h-screen bg-muted/40 px-4 py-6 sm:px-6 lg:px-8 print:bg-background print:p-0">
       <main className="mx-auto max-w-7xl rounded-lg border bg-muted/30 p-4 shadow-sm sm:p-6">
         <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
