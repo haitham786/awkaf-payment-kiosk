@@ -117,7 +117,7 @@ const ThankYouPage = () => {
 
   return (
     <KioskLayout>
-      <div className="w-[90%] max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[62vh]">
+      <div className="w-[90%] max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[62vh] pb-20">
         {verifying ? (
           <Card className="p-6 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-md">
             <div className="space-y-4">
@@ -128,28 +128,28 @@ const ThankYouPage = () => {
           </Card>
         ) : (
           <>
-            <Card className="px-5 py-4 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-sm">
-              <div className="space-y-2.5">
-                <div className="space-y-1">
+            <Card className="px-5 py-2.5 bg-white/60 backdrop-blur-sm shadow-lg border-0 text-center w-full max-w-sm">
+              <div className="space-y-1.5">
+                <div className="space-y-0.5">
                   <h1 className="text-3xl font-bold text-emerald-700">شكرا لكم</h1>
                   <p className="text-lg text-emerald-700">Thank You</p>
                   <h2 className="text-xl font-semibold text-gray-900">تم قبول تبرعكم بنجاح</h2>
-                  <p className="text-sm text-gray-900 whitespace-nowrap">Your Donation has been accepted</p>
+                  <p className="text-xs text-gray-900 whitespace-nowrap">Your Donation has been accepted</p>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-1 min-h-[72px]">
-                  <div className="w-14 h-14 flex items-center justify-center">
+                <div className="flex flex-col items-center justify-center gap-0.5 min-h-[56px]">
+                  <div className="w-12 h-12 flex items-center justify-center">
                     {categoryData?.icon_url && isReady && (
                       <img src={categoryData.icon_url} alt={categoryData.title} className="w-full h-full object-contain" />
                     )}
                   </div>
-                  <p className="text-lg font-semibold text-gray-900">{categoryData?.title || 'تبرع'}</p>
+                  <p className="text-base font-semibold text-gray-900">{categoryData?.title || 'تبرع'}</p>
                   {categoryData?.title_en && (
-                    <p className="text-sm text-gray-900">{categoryData.title_en}</p>
+                    <p className="text-xs text-gray-900">{categoryData.title_en}</p>
                   )}
                 </div>
 
-                <div className="pt-1">
+                <div>
                   <p className="text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
                     <CurrencyLogo className="h-5" />
                     {formatAmountNum(amount)}
@@ -158,10 +158,10 @@ const ThankYouPage = () => {
               </div>
             </Card>
 
-             <div className="mt-3 text-center space-y-3">
-              <div className="space-y-1">
-                <h3 className="text-lg font-semibold text-gray-900">هل تريد إيصال عبر الرسائل النصية؟</h3>
-                <p className="text-sm text-gray-900 whitespace-nowrap">Would you like to receive a receipt via SMS?</p>
+             <div className="mt-2 text-center space-y-2">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-gray-900">هل تريد إيصال عبر الرسائل النصية؟</h3>
+                <p className="text-xs text-gray-900 whitespace-nowrap">Would you like to receive a receipt via SMS?</p>
               </div>
               
               <div className="flex justify-center">
@@ -170,7 +170,7 @@ const ThankYouPage = () => {
                   size="sm"
                   soundEffect="navigation"
                   onClick={handleSMSReceipt}
-                  className="h-12 px-10 py-1 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center justify-center gap-0.5 rounded-xl -translate-y-1"
+                  className="h-10 px-8 py-1 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center justify-center gap-0 rounded-xl"
                 >
                   <span className="text-sm">نعم</span>
                   <span className="text-gray-900">Yes</span>

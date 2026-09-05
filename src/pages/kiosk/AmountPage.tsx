@@ -78,7 +78,7 @@ const AmountPage = () => {
     <KioskLayout>
       <div className="w-full max-w-[18rem] mx-auto flex flex-col h-full pb-24">
         {/* Category header */}
-        <div className="text-center mb-1 shrink-0">
+        <div className="text-center mb-3 shrink-0">
           <div className="flex flex-col items-center justify-center gap-0.5">
             {categoryData?.icon_url && (
               <img src={categoryData.icon_url} alt={categoryData.title} className="w-10 h-10 object-contain" loading="eager" />
@@ -87,10 +87,10 @@ const AmountPage = () => {
               {categoryData?.title || "أدخل مبلغ التبرع"}
             </h1>
             {categoryData?.title_en && (
-              <p className="text-xs text-gray-600 leading-tight">{categoryData.title_en}</p>
+              <p className="text-xs text-gray-900 leading-tight">{categoryData.title_en}</p>
             )}
             {!categoryData?.title && (
-              <p className="text-xs text-gray-600">Enter Donation Amount</p>
+              <p className="text-xs text-gray-900">Enter Donation Amount</p>
             )}
           </div>
         </div>
@@ -108,7 +108,7 @@ const AmountPage = () => {
               <CurrencyLogo className="h-5" />
               {rialAmount || "0"}
             </div>
-            <p className="text-center text-[0.6rem] text-gray-600 mt-1">ریال عماني / Rials</p>
+            <p className="text-center text-[0.6rem] text-gray-900 mt-1">ریال عماني / Rials</p>
           </div>
 
           {/* Baisa Field */}
@@ -121,7 +121,7 @@ const AmountPage = () => {
             <div className="text-center text-2xl font-bold text-blue-600 leading-none">
               {baisaAmount || "0"}
             </div>
-            <p className="text-center text-[0.6rem] text-gray-600 mt-1">بيسة / Baisas</p>
+            <p className="text-center text-[0.6rem] text-gray-900 mt-1">بيسة / Baisas</p>
           </div>
         </div>
 
