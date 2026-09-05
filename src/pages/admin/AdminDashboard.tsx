@@ -6,18 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { 
-  DollarSign, CreditCard, TrendingUp, Activity, 
-  LogOut, RefreshCw, Settings, BarChart3, Users
-} from "lucide-react";
+import { Activity, LogOut, RefreshCw, Settings, BarChart3, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import awqafLogo from "@/assets/awkaflogo-3.png.asset.json";
 import TransactionsFinanceTable from "@/components/admin/TransactionsFinanceTable";
+import HomeCommandCentre from "@/components/admin/HomeCommandCentre";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -194,41 +188,6 @@ const AdminDashboard = () => {
     navigate("/auth");
   };
 
-  const formatAmount = (baisas: number) => {
-    const rials = Math.floor(baisas / 1000);
-    const remainingBaisas = baisas % 1000;
-    return `${rials}.${remainingBaisas.toString().padStart(3, '0')} OMR`;
-  };
-
-  // Chart data
-  const categoryData = transactions.reduce((acc: any[], t) => {
-    const existing = acc.find(item => item.name === t.category);
-    if (existing) {
-      existing.value += t.amount_baisas;
-      existing.count += 1;
-    } else {
-      acc.push({ name: t.category, value: t.amount_baisas, count: 1 });
-    }
-    return acc;
-  }, []);
-
-  const dailyData = transactions
-    .filter(t => t.status === 'completed')
-    .reduce((acc: any[], t) => {
-      const date = new Date(t.created_at).toLocaleDateString();
-      const existing = acc.find(item => item.date === date);
-      if (existing) {
-        existing.amount += t.amount_baisas / 1000;
-        existing.transactions += 1;
-      } else {
-        acc.push({ date, amount: t.amount_baisas / 1000, transactions: 1 });
-      }
-      return acc;
-    }, [])
-    .slice(-7);
-
-  const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -300,88 +259,8 @@ const AdminDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{formatAmount(stats.totalRevenue)}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-green-500" />
-            </div>
-          </Card>
+        <HomeCommandCentre transactions={transactions} isSuperAdmin={isSuperAdmin} />
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Transactions</p>
-                <p className="text-2xl font-bold">{stats.totalTransactions}</p>
-              </div>
-              <CreditCard className="h-8 w-8 text-blue-500" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Success Rate</p>
-                <p className="text-2xl font-bold">{stats.successRate.toFixed(1)}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-500" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Kiosks</p>
-                <p className="text-2xl font-bold">{stats.activeKiosks}</p>
-              </div>
-              <Activity className="h-8 w-8 text-orange-500" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Daily Revenue (Last 7 Days)</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="amount" stroke="#10b981" name="Revenue (OMR)" />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Revenue by Category</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatAmount(value)} />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
 
         {/* Tabs */}
         <Tabs defaultValue="transactions" className="w-full">
