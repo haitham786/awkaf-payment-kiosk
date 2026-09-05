@@ -901,6 +901,15 @@ export type Database = {
         Args: { _cooldown_ms?: number; _kiosk_id: string }
         Returns: undefined
       }
+      report_financial_stats: {
+        Args: {
+          _category_reference?: string
+          _include_test?: boolean
+          _kiosk_id?: string
+          _period?: string
+        }
+        Returns: Json
+      }
       request_apex_terminal_cancellation: {
         Args: { _kiosk_id: string; _transaction_id: string }
         Returns: {
