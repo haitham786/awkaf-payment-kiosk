@@ -8,7 +8,12 @@ import { TerminalTapScreen } from "@/components/kiosk/TerminalTapScreen";
 import { readCachedCategory, storeCategoryInCache } from "@/lib/kioskCategoryCache";
 import { getCachedNboPosConfig, loadKioskRuntimeConfig } from "@/lib/kioskConfig";
 import NboEcr, { type NboPurchaseResult } from "@/services/nboEcrPlugin";
-import { conditionText, isHousekeepingCode } from "@/lib/posHealth";
+import {
+  conditionText,
+  isHousekeepingCode,
+  recordTransactionCondition,
+  setPosTransactionActive,
+} from "@/lib/posHealth";
 
 type Stage = "processing" | "declined" | "error";
 
