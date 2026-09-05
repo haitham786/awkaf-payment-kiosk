@@ -174,11 +174,6 @@ const TransactionsFinanceTable = ({ transactions, kiosks, isSuperAdmin }: Transa
     }),
   ), [categories]);
 
-  const getCategory = (transaction: Transaction) => {
-    const key = transaction.category_reference?.toLowerCase();
-    return key ? categoryMap.get(key) : undefined;
-  };
-
   const filteredTransactions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const today = muscatDateKey(new Date());
@@ -186,7 +181,8 @@ const TransactionsFinanceTable = ({ transactions, kiosks, isSuperAdmin }: Transa
     const dateStart = dateFilter === "7days" ? shiftDateKey(today, -6) : dateFilter === "30days" ? shiftDateKey(today, -29) : null;
 
     const filtered = transactions.filter((transaction) => {
-      const category = getCategory(transaction);
+      const categoryKey = transaction.category_reference?.toLowerCase();
+      const category = categoryKey ? categoryMap.get(categoryKey) : undefined;
       const transactionDate = muscatDateKey(transaction.created_at);
       const matchesDate = dateFilter === "all"
         || (dateFilter === "today" && transactionDate === today)
@@ -270,6 +266,11 @@ const TransactionsFinanceTable = ({ transactions, kiosks, isSuperAdmin }: Transa
     if (transaction.receipt_printed) return "Printed";
     if (transaction.receipt_sent) return "Sent";
     return "Not sent";
+  };
+
+  const getCategory = (transaction: Transaction) => {
+    const key = transaction.category_reference?.toLowerCase();
+    return key ? categoryMap.get(key) : undefined;
   };
 
   return (
