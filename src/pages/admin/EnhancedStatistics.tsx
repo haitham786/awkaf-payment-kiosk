@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, Printer, ChevronDown, ChevronUp, Search, CheckCircle2, ShieldCheck } from "lucide-react";
@@ -391,7 +390,7 @@ const EnhancedStatistics = () => {
             </Select>
             <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 border-0 pl-9 shadow-none" placeholder="Search by system reference, POS/Bank RRN or mobile number…" /></div>
           </div>
-          {searchTerm && <div className="mt-2 border-t pt-2"><p className="mb-2 px-2 text-xs text-muted-foreground">Found {searchResults.length} transaction(s)</p><div className="max-h-80 space-y-2 overflow-y-auto">{searchResults.map((t) => <div key={t.id} className="rounded-md bg-muted/50 p-3 text-sm"><button type="button" className="flex w-full items-start justify-between text-left" onClick={() => toggleTransactionDetails(t.id)}><span><span className="font-semibold">{t.reference_number}</span><span className="ml-2 text-muted-foreground">{t.category} · {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR</span></span>{expandedTransaction === t.id ? <ChevronUp /> : <ChevronDown />}</button>{expandedTransaction === t.id && <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-xs md:grid-cols-4"><span>Bank RRN<br/><b>{t.pos_rrn || 'N/A'}</b></span><span>Auth Code<br/><b>{t.pos_auth_code || 'N/A'}</b></span><span>Terminal ID<br/><b>{t.pos_tid || 'N/A'}</b></span><span>Kiosk<br/><b>{t.kiosks?.name || 'N/A'}</b></span></div>}</div>)}</div></div>}
+          {searchTerm && <div className="mt-2 border-t pt-2"><p className="mb-2 px-2 text-xs text-muted-foreground">Found {searchResults.length} transaction(s)</p><div className="max-h-80 space-y-2 overflow-y-auto">{searchResults.map((t) => <div key={t.id} className="rounded-md bg-muted/50 p-3 text-sm"><Button type="button" variant="ghost" className="h-auto w-full items-start justify-between whitespace-normal p-0 text-left hover:bg-transparent" onClick={() => toggleTransactionDetails(t.id)}><span><span className="font-semibold">{t.reference_number}</span><span className="ml-2 text-muted-foreground">{t.category} · {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR</span></span>{expandedTransaction === t.id ? <ChevronUp /> : <ChevronDown />}</Button>{expandedTransaction === t.id && <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-xs md:grid-cols-4"><span>Bank RRN<br/><b>{t.pos_rrn || 'N/A'}</b></span><span>Auth Code<br/><b>{t.pos_auth_code || 'N/A'}</b></span><span>Terminal ID<br/><b>{t.pos_tid || 'N/A'}</b></span><span>Kiosk<br/><b>{t.kiosks?.name || 'N/A'}</b></span></div>}</div>)}</div></div>}
         </Card>
 
         <section className="grid gap-3 md:grid-cols-2 print:grid-cols-2">
