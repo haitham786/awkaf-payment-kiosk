@@ -7,27 +7,16 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquare, MessageCircle, Save, Wallet } from "lucide-react";
 
-interface Props {
-  /** Transactions already filtered by the page's period / kiosk / category filters. */
-  transactions: any[];
-}
-
 type Counts = { sent: number; failed: number; notSent: number };
 
-const emptyCounts = (): Counts => ({ sent: 0, failed: 0, notSent: 0 });
-
-const tally = (transactions: any[], field: "sms_status" | "whatsapp_status"): Counts => {
-  const counts = emptyCounts();
-  for (const t of transactions) {
-    const status = t?.[field] || "not_sent";
-    if (status === "sent") counts.sent += 1;
-    else if (status === "failed") counts.failed += 1;
-    else counts.notSent += 1;
-  }
-  return counts;
-};
+interface Props {
+  /** Aggregated in the database for the page's period / kiosk / category filters. */
+  smsCounts: Counts;
+  whatsappCounts: Counts;
+}
 
 const omr = (value: number) => value.toFixed(3);
+
 
 const ChannelBlock = ({
   label,
