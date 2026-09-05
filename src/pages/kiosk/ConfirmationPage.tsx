@@ -75,7 +75,7 @@ const ConfirmationPage = () => {
       <div className="w-[92%] max-w-2xl mx-auto">
         <div className="text-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900 drop-shadow-lg">تأكيد المبلغ</h1>
-          <p className="text-base text-gray-600">Confirm Amount</p>
+          <p className="text-base text-gray-900">Confirm Amount</p>
         </div>
 
         <Card className="p-6 bg-white/40 backdrop-blur-sm shadow-lg border-0 text-center">
@@ -92,13 +92,13 @@ const ConfirmationPage = () => {
                   {categoryData?.title || 'تبرع'}
                 </p>
                 {categoryData?.title_en && (
-                  <p className="text-base text-gray-600">{categoryData.title_en}</p>
+                  <p className="text-base text-gray-900">{categoryData.title_en}</p>
                 )}
               </div>
 
               <div className="rounded-lg p-4 border-0">
                 <p className="text-sm text-gray-900 mb-0.5">مبلغ التبرع</p>
-                <p className="text-xs text-gray-400 mb-1">Donation Amount</p>
+                <p className="text-xs text-gray-900 mb-1">Donation Amount</p>
                 <p className="text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
                   <CurrencyLogo className="h-6" />
                   {formatAmountNum(amount)}
@@ -118,7 +118,7 @@ const ConfirmationPage = () => {
           >
             <span className="flex flex-col items-center text-center leading-tight">
               <span>تعديل المبلغ</span>
-              <span className="text-xs text-gray-500">Edit Amount</span>
+              <span className="text-xs text-gray-900">Edit Amount</span>
             </span>
           </KioskButton>
           
@@ -131,7 +131,7 @@ const ConfirmationPage = () => {
           >
             <span className="flex flex-col items-center text-center leading-tight">
               <span>التأكيد و الدفع</span>
-              <span className="text-xs text-gray-500">Confirm & Pay</span>
+              <span className="text-xs text-gray-900">Confirm & Pay</span>
             </span>
           </KioskButton>
         </div>
