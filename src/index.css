@@ -187,6 +187,23 @@
     font-family: 'Times New Roman', serif;
   }
 
+  /* Enhanced Statistics follows the supplied light financial-report reference in either app theme. */
+  .stats-report {
+    --background: var(--kiosk-surface);
+    --foreground: var(--kiosk-text);
+    --card: var(--kiosk-surface);
+    --card-foreground: var(--kiosk-text);
+    --popover: var(--kiosk-surface);
+    --popover-foreground: var(--kiosk-text);
+    --muted: var(--kiosk-page);
+    --muted-foreground: var(--kiosk-muted);
+    --border: var(--kiosk-border);
+    --input: var(--kiosk-border);
+    --primary: var(--kiosk-brand);
+    --primary-foreground: 0 0% 100%;
+    --success: var(--kiosk-ready);
+  }
+
   /* RTL support for Arabic content */
   .rtl {
     direction: rtl;
