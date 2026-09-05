@@ -170,6 +170,36 @@ export type Database = {
         }
         Relationships: []
       }
+      export_audit: {
+        Row: {
+          created_at: string
+          export_type: string
+          filters: Json
+          id: string
+          masked: boolean
+          row_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          export_type?: string
+          filters?: Json
+          id?: string
+          masked?: boolean
+          row_count?: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          export_type?: string
+          filters?: Json
+          id?: string
+          masked?: boolean
+          row_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       kiosk_pos_status: {
         Row: {
           alerted_at: string | null
@@ -871,6 +901,15 @@ export type Database = {
         Args: { _cooldown_ms?: number; _kiosk_id: string }
         Returns: undefined
       }
+      report_financial_stats: {
+        Args: {
+          _category_reference?: string
+          _include_test?: boolean
+          _kiosk_id?: string
+          _period?: string
+        }
+        Returns: Json
+      }
       request_apex_terminal_cancellation: {
         Args: { _kiosk_id: string; _transaction_id: string }
         Returns: {
@@ -889,6 +928,8 @@ export type Database = {
         | "completed"
         | "failed"
         | "cancelled"
+        | "refunded"
+        | "reversed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1025,6 +1066,8 @@ export const Constants = {
         "completed",
         "failed",
         "cancelled",
+        "refunded",
+        "reversed",
       ],
     },
   },
