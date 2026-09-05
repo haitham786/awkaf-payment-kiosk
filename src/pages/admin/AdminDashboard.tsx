@@ -6,18 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { 
-  DollarSign, CreditCard, TrendingUp, Activity, 
-  LogOut, RefreshCw, Settings, BarChart3, Users
-} from "lucide-react";
+import { Activity, LogOut, RefreshCw, Settings, BarChart3, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import awqafLogo from "@/assets/awkaflogo-3.png.asset.json";
 import TransactionsFinanceTable from "@/components/admin/TransactionsFinanceTable";
+import HomeCommandCentre from "@/components/admin/HomeCommandCentre";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -193,41 +187,6 @@ const AdminDashboard = () => {
     await supabase.auth.signOut();
     navigate("/auth");
   };
-
-  const formatAmount = (baisas: number) => {
-    const rials = Math.floor(baisas / 1000);
-    const remainingBaisas = baisas % 1000;
-    return `${rials}.${remainingBaisas.toString().padStart(3, '0')} OMR`;
-  };
-
-  // Chart data
-  const categoryData = transactions.reduce((acc: any[], t) => {
-    const existing = acc.find(item => item.name === t.category);
-    if (existing) {
-      existing.value += t.amount_baisas;
-      existing.count += 1;
-    } else {
-      acc.push({ name: t.category, value: t.amount_baisas, count: 1 });
-    }
-    return acc;
-  }, []);
-
-  const dailyData = transactions
-    .filter(t => t.status === 'completed')
-    .reduce((acc: any[], t) => {
-      const date = new Date(t.created_at).toLocaleDateString();
-      const existing = acc.find(item => item.date === date);
-      if (existing) {
-        existing.amount += t.amount_baisas / 1000;
-        existing.transactions += 1;
-      } else {
-        acc.push({ date, amount: t.amount_baisas / 1000, transactions: 1 });
-      }
-      return acc;
-    }, [])
-    .slice(-7);
-
-  const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
 
   if (loading) {
     return (
