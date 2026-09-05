@@ -687,6 +687,45 @@ export type Database = {
         }
         Relationships: []
       }
+      targets: {
+        Row: {
+          active: boolean
+          amount_baisas: number
+          category_reference: string | null
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          scope: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount_baisas: number
+          category_reference?: string | null
+          created_at?: string
+          end_date: string
+          id?: string
+          name: string
+          scope?: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount_baisas?: number
+          category_reference?: string | null
+          created_at?: string
+          end_date?: string
+          id?: string
+          name?: string
+          scope?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount_baisas: number
@@ -908,6 +947,10 @@ export type Database = {
           _kiosk_id?: string
           _period?: string
         }
+        Returns: Json
+      }
+      report_homepage_overview: {
+        Args: { _trend_days?: number }
         Returns: Json
       }
       request_apex_terminal_cancellation: {
