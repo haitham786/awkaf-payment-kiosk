@@ -115,7 +115,7 @@ const formatMuscatTime = (value: string) => new Intl.DateTimeFormat("en-GB", {
 }).format(new Date(value));
 
 const formatAmount = (baisas: number) => (baisas / 1000).toFixed(3);
-const titleCase = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const titleCase = (value: string) => value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const statusMeta = (status: string) => {
   if (status === "completed") return { label: "Completed", className: "bg-success/10 text-success" };
