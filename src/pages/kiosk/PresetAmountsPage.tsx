@@ -63,10 +63,10 @@ const PresetAmountsPage = () => {
               {categoryData?.title || "اختر مبلغ التبرع"}
             </h1>
             {categoryData?.title_en && (
-              <p className="text-xs text-gray-600 leading-tight">{categoryData.title_en}</p>
+              <p className="text-xs text-gray-900 leading-tight">{categoryData.title_en}</p>
             )}
             {!categoryData?.title && (
-              <p className="text-xs text-gray-600">Select Donation Amount</p>
+              <p className="text-xs text-gray-900">Select Donation Amount</p>
             )}
           </div>
         </div>
@@ -101,7 +101,7 @@ const PresetAmountsPage = () => {
             className="h-auto px-10 py-4 text-xs font-bold bg-white/50 hover:bg-white/70 backdrop-blur-sm text-gray-900 border-0 flex flex-col items-center gap-2 rounded-xl"
           >
             <span className="text-sm">إدخال مبلغ مختلف</span>
-            <span className="text-gray-500">Enter a different amount</span>
+            <span className="text-gray-900">Enter a different amount</span>
           </KioskButton>
         </div>
       </div>

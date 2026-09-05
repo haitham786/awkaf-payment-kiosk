@@ -200,7 +200,7 @@ const KioskHomepage = () => {
           <p className="text-base text-gray-900 font-bold drop-shadow mb-0.5">
             اختر نوع التبرع
           </p>
-          <p className="text-sm text-gray-600 font-bold">
+          <p className="text-sm text-gray-900 font-bold">
             Choose the category of donation
           </p>
         </div>
@@ -249,7 +249,7 @@ const KioskHomepage = () => {
                     {category.title}
                   </h3>
                   {category.title_en && (
-                    <p className="text-xs text-gray-600 group-hover:text-emerald-600 transition-colors leading-tight">
+                    <p className="text-xs text-gray-900 group-hover:text-emerald-600 transition-colors leading-tight">
                       {category.title_en}
                     </p>
                   )}

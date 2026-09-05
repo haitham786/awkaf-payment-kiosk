@@ -163,7 +163,7 @@ export const TerminalTapScreen: React.FC<TerminalTapScreenProps> = ({
           {/* Instruction */}
           <div className="text-center leading-tight">
             <h2 className="text-gray-900 text-sm font-bold whitespace-nowrap">يرجى وضع بطاقة البنك على جهاز الدفع</h2>
-            <p className="text-gray-600 text-sm mt-1">Please tap your card on the POS terminal</p>
+            <p className="text-gray-900 text-sm mt-1">Please tap your card on the POS terminal</p>
           </div>
 
         </div>
