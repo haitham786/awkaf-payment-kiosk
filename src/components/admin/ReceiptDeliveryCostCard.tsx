@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, MessageCircle, Save, Wallet } from "lucide-react";
+import { MessageSquare, MessageCircle } from "lucide-react";
 
 type Counts = { sent: number; failed: number; notSent: number };
 
@@ -29,23 +25,23 @@ const ChannelBlock = ({
   counts: Counts;
   unitCost: number;
 }) => (
-  <div className="rounded-lg border p-4 space-y-3">
-    <div className="flex items-center gap-2 font-semibold">
+  <div className="rounded-lg border p-4 space-y-3 bg-background">
+    <div className="flex items-center gap-2 text-sm font-semibold">
       {icon}
       {label}
     </div>
     <div className="grid grid-cols-3 gap-2 text-center">
       <div>
-        <p className="text-2xl font-bold text-green-600">{counts.sent}</p>
-        <p className="text-xs text-muted-foreground">Sent</p>
+        <p className="text-lg font-bold text-success">{counts.sent}</p>
+        <p className="text-[10px] uppercase text-muted-foreground">Sent</p>
       </div>
       <div>
-        <p className="text-2xl font-bold text-destructive">{counts.failed}</p>
-        <p className="text-xs text-muted-foreground">Failed</p>
+        <p className="text-lg font-bold text-destructive">{counts.failed}</p>
+        <p className="text-[10px] uppercase text-muted-foreground">Failed</p>
       </div>
       <div>
-        <p className="text-2xl font-bold text-muted-foreground">{counts.notSent}</p>
-        <p className="text-xs text-muted-foreground">Not sent</p>
+        <p className="text-lg font-bold text-muted-foreground">{counts.notSent}</p>
+        <p className="text-[10px] uppercase text-muted-foreground">Not sent</p>
       </div>
     </div>
     <div className="pt-2 border-t flex items-baseline justify-between">
@@ -56,11 +52,8 @@ const ChannelBlock = ({
 );
 
 const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props) => {
-  const { toast } = useToast();
-  const [rateId, setRateId] = useState<string | null>(null);
   const [smsRate, setSmsRate] = useState("0");
   const [waRate, setWaRate] = useState("0");
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -70,7 +63,6 @@ const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props)
         .limit(1)
         .maybeSingle();
       if (data) {
-        setRateId(data.id);
         setSmsRate(String(data.sms_unit_cost_omr ?? 0));
         setWaRate(String(data.whatsapp_unit_cost_omr ?? 0));
       }
@@ -86,43 +78,11 @@ const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props)
   const totalCost = smsCost + waCost;
   const totalSent = smsCounts.sent + waCounts.sent;
 
-  const handleSaveRates = async () => {
-    setSaving(true);
-    try {
-      const payload = {
-        sms_unit_cost_omr: smsUnit,
-        whatsapp_unit_cost_omr: waUnit,
-      };
-      if (rateId) {
-        const { error } = await supabase.from("messaging_rates").update(payload).eq("id", rateId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("messaging_rates")
-          .insert(payload)
-          .select()
-          .single();
-        if (error) throw error;
-        if (data) setRateId(data.id);
-      }
-      toast({ title: "Rates saved" });
-    } catch (e: any) {
-      toast({ title: "Error saving rates", description: e.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <Card className="p-6 mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold">Receipt Delivery &amp; Cost</h2>
-          <p className="text-sm text-muted-foreground">
-            Based on the selected period, kiosk and category filters. Costs are estimates — the
-            provider invoice is authoritative.
-          </p>
-        </div>
+    <Card className="mt-3 p-4">
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+        <h2 className="font-bold">Receipt Delivery &amp; Cost</h2>
+        <p className="text-xs text-muted-foreground">respects the current filters · estimates only — the provider invoice is authoritative</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -140,82 +100,9 @@ const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props)
         />
       </div>
 
-      <div className="mt-4 rounded-lg border bg-muted/40 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            {totalSent} receipt{totalSent === 1 ? "" : "s"} delivered
-          </span>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Estimated total</p>
-          <p className="text-2xl font-bold">{omr(totalCost)} OMR</p>
-        </div>
-      </div>
-
-      {totalSent > 0 && (
-        <div className="mt-4">
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="bg-primary"
-              style={{ width: `${(smsCounts.sent / totalSent) * 100}%` }}
-            />
-            <div
-              className="bg-green-500"
-              style={{ width: `${(waCounts.sent / totalSent) * 100}%` }}
-            />
-          </div>
-          <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-2 h-2 rounded-full bg-primary" /> SMS {smsCounts.sent}
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500" /> WhatsApp{" "}
-              {waCounts.sent}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-6 pt-4 border-t">
-        <p className="text-sm font-medium mb-3">Unit rates (OMR per delivered message)</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="sms_rate" className="text-xs">
-              SMS
-            </Label>
-            <Input
-              id="sms_rate"
-              type="number"
-              step="0.001"
-              min="0"
-              className="w-32"
-              value={smsRate}
-              onChange={(e) => setSmsRate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="wa_rate" className="text-xs">
-              WhatsApp
-            </Label>
-            <Input
-              id="wa_rate"
-              type="number"
-              step="0.001"
-              min="0"
-              className="w-32"
-              value={waRate}
-              onChange={(e) => setWaRate(e.target.value)}
-            />
-          </div>
-          <Button onClick={handleSaveRates} disabled={saving} variant="outline">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? "Saving..." : "Save rates"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Update these when your SMS gateway or Twilio/Meta WhatsApp pricing changes.
-        </p>
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">
+        <span>{totalSent} receipt{totalSent === 1 ? "" : "s"} delivered · SMS vs WhatsApp mix</span>
+        <span className="text-lg">{omr(totalCost)} OMR</span>
       </div>
     </Card>
   );

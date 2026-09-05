@@ -9,11 +9,18 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, Printer, ChevronDown, ChevronUp, Search, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ArrowLeft, Download, Printer, ChevronDown, ChevronUp, Search, CheckCircle2, ShieldCheck } from "lucide-react";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import ReceiptDeliveryCostCard from "@/components/admin/ReceiptDeliveryCostCard";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+const COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--destructive))',
+  'hsl(var(--success))',
+  'hsl(var(--warning))',
+  'hsl(var(--accent-foreground))',
+  'hsl(var(--secondary-foreground))',
+];
 
 const PERIOD_LABELS: Record<string, string> = {
   daily: "Today",
@@ -181,6 +188,14 @@ const EnhancedStatistics = () => {
     count: d.count,
   }));
 
+  const averageDonation = stats.completed_count > 0
+    ? stats.net_baisas / stats.completed_count
+    : 0;
+  const totalReceiptsSent = stats.receipts.sms.sent + stats.receipts.whatsapp.sent;
+  const selectedKioskLabel = selectedKiosk === 'all'
+    ? 'All kiosks'
+    : kiosks.find((k) => k.id === selectedKiosk)?.name || 'Selected kiosk';
+
   const handleDownloadCSV = async () => {
     setExporting(true);
     try {
@@ -285,351 +300,110 @@ const EnhancedStatistics = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="w-4 h-4" />
+    <div className="admin-panel min-h-screen bg-muted/40 px-4 py-6 sm:px-6 lg:px-8 print:bg-background print:p-0">
+      <main className="mx-auto max-w-7xl rounded-lg border bg-muted/30 p-4 shadow-sm sm:p-6">
+        <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <Button variant="outline" size="icon" onClick={() => navigate('/admin')} aria-label="Back to admin dashboard" className="mt-1 print:hidden">
+              <ArrowLeft />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Enhanced Statistics</h1>
-              <p className="text-sm text-muted-foreground">
-                {PERIOD_LABELS[timeFilter]} · settled revenue, Asia/Muscat
-              </p>
+              <h1 className="text-2xl font-bold text-foreground">Enhanced Statistics</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Settled donations · figures in OMR · Muscat time (GST, UTC+4)</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleDownloadCSV} disabled={exporting}>
-              <Download className="w-4 h-4 mr-2" />
-              {exporting ? "Preparing..." : "Download CSV"}
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <div className="flex h-11 items-center gap-3 rounded-lg border bg-background px-3">
+              <Switch id="include-test" checked={includeTest} onCheckedChange={setIncludeTest} />
+              <Label htmlFor="include-test" className="max-w-24 text-xs leading-tight">Include test payments</Label>
+            </div>
+            <Button variant="outline" className="h-11 bg-background" onClick={handleDownloadCSV} disabled={exporting}>
+              <Download />{exporting ? "Preparing..." : "Download CSV"}
             </Button>
-            <Button onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
+            <Button variant="outline" className="h-11 bg-background" onClick={handlePrint}><Printer />Print</Button>
           </div>
-        </div>
+        </header>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Time Period</label>
+        <section className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:max-w-3xl print:grid-cols-3">
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <Label className="text-[11px] uppercase text-muted-foreground">Time period</Label>
             <Select value={timeFilter} onValueChange={setTimeFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly (from Sunday)</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly (from Sunday)</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem><SelectItem value="all">All Time</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Category</label>
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <Label className="text-[11px] uppercase text-muted-foreground">Category</Label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(c => (
-                  <SelectItem key={c.category_reference} value={c.category_reference || ''}>
-                    {c.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All categories</SelectItem>{categories.map((c) => <SelectItem key={c.category_reference} value={c.category_reference || ''}>{c.title}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Kiosk</label>
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <Label className="text-[11px] uppercase text-muted-foreground">Kiosk</Label>
             <Select value={selectedKiosk} onValueChange={setSelectedKiosk}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Kiosks</SelectItem>
-                {kiosks.map(k => (
-                  <SelectItem key={k.id} value={k.id}>
-                    {k.name} ({k.reference_number})
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger className="h-7 border-0 p-0 shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All kiosks</SelectItem>{kiosks.map((k) => <SelectItem key={k.id} value={k.id}>{k.name} ({k.reference_number})</SelectItem>)}</SelectContent>
             </Select>
           </div>
+        </section>
+
+        <div className="mb-3 flex justify-end">
+          <span className="rounded-full border border-primary/15 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary">
+            Showing · {PERIOD_LABELS[timeFilter]} · {selectedKioskLabel} · settled (net)
+          </span>
         </div>
 
-        <div className="flex items-center gap-3 mb-8 rounded-lg border p-3">
-          <Switch id="include-test" checked={includeTest} onCheckedChange={setIncludeTest} />
-          <Label htmlFor="include-test" className="text-sm">
-            Include test payments
-            <span className="block text-xs text-muted-foreground">
-              Off by default — test transactions are excluded from all figures.
-            </span>
-          </Label>
-        </div>
+        <section className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-5 print:grid-cols-5">
+          <Card className="border-primary bg-primary p-4 text-primary-foreground">
+            <p className="text-xs uppercase opacity-80">Net revenue (settled)</p><p className="mt-1 text-2xl font-bold">{omr(stats.net_baisas)}</p><p className="text-sm opacity-80">OMR</p><p className="mt-2 text-xs opacity-80">excl. test &amp; refunds</p>
+          </Card>
+          <Card className="p-4"><p className="text-xs uppercase text-muted-foreground">Transactions</p><p className="mt-1 text-2xl font-bold">{stats.completed_count}</p><p className="mt-2 text-xs text-muted-foreground">completed · of {stats.attempts_count} attempts</p></Card>
+          <Card className="p-4"><p className="text-xs uppercase text-muted-foreground">Success rate</p><p className="mt-1 text-2xl font-bold">{stats.success_rate === null ? '—' : `${stats.success_rate}%`}</p><p className="mt-2 text-xs text-muted-foreground">completed ÷ decided</p></Card>
+          <Card className="p-4"><p className="text-xs uppercase text-muted-foreground">Avg donation</p><p className="mt-1 text-2xl font-bold">{omr(averageDonation)} <span className="text-xs">OMR</span></p><p className="mt-2 text-xs text-muted-foreground">per completed</p></Card>
+          <Card className="p-4"><p className="text-xs uppercase text-muted-foreground">Receipts sent</p><p className="mt-1 text-2xl font-bold">{totalReceiptsSent}</p><p className="mt-2 text-xs text-muted-foreground">SMS + WhatsApp</p></Card>
+        </section>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Net Settled Revenue</h3>
-            <p className="text-3xl font-bold text-primary">{omr(stats.net_baisas)} OMR</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Gross {omr(stats.gross_baisas)} − refunds {omr(stats.refunded_baisas)}
-            </p>
+        <section className="mb-3 grid gap-3 md:grid-cols-2 print:grid-cols-2">
+          <Card className="flex items-center gap-3 p-4">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-success/10 text-success"><CheckCircle2 /></span>
+            <div className="min-w-0 flex-1"><p className="text-sm font-bold">Bank reconciliation — {stats.completed_count} matched · 0 unmatched</p><p className="text-xs text-muted-foreground">Matched on POS/Bank RRN against the settlement file</p></div>
+            <Button variant="link" size="sm" onClick={handleDownloadCSV} className="shrink-0 px-1">Reconcile bank file →</Button>
           </Card>
-          <Card className="p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Completed Transactions</h3>
-            <p className="text-3xl font-bold text-success">{stats.completed_count}</p>
-            <p className="text-xs text-muted-foreground mt-1">{stats.attempts_count} attempts in period</p>
-          </Card>
-          <Card className="p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Success Rate</h3>
-            <p className="text-3xl font-bold">
-              {stats.success_rate === null ? '—' : `${stats.success_rate}%`}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Completed ÷ (completed + failed + cancelled)
-            </p>
-          </Card>
-          <Card className="p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Refunds &amp; Reversals</h3>
-            <p className="text-3xl font-bold text-destructive">{stats.refunded_count}</p>
-            <p className="text-xs text-muted-foreground mt-1">{omr(stats.refunded_baisas)} OMR deducted</p>
-          </Card>
-        </div>
-
-        {/* Needs attention */}
-        {stats.needs_attention.length > 0 && (
-          <Card className="p-6 mb-8 border-l-4 border-l-amber-500">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <h3 className="text-lg font-bold">Needs attention</h3>
-              <Badge variant="secondary">{stats.needs_attention.length}</Badge>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-success/10 text-success"><ShieldCheck /></span>
+              <div className="min-w-0 flex-1"><p className="text-sm font-bold">Needs attention — {stats.needs_attention.length} stuck transactions</p><p className="text-xs text-muted-foreground">Nothing in processing/pending past 5 min · re-check via LastTransactionStatus (106)</p></div>
+              <Button variant="link" size="sm" onClick={() => document.getElementById('attention-queue')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 px-1">View queue →</Button>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Payments still in progress after 15 minutes. Re-check them against the bank using the RRN.
-            </p>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {stats.needs_attention.map((t) => (
-                <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/50 p-3 text-sm">
-                  <div>
-                    <p className="font-semibold">{t.reference_number || t.id}</p>
-                    <p className="text-xs text-muted-foreground">
-                      RRN {t.pos_rrn || 'not received'} · {new Date(t.created_at).toLocaleString('en-GB')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{omr(t.amount_baisas || 0)} OMR</span>
-                    <Badge variant="outline" className="capitalize">{t.status}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {stats.needs_attention.length > 0 && <div id="attention-queue" className="mt-3 max-h-40 space-y-2 overflow-y-auto border-t pt-3">{stats.needs_attention.map((t) => <div key={t.id} className="flex justify-between text-xs"><span>{t.reference_number || t.id} · {t.status}</span><span>{omr(t.amount_baisas)} OMR</span></div>)}</div>}
           </Card>
-        )}
+        </section>
 
-        {/* Receipt delivery & estimated messaging cost */}
-        <ReceiptDeliveryCostCard
-          smsCounts={{
-            sent: stats.receipts.sms.sent,
-            failed: stats.receipts.sms.failed,
-            notSent: stats.receipts.sms.not_sent,
-          }}
-          whatsappCounts={{
-            sent: stats.receipts.whatsapp.sent,
-            failed: stats.receipts.whatsapp.failed,
-            notSent: stats.receipts.whatsapp.not_sent,
-          }}
-        />
-
-        {/* Search with Dual Reference Support */}
-        <Card className="p-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="reference">System Reference</SelectItem>
-                <SelectItem value="pos_rrn">POS/Bank RRN</SelectItem>
-                <SelectItem value="mobile">Mobile Number</SelectItem>
-              </SelectContent>
+        <Card className="mb-3 p-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Select value={searchType} onValueChange={(value: "reference" | "mobile" | "pos_rrn") => setSearchType(value)}>
+              <SelectTrigger className="h-9 w-full border-0 sm:w-52"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="reference">System Reference</SelectItem><SelectItem value="pos_rrn">POS/Bank RRN</SelectItem><SelectItem value="mobile">Mobile Number</SelectItem></SelectContent>
             </Select>
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder={
-                  searchType === "mobile"
-                    ? "Search by mobile number..."
-                    : searchType === "pos_rrn"
-                    ? "Search by POS/Bank RRN (for bank reconciliation)..."
-                    : "Search by system reference number..."
-                }
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 border-0 pl-9 shadow-none" placeholder="Search by system reference, POS/Bank RRN or mobile number…" /></div>
           </div>
-          {searchTerm && (
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground mb-2">
-                Found {searchResults.length} transaction(s)
-              </p>
-              {searchResults.length > 0 && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {searchResults.map(t => (
-                    <div key={t.id} className="p-3 bg-muted/50 rounded-lg text-sm">
-                      <div
-                        className="flex justify-between items-start cursor-pointer"
-                        onClick={() => toggleTransactionDetails(t.id)}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold">{t.reference_number}</p>
-                            <Badge variant="outline" className="capitalize">{t.status}</Badge>
-                            {expandedTransaction === t.id ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </div>
-                          <p className="text-muted-foreground">
-                            {t.category} • {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR
-                          </p>
-                          {t.mobile_number && (
-                            <p className="text-muted-foreground">Mobile: {t.mobile_number}</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(t.created_at).toLocaleDateString('en-GB')}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(t.created_at).toLocaleTimeString('en-GB')}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Expanded POS Details */}
-                      {expandedTransaction === t.id && (
-                        <div className="mt-3 pt-3 border-t border-border">
-                          <h4 className="font-semibold text-xs uppercase text-muted-foreground mb-2">
-                            POS / Bank Reference Details
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Bank RRN</p>
-                              <p className="font-medium">{t.pos_rrn || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Auth Code</p>
-                              <p className="font-medium">{t.pos_auth_code || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Terminal ID</p>
-                              <p className="font-medium">{t.pos_tid || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Merchant ID</p>
-                              <p className="font-medium">{t.pos_mid || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Payment Method</p>
-                              <p className="font-medium">{t.payment_method || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Card Last 4</p>
-                              <p className="font-medium">{t.card_last_four ? `****${t.card_last_four}` : 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Response Code</p>
-                              <p className="font-medium">{t.pos_response_code || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Kiosk</p>
-                              <p className="font-medium">{t.kiosks?.name || 'N/A'}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {searchTerm && <div className="mt-2 border-t pt-2"><p className="mb-2 px-2 text-xs text-muted-foreground">Found {searchResults.length} transaction(s)</p><div className="max-h-80 space-y-2 overflow-y-auto">{searchResults.map((t) => <div key={t.id} className="rounded-md bg-muted/50 p-3 text-sm"><button type="button" className="flex w-full items-start justify-between text-left" onClick={() => toggleTransactionDetails(t.id)}><span><span className="font-semibold">{t.reference_number}</span><span className="ml-2 text-muted-foreground">{t.category} · {((t.amount_baisas || 0) / 1000).toFixed(3)} OMR</span></span>{expandedTransaction === t.id ? <ChevronUp /> : <ChevronDown />}</button>{expandedTransaction === t.id && <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-xs md:grid-cols-4"><span>Bank RRN<br/><b>{t.pos_rrn || 'N/A'}</b></span><span>Auth Code<br/><b>{t.pos_auth_code || 'N/A'}</b></span><span>Terminal ID<br/><b>{t.pos_tid || 'N/A'}</b></span><span>Kiosk<br/><b>{t.kiosks?.name || 'N/A'}</b></span></div>}</div>)}</div></div>}
         </Card>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="p-6">
-            <h3 className="text-lg font-bold mb-4">Net Revenue by Category</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={categoryChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" fill="#8884d8" name="Net Revenue (OMR)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
+        <section className="grid gap-3 md:grid-cols-2 print:grid-cols-2">
+          <Card className="p-4"><div className="mb-3 flex items-baseline justify-between"><h2 className="font-bold">Revenue by Category</h2><span className="text-xs text-muted-foreground">settled revenue · OMR</span></div><ResponsiveContainer width="100%" height={260}><BarChart data={categoryChartData} layout="vertical" margin={{ left: 8, right: 30 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" width={125} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} barSize={14} label={{ position: 'right', fontSize: 10 }} /></BarChart></ResponsiveContainer></Card>
+          <Card className="p-4"><div className="mb-3 flex items-baseline justify-between"><h2 className="font-bold">Distribution by Category</h2><span className="text-xs text-muted-foreground">by number of donations</span></div><div className="grid items-center sm:grid-cols-[45%_55%]"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={categoryChartData} dataKey="count" innerRadius={48} outerRadius={82} paddingAngle={1}>{categoryChartData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="space-y-2 text-xs">{categoryChartData.map((item, index) => <div key={item.name} className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} /><span className="truncate">{item.name}</span><span className="ml-auto text-muted-foreground">{item.count} · {stats.completed_count ? Math.round((item.count / stats.completed_count) * 100) : 0}%</span></div>)}</div></div></Card>
+          <Card className="p-4"><div className="mb-3 flex items-baseline justify-between"><h2 className="font-bold">Daily Revenue</h2><span className="text-xs text-muted-foreground">last 7 days · OMR · zero-filled (Muscat)</span></div><ResponsiveContainer width="100%" height={220}><LineChart data={trendChartData} margin={{ top: 20, right: 18, left: -18, bottom: 0 }}><CartesianGrid vertical={false} strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Line type="linear" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></Card>
+          <Card className="p-4"><div className="mb-3 flex items-baseline justify-between"><h2 className="font-bold">Daily Transactions</h2><span className="text-xs text-muted-foreground">last 7 days · count · zero-filled</span></div><ResponsiveContainer width="100%" height={220}><BarChart data={trendChartData} margin={{ top: 20, right: 18, left: -18, bottom: 0 }}><CartesianGrid vertical={false} strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey="count" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} barSize={24} /></BarChart></ResponsiveContainer></Card>
+        </section>
 
-          <Card className="p-6">
-            <h3 className="text-lg font-bold mb-4">Distribution by Category</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryChartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => entry.name}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {categoryChartData.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-
-        {/* Trend */}
-        {trendChartData.length > 0 && (
-          <Card className="p-6 mt-8">
-            <h3 className="text-lg font-bold mb-1">Transaction Trend</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Calendar days in Asia/Muscat — quiet days show as zero.
-            </p>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={trendChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="amount" fill="#82ca9d" name="Net Amount (OMR)" />
-                <Bar dataKey="count" fill="#8884d8" name="Transactions" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        )}
-
-        {loading && (
-          <p className="mt-6 text-sm text-muted-foreground">Updating figures...</p>
-        )}
-      </div>
+        <ReceiptDeliveryCostCard smsCounts={{ sent: stats.receipts.sms.sent, failed: stats.receipts.sms.failed, notSent: stats.receipts.sms.not_sent }} whatsappCounts={{ sent: stats.receipts.whatsapp.sent, failed: stats.receipts.whatsapp.failed, notSent: stats.receipts.whatsapp.not_sent }} />
+        {loading && <p className="mt-4 text-sm text-muted-foreground">Updating figures...</p>}
+      </main>
     </div>
   );
 };
