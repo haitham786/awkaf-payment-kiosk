@@ -204,6 +204,25 @@
     --success: var(--kiosk-ready);
   }
 
+  /* Admin finance surfaces share the supplied transactions/statistics visual system. */
+  .transactions-finance {
+    --background: 0 0% 100%;
+    --foreground: 216 50% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 50% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 50% 12%;
+    --muted: 220 30% 97%;
+    --muted-foreground: 213 12% 47%;
+    --border: 216 38% 90%;
+    --input: 216 38% 90%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --success: 145 67% 37%;
+    --destructive: 354 70% 54%;
+    --warning: 41 100% 39%;
+  }
+
   /* RTL support for Arabic content */
   .rtl {
     direction: rtl;
