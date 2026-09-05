@@ -200,7 +200,10 @@ const NboPosPaymentPage = () => {
       void NboEcr.cancel().catch(() => undefined);
       setErrorMessage(err instanceof Error ? err.message : "Could not reach the payment terminal.");
       setStage("error");
+    } finally {
+      setPosTransactionActive(false);
     }
+
 
   }, [amount, category, categoryReference, kioskId, navigate, recordTransaction, transactionId]);
 
