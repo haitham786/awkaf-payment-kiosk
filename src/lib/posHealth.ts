@@ -35,8 +35,50 @@ export const ERR_LOW_BATTERY = "E011";
 /** Server-side offline rule (spec §7): older than 3 minutes = offline. */
 export const STALE_AFTER_MS = 3 * 60 * 1000;
 
+/** Silent heartbeat cadence — USB transport only, no serial traffic, no beeps. */
 export const HEALTH_POLL_MS = 20_000;
 export const HEALTH_KEEPALIVE_MS = 60_000;
+/** Deep status (GetStatus 114) is rare — it makes the terminal beep. */
+export const DEEP_STATUS_INTERVAL_MS = 20 * 60 * 1000;
+
+/**
+ * Transaction lock — while a purchase is in flight nothing else may touch the
+ * serial line (not even the silent heartbeat's USB probe).
+ */
+let transactionActive = false;
+export function setPosTransactionActive(active: boolean) {
+  transactionActive = active;
+}
+export function isPosTransactionActive(): boolean {
+  return transactionActive;
+}
+
+/**
+ * Opportunistic condition learned from real transaction responses
+ * (E006 = no paper, E011 = low battery), so a dedicated poll is rarely needed.
+ */
+export interface PosCondition {
+  paperOk: boolean | null;
+  batteryOk: boolean | null;
+  errorCode: string | null;
+  at: number;
+}
+let lastCondition: PosCondition | null = null;
+export function recordTransactionCondition(errorCode: string | null | undefined, approved?: boolean) {
+  const code = errorCode ? errorCode.toUpperCase().trim() : null;
+  if (code === ERR_NO_PAPER) {
+    lastCondition = { paperOk: false, batteryOk: lastCondition?.batteryOk ?? null, errorCode: code, at: Date.now() };
+  } else if (code === ERR_LOW_BATTERY) {
+    lastCondition = { paperOk: lastCondition?.paperOk ?? null, batteryOk: false, errorCode: code, at: Date.now() };
+  } else if (approved) {
+    // A clean approved sale printed a receipt: paper and power are fine.
+    lastCondition = { paperOk: true, batteryOk: true, errorCode: null, at: Date.now() };
+  }
+}
+export function getTransactionCondition(): PosCondition | null {
+  return lastCondition;
+}
+
 
 /** Housekeeping codes are NEVER payment declines (missing-features doc §4). */
 export const HOUSEKEEPING_CODES = new Set([ERR_NO_PAPER, ERR_LOW_BATTERY]);
