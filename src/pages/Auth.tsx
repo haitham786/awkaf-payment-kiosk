@@ -238,7 +238,10 @@ const Auth = () => {
             alt="Awqaf Al Lawatia"
             className="h-20 w-auto mx-auto mb-4 object-contain"
           />
-          <h1 className="text-3xl font-bold text-primary mb-2">
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: '#009186' }}
+          >
             Admin Portal
           </h1>
           <p className="text-muted-foreground">
@@ -291,7 +294,8 @@ const Auth = () => {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full text-white hover:opacity-90"
+                style={{ backgroundColor: '#009186' }}
                 disabled={loading}
               >
                 {loading ? "Signing in..." : "Sign In"}
