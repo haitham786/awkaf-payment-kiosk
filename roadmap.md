@@ -31,3 +31,6 @@
 - [x] Match the SMS keypad to the manual amount keypad
 - [x] Compact and reword the successful-payment receipt prompt
 - [x] Validate the four kiosk views at kiosk dimensions
+
+- [x] Match Enhanced Statistics layout and arrangement to the supplied redesign
+- [ ] Validate the redesigned reporting page in the live preview
