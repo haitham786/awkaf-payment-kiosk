@@ -80,8 +80,6 @@ const ReceiptDeliveryCostCard = ({ smsCounts, whatsappCounts: waCounts }: Props)
   const smsUnit = Number(smsRate) || 0;
   const waUnit = Number(waRate) || 0;
 
-  const smsCounts = useMemo(() => tally(transactions, "sms_status"), [transactions]);
-  const waCounts = useMemo(() => tally(transactions, "whatsapp_status"), [transactions]);
 
   const smsCost = smsCounts.sent * smsUnit;
   const waCost = waCounts.sent * waUnit;
