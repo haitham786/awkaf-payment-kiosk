@@ -34,6 +34,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { NetworkStatus } from "./components/shared/NetworkStatus";
 import { startBackgroundSync } from "./services/offlineQueueService";
+import { PosHealthDaemon } from "./components/kiosk/PosHealthDaemon";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ const AppContent = () => {
       <Sonner />
       <NetworkStatus />
       <BrowserRouter>
+          <PosHealthDaemon />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
